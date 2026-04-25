@@ -1,0 +1,9 @@
+{
+  "commands": [
+    { "name": "build",  "group": "make",   "dir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } },
+    { "name": "test",   "group": "make",   "dir": "{project}", "cmd": "echo testing {project}" },
+    { "name": "clean",  "group": "make",   "dir": "{project}", "cmd": "echo cleaning {project}" },
+    { "name": "deploy", "group": "deploy", "dir": "",          "cmd": "echo deploying {env}" },
+    { "name": "restart","group": "deploy", "dir": "",          "cmd": "echo restarting {env}" }
+  ]
+}

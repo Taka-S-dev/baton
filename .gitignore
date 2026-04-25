@@ -1,0 +1,29 @@
+# Ignore everything by default
+*
+
+# Allow directories to be traversed
+!*/
+
+# Re-ignore directories that should never be committed
+projects/
+
+# Source and project files
+!*.go
+!go.mod
+!go.sum
+!*.md
+!LICENSE
+!.gitignore
+
+# Sample project files
+!projects.example/**/*.json
+!projects.example/**/*.tsv
+
+# Exclude user-generated data inside projects.example
+projects.example/**/.last_workflow
+projects.example/**/workflows.json
+projects.example/**/aliases.json
+
+# Exclude binaries
+*.exe
+*.out
