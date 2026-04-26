@@ -1,4 +1,4 @@
-name	group	dir	cmd	shell	vars
+name	group	workdir	cmd	shell	vars
 build	make	{projDir}	echo building {projCmd}		projDir=project,projCmd=project
 test	make	{project}	echo testing {project}
 clean	make	{project}	echo cleaning {project}

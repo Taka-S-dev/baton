@@ -244,7 +244,7 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 			if r.itemNotes[r.currentIdx] == "" {
 				note := "$ " + resolved.Cmd
 				if resolved.Dir != "" {
-					note += "  (dir: " + resolved.Dir + ")"
+					note += "  (workdir: " + resolved.Dir + ")"
 				}
 				r.itemNotes[r.currentIdx] = note
 			}
@@ -403,7 +403,7 @@ func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 			partial := slot.Apply(*item.cmd, r.currentValues)
 			note := "$ " + partial.Cmd
 			if partial.Dir != "" {
-				note += "  (dir: " + partial.Dir + ")"
+				note += "  (workdir: " + partial.Dir + ")"
 			}
 			r.itemNotes[r.currentIdx] = note
 		}

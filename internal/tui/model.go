@@ -395,7 +395,7 @@ func (m *Model) updateStepsViewport() {
 				if len(shortDir) > maxDirLen {
 					shortDir = shortDir[:maxDirLen-3] + "..."
 				}
-				lines = append(lines, indent+gray("dir: "+shortDir))
+				lines = append(lines, indent+gray("workdir: "+shortDir))
 			}
 		} else {
 			lines = append(lines, prefix)

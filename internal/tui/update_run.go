@@ -93,6 +93,9 @@ func (m Model) runNext() tea.Cmd {
 		return m.runNext()
 	}
 	stepHeader := fmt.Sprintf("\n── [%d/%d] %s", r.current+1, len(r.items), item.Name)
+	if item.Cmd.Dir != "" {
+		stepHeader += fmt.Sprintf("   workdir: %s", item.Cmd.Dir)
+	}
 	bar := progressBar(r.current, len(r.items), 24)
 	prefix := ""
 	if r.current == r.startIdx {

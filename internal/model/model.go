@@ -4,7 +4,7 @@ package model
 type Command struct {
 	Name  string            `json:"name"`
 	Group string            `json:"group,omitempty"`
-	Dir   string            `json:"dir,omitempty"`
+	Dir   string            `json:"workdir,omitempty"`
 	Cmd   string            `json:"cmd"`
 	Shell string            `json:"shell,omitempty"`
 	Vars  map[string]string `json:"vars,omitempty"`

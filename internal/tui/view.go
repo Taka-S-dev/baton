@@ -401,7 +401,7 @@ func (m Model) viewMultiSelect(w int) string {
 			}
 			b.WriteString("  " + gray("$ "+cmdStr) + "\n")
 			if hovered.cmd.Dir != "" {
-				b.WriteString("  " + dim("dir: "+hovered.cmd.Dir) + "\n")
+				b.WriteString("  " + dim("workdir: "+hovered.cmd.Dir) + "\n")
 			}
 		}
 	} else {
@@ -495,7 +495,7 @@ func (m Model) viewSlotPick(w int) string {
 			}
 			if showDir {
 				highlighted := slot.HighlightSlot(sp.currentCmd.Dir, sp.slotName, sp.resolvedSoFar)
-				b.WriteString("    " + gray("dir:") + " " + highlighted + "\n")
+				b.WriteString("    " + gray("workdir:") + " " + highlighted + "\n")
 				partialDir := sp.currentCmd.Dir
 				for k, v := range sp.resolvedSoFar {
 					partialDir = strings.ReplaceAll(partialDir, "{"+k+"}", v)
@@ -609,7 +609,7 @@ func (m Model) viewConfirmRun(w int) string {
 			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
 			b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
 			if item.Cmd.Dir != "" {
-				b.WriteString("         " + dim("dir: "+item.Cmd.Dir) + "\n")
+				b.WriteString("         " + dim("workdir: "+item.Cmd.Dir) + "\n")
 			}
 		}
 	}
@@ -681,7 +681,7 @@ func (m Model) viewConfirmVars(w int) string {
 		b.WriteString("  " + gray(fmt.Sprintf("  %d. %s", i+1, cmd.Name)) + "\n")
 		b.WriteString("       " + gray("$ "+resolved.Cmd) + "\n")
 		if resolved.Dir != "" {
-			b.WriteString("         " + dim("dir: "+resolved.Dir) + "\n")
+			b.WriteString("         " + dim("workdir: "+resolved.Dir) + "\n")
 		}
 	}
 

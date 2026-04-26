@@ -124,9 +124,9 @@ If multiple projects exist, baton shows a selection screen on startup. Use **Swi
 ```json
 {
   "commands": [
-    { "name": "build",  "group": "make",   "dir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } },
-    { "name": "test",   "group": "make",   "dir": "{project}", "cmd": "echo testing {project}" },
-    { "name": "deploy", "group": "deploy", "dir": "",          "cmd": "echo deploying {env}" }
+    { "name": "build",  "group": "make",   "workdir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } },
+    { "name": "test",   "group": "make",   "workdir": "{project}", "cmd": "echo testing {project}" },
+    { "name": "deploy", "group": "deploy", "workdir": "",          "cmd": "echo deploying {env}" }
   ]
 }
 ```
@@ -136,7 +136,7 @@ If multiple projects exist, baton shows a selection screen on startup. Use **Swi
 Tab-separated alternative to `config.json`. If both files exist, `config.json` takes priority.
 
 ```
-name	group	dir	cmd	shell	vars
+name	group	workdir	cmd	shell	vars
 build	make	{projDir}	echo building {projCmd}		projDir=project,projCmd=project
 test	make	{project}	echo testing {project}
 deploy	deploy		echo deploying {env}
@@ -148,14 +148,14 @@ deploy	deploy		echo deploying {env}
 |---------|----------|-------------|
 | `name`  | Yes      | Command name |
 | `group` | No       | Group label for filtering |
-| `dir`   | No       | Working directory (leave empty to use current). Supports `{placeholders}` |
+| `workdir`   | No       | Working directory (leave empty to use current). Supports `{placeholders}` |
 | `cmd`   | Yes      | Command to execute. Supports `{placeholders}` |
 | `shell` | No       | `"ps"` for PowerShell (`powershell` on Windows, `pwsh` on Linux/macOS), omit to use the platform default (`cmd /C` on Windows, `sh -c` elsewhere) |
 | `vars`  | No       | Maps slot names to list names (see Placeholders) |
 
 ## Placeholders and Selection Lists
 
-Use `{name}` placeholders in `cmd` or `dir` to prompt for a value at runtime.
+Use `{name}` placeholders in `cmd` or `workdir` to prompt for a value at runtime.
 
 ### Selection lists
 
@@ -167,14 +167,14 @@ Create lists via **Manage lists** from the main menu. Each list is stored as a `
 /home/user/worker worker
 ```
 
-By default, `{name}` selects from the list named `name`. The same placeholder in `cmd` and `dir` is prompted once and applied to both.
+By default, `{name}` selects from the list named `name`. The same placeholder in `cmd` and `workdir` is prompted once and applied to both.
 
 ### vars — mapping slot names to lists
 
 Use `vars` to map different slot names to the same list:
 
 ```json
-{ "dir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } }
+{ "workdir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } }
 ```
 
 Both `{projDir}` and `{projCmd}` will select from the `project` list, each prompted separately.
@@ -254,13 +254,13 @@ On each subsequent retry, the header shows `(retry #N)` so you can tell a retry 
 
 ## Working Directory
 
-The `dir` field sets the working directory for a command. It accepts any absolute path or a `{placeholder}`:
+The `workdir` field sets the working directory for a command. It accepts any absolute path or a `{placeholder}`:
 
 ```json
-{ "name": "build", "dir": "{project}", "cmd": "make build" }
+{ "name": "build", "workdir": "{project}", "cmd": "make build" }
 ```
 
-Leave `dir` empty to inherit the current working directory when baton is launched.
+Leave `workdir` empty to inherit the current working directory when baton is launched.
 
 ## License
 
