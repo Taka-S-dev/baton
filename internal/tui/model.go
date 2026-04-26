@@ -299,8 +299,16 @@ func (m *Model) loadProject(projectDir string) error {
 		m.configFile = "config.tsv"
 	}
 	m.config = cfg
-	m.workflows = store.LoadWorkflows(projectDir)
-	m.aliases = store.LoadAliases(projectDir)
+	workflows, err := store.LoadWorkflows(projectDir)
+	if err != nil {
+		return err
+	}
+	m.workflows = workflows
+	aliases, err := store.LoadAliases(projectDir)
+	if err != nil {
+		return err
+	}
+	m.aliases = aliases
 	m.lists = slot.LoadLists(filepath.Join(projectDir, "lists"))
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
 	return nil

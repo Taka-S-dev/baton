@@ -34,6 +34,9 @@ func Exec(idx int, cmd model.Command, dryRun bool) tea.Cmd {
 	})
 }
 
+// BuildExecForTest exposes buildExec for use in tests.
+func BuildExecForTest(cmd model.Command) *exec.Cmd { return buildExec(cmd) }
+
 func buildExec(cmd model.Command) *exec.Cmd {
 	var c *exec.Cmd
 	switch {

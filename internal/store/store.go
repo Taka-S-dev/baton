@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,12 +10,19 @@ import (
 	"github.com/Taka-S-dev/baton/internal/model"
 )
 
-func LoadWorkflows(projectDir string) []model.Workflow {
+func LoadWorkflows(projectDir string) ([]model.Workflow, error) {
 	var result []model.Workflow
-	if data, err := os.ReadFile(filepath.Join(projectDir, "workflows.json")); err == nil {
-		_ = json.Unmarshal(data, &result)
+	data, err := os.ReadFile(filepath.Join(projectDir, "workflows.json"))
+	if os.IsNotExist(err) {
+		return result, nil
 	}
-	return result
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("workflows.json: %w", err)
+	}
+	return result, nil
 }
 
 func SaveWorkflows(projectDir string, workflows []model.Workflow) error {
@@ -25,12 +33,19 @@ func SaveWorkflows(projectDir string, workflows []model.Workflow) error {
 	return os.WriteFile(filepath.Join(projectDir, "workflows.json"), data, 0644)
 }
 
-func LoadAliases(projectDir string) []model.Alias {
+func LoadAliases(projectDir string) ([]model.Alias, error) {
 	var result []model.Alias
-	if data, err := os.ReadFile(filepath.Join(projectDir, "aliases.json")); err == nil {
-		_ = json.Unmarshal(data, &result)
+	data, err := os.ReadFile(filepath.Join(projectDir, "aliases.json"))
+	if os.IsNotExist(err) {
+		return result, nil
 	}
-	return result
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("aliases.json: %w", err)
+	}
+	return result, nil
 }
 
 func SaveAliases(projectDir string, aliases []model.Alias) error {
