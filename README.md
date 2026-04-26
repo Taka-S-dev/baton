@@ -1,5 +1,8 @@
 # baton
 
+[![CI](https://github.com/Taka-S-dev/baton/actions/workflows/ci.yml/badge.svg)](https://github.com/Taka-S-dev/baton/actions/workflows/ci.yml)
+[![Release](https://github.com/Taka-S-dev/baton/actions/workflows/release.yml/badge.svg)](https://github.com/Taka-S-dev/baton/actions/workflows/release.yml)
+
 ```
   _           _
  | |__   __ _| |_ ___  _ __
@@ -68,7 +71,7 @@ Download the latest binary for your platform from the [Releases](../../releases)
 go build -o baton .
 ```
 
-Requires Go 1.21+.
+Requires Go 1.24+.
 
 ## Quick start
 
