@@ -9,7 +9,7 @@ import (
 
 var (
 	sCyan     = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
-	sGray     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	sGray     = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 	sWhite    = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
 	sGreen    = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
 	sYellow   = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))
