@@ -400,9 +400,11 @@ func (m Model) viewMultiSelect(w int) string {
 				cmdStr = cmdStr[:maxLen-3] + "..."
 			}
 			b.WriteString("  " + gray("$ "+cmdStr) + "\n")
-			if hovered.cmd.Dir != "" {
-				b.WriteString("  " + dim("workdir: "+hovered.cmd.Dir) + "\n")
+			workdir := hovered.cmd.Dir
+			if workdir == "" {
+				workdir = "."
 			}
+			b.WriteString("  " + dim("workdir: "+workdir) + "\n")
 		}
 	} else {
 		b.WriteString(hline(w) + "\n")
@@ -465,9 +467,6 @@ func (m Model) viewSlotPick(w int) string {
 
 		// Command preview — separated from the list
 		if sp.currentCmd != nil {
-			showCmd := slot.Pattern.MatchString(sp.currentCmd.Cmd) ||
-				(!slot.Pattern.MatchString(sp.currentCmd.Cmd) && !slot.Pattern.MatchString(sp.currentCmd.Dir))
-			showDir := slot.Pattern.MatchString(sp.currentCmd.Dir)
 			b.WriteString("\n" + hlineLabel(w, "command preview") + "\n\n")
 			// Compute hovered value for inline display
 			hoveredValPreview := ""
@@ -482,26 +481,28 @@ func (m Model) viewSlotPick(w int) string {
 				pointerSuffix = "  " + slotVar("{"+sp.slotName+"}") + gray(" = ") + white(hoveredValPreview)
 			}
 
-			if showCmd {
-				highlighted := slot.HighlightSlot(sp.currentCmd.Cmd, sp.slotName, sp.resolvedSoFar)
-				b.WriteString("    " + gray("$") + " " + highlighted + "\n")
-				partialCmd := sp.currentCmd.Cmd
-				for k, v := range sp.resolvedSoFar {
-					partialCmd = strings.ReplaceAll(partialCmd, "{"+k+"}", v)
-				}
-				if idx := strings.Index(partialCmd, "{"+sp.slotName+"}"); idx >= 0 {
-					b.WriteString(strings.Repeat(" ", 6+idx) + cyan("^") + pointerSuffix + "\n")
-				}
+			highlighted := slot.HighlightSlot(sp.currentCmd.Cmd, sp.slotName, sp.resolvedSoFar)
+			b.WriteString("    " + gray("$") + " " + highlighted + "\n")
+			partialCmd := sp.currentCmd.Cmd
+			for k, v := range sp.resolvedSoFar {
+				partialCmd = strings.ReplaceAll(partialCmd, "{"+k+"}", v)
 			}
-			if showDir {
-				highlighted := slot.HighlightSlot(sp.currentCmd.Dir, sp.slotName, sp.resolvedSoFar)
+			if idx := strings.Index(partialCmd, "{"+sp.slotName+"}"); idx >= 0 {
+				b.WriteString(strings.Repeat(" ", 6+idx) + cyan("^") + pointerSuffix + "\n")
+			}
+
+			dir := sp.currentCmd.Dir
+			if dir == "" {
+				b.WriteString("    " + gray("workdir:") + " " + dim(".") + "\n")
+			} else {
+				highlighted := slot.HighlightSlot(dir, sp.slotName, sp.resolvedSoFar)
 				b.WriteString("    " + gray("workdir:") + " " + highlighted + "\n")
-				partialDir := sp.currentCmd.Dir
+				partialDir := dir
 				for k, v := range sp.resolvedSoFar {
 					partialDir = strings.ReplaceAll(partialDir, "{"+k+"}", v)
 				}
 				if idx := strings.Index(partialDir, "{"+sp.slotName+"}"); idx >= 0 {
-					b.WriteString(strings.Repeat(" ", 9+idx) + cyan("^") + pointerSuffix + "\n")
+					b.WriteString(strings.Repeat(" ", 13+idx) + cyan("^") + pointerSuffix + "\n")
 				}
 			}
 		}
@@ -608,9 +609,11 @@ func (m Model) viewConfirmRun(w int) string {
 		} else {
 			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
 			b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
-			if item.Cmd.Dir != "" {
-				b.WriteString("         " + dim("workdir: "+item.Cmd.Dir) + "\n")
+			workdir := item.Cmd.Dir
+			if workdir == "" {
+				workdir = "."
 			}
+			b.WriteString("         " + dim("workdir: "+workdir) + "\n")
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n\n")
@@ -680,9 +683,11 @@ func (m Model) viewConfirmVars(w int) string {
 		resolved := slot.Apply(cmd, vars)
 		b.WriteString("  " + gray(fmt.Sprintf("  %d. %s", i+1, cmd.Name)) + "\n")
 		b.WriteString("       " + gray("$ "+resolved.Cmd) + "\n")
-		if resolved.Dir != "" {
-			b.WriteString("         " + dim("workdir: "+resolved.Dir) + "\n")
+		workdir := resolved.Dir
+		if workdir == "" {
+			workdir = "."
 		}
+		b.WriteString("         " + dim("workdir: "+workdir) + "\n")
 	}
 
 	b.WriteString("\n" + hline(w) + "\n\n")

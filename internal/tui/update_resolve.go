@@ -242,10 +242,11 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 		if r.currentSlotIdx >= len(r.currentSlots) {
 			resolved := slot.Apply(*item.cmd, r.currentValues)
 			if r.itemNotes[r.currentIdx] == "" {
-				note := "$ " + resolved.Cmd
-				if resolved.Dir != "" {
-					note += "  (workdir: " + resolved.Dir + ")"
+				dir := resolved.Dir
+				if dir == "" {
+					dir = "."
 				}
+				note := "$ " + resolved.Cmd + "  (workdir: " + dir + ")"
 				r.itemNotes[r.currentIdx] = note
 			}
 			if r.purpose != purposeRunManually {
@@ -401,10 +402,11 @@ func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 		item := r.rawItems[r.currentIdx]
 		if !item.isAlias() {
 			partial := slot.Apply(*item.cmd, r.currentValues)
-			note := "$ " + partial.Cmd
-			if partial.Dir != "" {
-				note += "  (workdir: " + partial.Dir + ")"
+			partialDir := partial.Dir
+			if partialDir == "" {
+				partialDir = "."
 			}
+			note := "$ " + partial.Cmd + "  (workdir: " + partialDir + ")"
 			r.itemNotes[r.currentIdx] = note
 		}
 	}
