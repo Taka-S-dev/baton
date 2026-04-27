@@ -469,6 +469,24 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 		r.itemNotes[r.currentIdx] = ""
 	}
 
+	// If we landed on an item with no slots, no earlier slotted item exists — go back to selection.
+	landed := r.rawItems[r.currentIdx]
+	hasSlots := (!landed.isAlias() && len(slot.GetSlots(*landed.cmd)) > 0) ||
+		(landed.isAlias() && landed.alias.Vars == nil && len(m.collectAliasSlots(landed.alias)) > 0)
+	if !hasSlots {
+		m.resolve = nil
+		m.sp = nil
+		switch r.purpose {
+		case purposeCreateWorkflow:
+			m.screen = ScreenCreateWorkflow
+		case purposeCreateAlias:
+			m.screen = ScreenCreateAlias
+		default:
+			m.screen = ScreenRunManually
+		}
+		return m, m.setupMultiSelect(r.purpose == purposeRunManually)
+	}
+
 	m.sp = nil
 	return m.advanceResolve()
 }

@@ -447,7 +447,7 @@ func (m Model) viewSlotPick(w int) string {
 		for i := start; i < end; i++ {
 			name := sp.contextNames[i]
 			if i == cur {
-				b.WriteString("  " + cyanBold(fmt.Sprintf("  %2d. %s", i+1, name)) + "\n")
+				b.WriteString("  " + cyanBold(fmt.Sprintf("▶ %2d. %s", i+1, name)) + "\n")
 			} else {
 				isDone := i < cur && i < len(sp.contextNotes) && sp.contextNotes[i] != ""
 				marker := "  "
@@ -470,43 +470,36 @@ func (m Model) viewSlotPick(w int) string {
 
 		// Command preview — separated from the list
 		if sp.currentCmd != nil {
-			b.WriteString("\n" + hlineLabel(w, "command preview") + "\n\n")
-			// Compute hovered value for inline display
-			hoveredValPreview := ""
-			isCustomCursorPreview := sp.cursor == len(sp.filtered)
-			if !isCustomCursorPreview && sp.cursor >= 0 && sp.cursor < len(sp.filtered) {
-				hoveredValPreview = sp.filtered[sp.cursor].Value
-			} else if isCustomCursorPreview && sp.search != "" {
-				hoveredValPreview = sp.search
-			}
-			pointerSuffix := ""
-			if hoveredValPreview != "" {
-				pointerSuffix = "  " + slotVar("{"+sp.slotName+"}") + gray(" = ") + white(hoveredValPreview)
+			b.WriteString("\n" + hlineLabelBright(w, "command preview  "+yellow("{"+sp.slotName+"}")) + "\n\n")
+
+			// Hovered value (from list cursor or custom search input)
+			hoveredVal := ""
+			if sp.cursor >= 0 && sp.cursor < len(sp.filtered) {
+				hoveredVal = sp.filtered[sp.cursor].Value
+			} else if sp.cursor == len(sp.filtered) && sp.search != "" {
+				hoveredVal = sp.search
 			}
 
-			highlighted := slot.HighlightSlot(sp.currentCmd.Cmd, sp.slotName, sp.resolvedSoFar)
-			b.WriteString("    " + gray("$") + " " + highlighted + "\n")
-			partialCmd := sp.currentCmd.Cmd
-			for k, v := range sp.resolvedSoFar {
-				partialCmd = strings.ReplaceAll(partialCmd, "{"+k+"}", v)
+			// Substitute resolvedSoFar then current slot with hovered value (yellow) or highlight
+			preview := func(s string) string {
+				for k, v := range sp.resolvedSoFar {
+					s = strings.ReplaceAll(s, "{"+k+"}", v)
+				}
+				if hoveredVal != "" {
+					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", yellow(hoveredVal))
+				} else {
+					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", slotVar("{"+sp.slotName+"}"))
+				}
+				return s
 			}
-			if idx := strings.Index(partialCmd, "{"+sp.slotName+"}"); idx >= 0 {
-				b.WriteString(strings.Repeat(" ", 6+idx) + cyan("^") + pointerSuffix + "\n")
-			}
+
+			b.WriteString("    " + gray("$") + " " + preview(sp.currentCmd.Cmd) + "\n")
 
 			dir := sp.currentCmd.Dir
 			if dir == "" {
 				b.WriteString("    " + gray("workdir:") + " " + dim(".") + "\n")
 			} else {
-				highlighted := slot.HighlightSlot(dir, sp.slotName, sp.resolvedSoFar)
-				b.WriteString("    " + gray("workdir:") + " " + highlighted + "\n")
-				partialDir := dir
-				for k, v := range sp.resolvedSoFar {
-					partialDir = strings.ReplaceAll(partialDir, "{"+k+"}", v)
-				}
-				if idx := strings.Index(partialDir, "{"+sp.slotName+"}"); idx >= 0 {
-					b.WriteString(strings.Repeat(" ", 13+idx) + cyan("^") + pointerSuffix + "\n")
-				}
+				b.WriteString("    " + gray("workdir:") + " " + preview(dir) + "\n")
 			}
 		}
 		b.WriteString("\n\n" + hlineLabelBright(w, "Select value") + "\n\n")
@@ -569,7 +562,7 @@ func (m Model) viewSlotPick(w int) string {
 					rawLine = e.Value
 				}
 			}
-			b.WriteString(sCursor.Width(w-2).Render("  ▶ " + rawLine) + "\n")
+			b.WriteString(sCursor.Width(w-2).Render("    " + rawLine) + "\n")
 		} else {
 			var line string
 			if isCustom {
