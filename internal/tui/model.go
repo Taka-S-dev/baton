@@ -177,9 +177,10 @@ type listEditState struct {
 
 // Model is the main bubbletea model.
 type Model struct {
-	dryRun      bool
-	projectsDir string
-	projects    []string
+	dryRun           bool
+	projectsDir      string
+	projects         []string
+	projectCmdCounts map[string]int
 
 	projectDir string
 	configFile string
@@ -255,6 +256,13 @@ func New(dryRun bool) (Model, error) {
 		return Model{}, fmt.Errorf("no projects found in %s", projectsDir)
 	}
 
+	cmdCounts := make(map[string]int, len(projects))
+	for _, p := range projects {
+		if cfg, err := config.LoadConfig(filepath.Join(projectsDir, p)); err == nil {
+			cmdCounts[p] = len(cfg.Commands)
+		}
+	}
+
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
@@ -267,12 +275,13 @@ func New(dryRun bool) (Model, error) {
 	ti.Width = 40
 
 	m := Model{
-		dryRun:      dryRun,
-		projectsDir: projectsDir,
-		projects:    projects,
-		spinner:     sp,
-		nameInput:   ti,
-		stepsVP:     viewport.New(80, 8),
+		dryRun:           dryRun,
+		projectsDir:      projectsDir,
+		projects:         projects,
+		projectCmdCounts: cmdCounts,
+		spinner:          sp,
+		nameInput:        ti,
+		stepsVP:          viewport.New(80, 8),
 	}
 
 	if len(projects) == 1 {

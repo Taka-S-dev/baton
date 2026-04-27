@@ -71,16 +71,19 @@ func (m Model) viewProjectSelect(w int) string {
 	var b strings.Builder
 	b.WriteString("\n  ┌───────────────┐\n")
 	b.WriteString("  │  " + bold(white("B A T O N")) + "    │\n")
-	b.WriteString("  └───────────────┘\n\n")
+	b.WriteString("  └───────────────┘\n")
+	b.WriteString("  " + gray("Command Runner") + "\n\n")
+	b.WriteString(hlineLabel(w, "Projects") + "\n\n")
 	for i, p := range m.projects {
+		count := fmt.Sprintf("%d commands", m.projectCmdCounts[p])
 		if i == m.listCursor {
-			b.WriteString("  " + cyanBold("▶") + " " + p + "\n")
+			b.WriteString("  " + cyanBold("▶") + " " + p + "   " + gray(count) + "\n")
 		} else {
-			b.WriteString("    " + p + "\n")
+			b.WriteString("    " + p + "   " + gray(count) + "\n")
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ Enter") + "\n")
+	b.WriteString("  " + gray("↑↓ move   Enter select   q quit") + "\n")
 	return b.String()
 }
 
