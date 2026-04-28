@@ -93,11 +93,11 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 		}
@@ -223,11 +223,11 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if le.cursor > 0 {
 			le.cursor--
 		}
-	case "down", "j":
+	case "down":
 		if le.cursor < total-1 {
 			le.cursor++
 		}

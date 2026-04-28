@@ -140,11 +140,11 @@ func (m Model) updateRetry(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		"Abort",
 	}
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(items)-1 {
 			m.listCursor++
 		}
@@ -173,14 +173,14 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.workflows) > 0 {
 			m.stepsFocused = !m.stepsFocused
 		}
-	case "up", "k":
+	case "up":
 		if m.stepsFocused {
 			m.stepsVP.ScrollUp(1)
 		} else if m.listCursor > 0 {
 			m.listCursor--
 			m.updateStepsViewport()
 		}
-	case "down", "j":
+	case "down":
 		if m.stepsFocused {
 			m.stepsVP.ScrollDown(1)
 		} else if m.listCursor < len(m.listItems)-1 {

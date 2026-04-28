@@ -77,11 +77,11 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	n := len(filtered)
 
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if n > 0 {
 			m.msCursor = (m.msCursor - 1 + n) % n
 		}
-	case "down", "j":
+	case "down":
 		if n > 0 {
 			m.msCursor = (m.msCursor + 1) % n
 		}
@@ -357,9 +357,9 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	total := len(sp.filtered) + 1
 
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		sp.cursor = (sp.cursor - 1 + total) % total
-	case "down", "j", "tab":
+	case "down", "tab":
 		sp.cursor = (sp.cursor + 1) % total
 	case "backspace":
 		if len(sp.search) > 0 {

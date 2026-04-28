@@ -13,12 +13,12 @@ import (
 
 func (m Model) updateEditWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 			m.updateStepsViewport()
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 			m.updateStepsViewport()
@@ -39,11 +39,11 @@ func (m Model) updateEditWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateEditWorkflowMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 		}
@@ -103,12 +103,12 @@ func (m Model) updateDeleteWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 			m.updateStepsViewport()
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 			m.updateStepsViewport()

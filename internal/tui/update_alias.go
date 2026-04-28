@@ -13,11 +13,11 @@ import (
 
 func (m Model) updateAliasMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 		}
@@ -51,11 +51,11 @@ func (m Model) updateAliasMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateEditAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 		}
@@ -76,11 +76,11 @@ func (m Model) updateEditAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateEditAliasMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 		}
@@ -143,11 +143,11 @@ func (m Model) updateDeleteAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.String() {
-	case "up", "k":
+	case "up":
 		if m.listCursor > 0 {
 			m.listCursor--
 		}
-	case "down", "j":
+	case "down":
 		if m.listCursor < len(m.listItems)-1 {
 			m.listCursor++
 		}
