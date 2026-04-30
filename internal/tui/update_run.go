@@ -96,7 +96,6 @@ func (m Model) runNext() tea.Cmd {
 	if item.Cmd.Dir != "" {
 		stepHeader += fmt.Sprintf("   workdir: %s", item.Cmd.Dir)
 	}
-	bar := progressBar(r.current, len(r.items), 24)
 	prefix := ""
 	if r.current == r.startIdx {
 		label := r.label
@@ -110,7 +109,7 @@ func (m Model) runNext() tea.Cmd {
 		}
 		prefix = "\n" + sep + "\n"
 	}
-	return tea.Sequence(tea.Println(prefix+stepHeader+"\n"+bar), runner.Exec(r.current, *item.Cmd, m.dryRun))
+	return tea.Sequence(tea.Println(prefix+stepHeader), runner.Exec(r.current, *item.Cmd, m.dryRun))
 }
 
 func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {
@@ -123,11 +122,12 @@ func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	r.current++
+	bar := progressBar(r.current, len(r.items), 24)
 	if r.current >= len(r.items) {
 		r.completed = true
-		return m, tea.ExitAltScreen
+		return m, tea.Sequence(tea.Println(bar), tea.ExitAltScreen)
 	}
-	return m, m.runNext()
+	return m, tea.Sequence(tea.Println(bar), m.runNext())
 }
 
 // ── Retry ─────────────────────────────────────────────────────────────────────

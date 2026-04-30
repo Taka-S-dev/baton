@@ -639,8 +639,7 @@ func (m Model) viewRunning(w int) string {
 	}
 	var b strings.Builder
 	n := len(r.items)
-	b.WriteString("\n" + progressBar(n, n, 24) + "\n\n")
-	b.WriteString(greenBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) + "\n\n")
+	b.WriteString("\n" + greenBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) + "\n\n")
 	b.WriteString("  " + gray("Press any key to return to menu...") + "\n")
 	return b.String()
 }
