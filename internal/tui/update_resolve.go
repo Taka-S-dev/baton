@@ -249,7 +249,7 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 				note := "$ " + resolved.Cmd + "  (workdir: " + dir + ")"
 				r.itemNotes[r.currentIdx] = note
 			}
-			if r.purpose != purposeRunManually {
+			if (r.purpose == purposeCreateWorkflow || r.purpose == purposeCreateAlias) && len(r.currentValues) > 0 {
 				r.workflowVars[item.cmd.Name] = copyMap(r.currentValues)
 			}
 			r.resolved = append(r.resolved, mdl.RunItem{Name: item.cmd.Name, Cmd: &resolved})
@@ -290,6 +290,7 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 		listName:      s.ListName,
 		entries:       entries,
 		cursor:        0,
+		canSkip:       r.purpose == purposeCreateWorkflow || r.purpose == purposeCreateAlias,
 		contextNames:  r.itemNames,
 		contextNotes:  r.itemNotes,
 		contextIdx:    r.currentIdx,
@@ -305,6 +306,8 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 	r := m.resolve
 	switch r.purpose {
+	case purposeRunWorkflow:
+		return m.startConfirmRun(r.resolved, r.workflowLabel)
 	case purposeRunManually:
 		return m.startConfirmRun(r.resolved, "manual")
 	case purposeCreateWorkflow:
@@ -354,7 +357,11 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 
 func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	sp := m.sp
-	total := len(sp.filtered) + 1
+	skipRow := len(sp.filtered) + 1
+	total := skipRow
+	if sp.canSkip {
+		total++
+	}
 
 	switch msg.String() {
 	case "up":
@@ -368,6 +375,9 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			sp.cursor = 0
 		}
 	case "enter":
+		if sp.canSkip && sp.cursor == skipRow {
+			return m.skipSlot()
+		}
 		if sp.cursor == len(sp.filtered) {
 			if sp.search != "" {
 				return m.acceptSlotValue(sp.search)
@@ -391,6 +401,30 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m Model) skipSlot() (tea.Model, tea.Cmd) {
+	r := m.resolve
+	r.currentSlotIdx++
+
+	if r.currentIdx < len(r.rawItems) {
+		item := r.rawItems[r.currentIdx]
+		if !item.isAlias() {
+			partial := slot.Apply(*item.cmd, r.currentValues)
+			dir := partial.Dir
+			if dir == "" {
+				dir = "."
+			}
+			r.itemNotes[r.currentIdx] = "$ " + partial.Cmd + "  (workdir: " + dir + ")"
+		}
+	}
+
+	m.sp = nil
+	m.screen = ScreenCreateWorkflow
+	if r.purpose == purposeCreateAlias {
+		m.screen = ScreenCreateAlias
+	}
+	return m.advanceResolve()
 }
 
 func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
@@ -417,6 +451,8 @@ func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 		m.screen = ScreenCreateWorkflow
 	} else if r.purpose == purposeCreateAlias {
 		m.screen = ScreenCreateAlias
+	} else if r.purpose == purposeRunWorkflow {
+		m.screen = ScreenRunWorkflow
 	}
 	return m.advanceResolve()
 }
@@ -436,6 +472,9 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 			m.screen = ScreenCreateWorkflow
 		case purposeCreateAlias:
 			m.screen = ScreenCreateAlias
+		case purposeRunWorkflow:
+			m.screen = ScreenRunWorkflow
+			return m, nil
 		default:
 			m.screen = ScreenRunManually
 		}
@@ -481,6 +520,9 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 			m.screen = ScreenCreateWorkflow
 		case purposeCreateAlias:
 			m.screen = ScreenCreateAlias
+		case purposeRunWorkflow:
+			m.screen = ScreenRunWorkflow
+			return m, nil
 		default:
 			m.screen = ScreenRunManually
 		}

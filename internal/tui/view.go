@@ -525,7 +525,11 @@ func (m Model) viewSlotPick(w int) string {
 		contextLines = len(sp.contextNames) + 3
 	}
 	viewH := max(1, m.height-8-contextLines)
-	total := len(sp.filtered) + 1
+	skipRow := len(sp.filtered) + 1
+	total := skipRow
+	if sp.canSkip {
+		total++
+	}
 	viewStart := max(0, min(sp.cursor-viewH/2, total-viewH))
 	viewEnd := min(viewStart+viewH, total)
 
@@ -542,12 +546,15 @@ func (m Model) viewSlotPick(w int) string {
 	}
 	for i := viewStart; i < viewEnd; i++ {
 		isCustom := i == len(sp.filtered)
+		isSkip := sp.canSkip && i == skipRow
 		selected := i == sp.cursor
 
 		if selected {
 			// Render raw text inside sCursor to avoid ANSI width miscalculation
 			var rawLine string
-			if isCustom {
+			if isSkip {
+				rawLine = "[ → skip — resolve at run time ]"
+			} else if isCustom {
 				if sp.search != "" {
 					rawLine = "[ + " + sp.search + "  (custom) ]"
 				} else {
@@ -565,7 +572,9 @@ func (m Model) viewSlotPick(w int) string {
 			b.WriteString(sCursor.Width(w-2).Render("    " + rawLine) + "\n")
 		} else {
 			var line string
-			if isCustom {
+			if isSkip {
+				line = dim("[ → skip — resolve at run time ]")
+			} else if isCustom {
 				if sp.search != "" {
 					line = cyan("[") + " + " + white(sp.search) + "  " + dim("(custom)") + cyan(" ]")
 				} else {

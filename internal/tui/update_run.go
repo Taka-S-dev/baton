@@ -192,7 +192,12 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		wf := m.workflows[m.listCursor]
-		var items []mdl.RunItem
+		store.SaveLastWorkflow(m.projectDir, wf.Name)
+		m.lastWorkflow = wf.Name
+
+		// Apply saved vars first; any remaining {slots} are resolved interactively.
+		var preCmds []mdl.Command
+		var names []string
 		for _, name := range wf.Commands {
 			for i := range m.config.Commands {
 				if m.config.Commands[i].Name == name {
@@ -202,14 +207,25 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							cmd = slot.Apply(cmd, vars)
 						}
 					}
-					items = append(items, mdl.RunItem{Name: name, Cmd: &cmd})
+					preCmds = append(preCmds, cmd)
+					names = append(names, name)
 					break
 				}
 			}
 		}
-		store.SaveLastWorkflow(m.projectDir, wf.Name)
-		m.lastWorkflow = wf.Name
-		return m.startConfirmRun(items, wf.Name)
+		msItems := make([]msItem, len(preCmds))
+		for i := range preCmds {
+			msItems[i] = msItem{cmd: &preCmds[i]}
+		}
+		m.resolve = &resolveFlowState{
+			purpose:       purposeRunWorkflow,
+			rawItems:      msItems,
+			itemNames:     names,
+			itemNotes:     make([]string, len(msItems)),
+			workflowVars:  make(map[string]map[string]string),
+			workflowLabel: wf.Name,
+		}
+		return m.advanceResolve()
 	case "esc":
 		m.gotoMainMenu()
 	}

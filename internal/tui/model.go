@@ -66,6 +66,7 @@ const (
 	purposeCreateAlias
 	purposeEditWorkflow
 	purposeEditAlias
+	purposeRunWorkflow
 )
 
 // msItem is an item shown in the multi-select screen.
@@ -99,8 +100,9 @@ type slotPickState struct {
 	listName  string
 	entries   []mdl.ListEntry
 	filtered  []mdl.ListEntry
-	cursor int
-	search string
+	cursor   int
+	search   string
+	canSkip  bool // true when creating a workflow/alias
 
 	contextNames  []string
 	contextNotes  []string
@@ -126,15 +128,16 @@ func (s *slotPickState) applyFilter() {
 
 // resolveFlowState tracks multi-command slot resolution.
 type resolveFlowState struct {
-	purpose   resolveFlowPurpose
-	rawItems  []msItem
-	itemNames []string
-	itemNotes []string
+	purpose       resolveFlowPurpose
+	rawItems      []msItem
+	itemNames     []string
+	itemNotes     []string
+	workflowLabel string // label for purposeRunWorkflow
 
-	currentIdx    int
-	currentSlots  []slot.Def
+	currentIdx     int
+	currentSlots   []slot.Def
 	currentSlotIdx int
-	currentValues map[string]string
+	currentValues  map[string]string
 
 	resolved     []mdl.RunItem
 	workflowVars map[string]map[string]string // for Create flows
