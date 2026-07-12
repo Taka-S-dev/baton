@@ -54,8 +54,8 @@ func TestGetSlots_Dedup(t *testing.T) {
 
 func TestGetSlots_VarsMapping(t *testing.T) {
 	cmd := model.Command{
-		Cmd:  "build {projDir}",
-		Vars: map[string]string{"projDir": "project"},
+		Cmd:   "build {projDir}",
+		Slots: map[string]string{"projDir": "project"},
 	}
 	slots := slot.GetSlots(cmd)
 	if len(slots) != 1 {

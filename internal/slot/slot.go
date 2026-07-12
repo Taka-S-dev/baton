@@ -1,6 +1,7 @@
 package slot
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -24,7 +25,7 @@ func HasPlaceholders(cmd model.Command) bool {
 }
 
 // GetSlots returns all unique slots to resolve for a command, in order.
-// List name comes from cmd.Vars if defined, otherwise defaults to the slot name.
+// List name comes from cmd.Slots if defined, otherwise defaults to the slot name.
 func GetSlots(cmd model.Command) []Def {
 	seen := make(map[string]bool)
 	var slots []Def
@@ -34,8 +35,8 @@ func GetSlots(cmd model.Command) []Def {
 		}
 		seen[name] = true
 		listName := name
-		if cmd.Vars != nil {
-			if ln, ok := cmd.Vars[name]; ok {
+		if cmd.Slots != nil {
+			if ln, ok := cmd.Slots[name]; ok {
 				listName = ln
 			}
 		}
@@ -127,5 +128,41 @@ func SaveList(listsDir, name string, entries []model.ListEntry) error {
 			lines = append(lines, e.Value)
 		}
 	}
-	return os.WriteFile(filepath.Join(listsDir, name+".tsv"), []byte(strings.Join(lines, "\n")), 0644)
+	path := filepath.Join(listsDir, name+".tsv")
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")), 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// MaterializeCommand bakes a template-derived command: Cmd/Dir/Shell/Slots
+// are recomputed from the template with stored Values applied, so template
+// edits propagate on every load. Slots without a stored value remain as
+// {placeholders} to be resolved interactively at run time.
+// The previously baked Cmd acts as a fallback when the template is missing.
+// Concrete commands (no Template) are returned unchanged.
+func MaterializeCommand(cmd model.Command, config model.Config) (model.Command, error) {
+	if cmd.Template == "" {
+		return cmd, nil
+	}
+	tpl, found := config.FindCommand(cmd.Template)
+	if !found || tpl.Template != "" {
+		if cmd.Cmd != "" {
+			// Keep the last baked command so the entry still runs.
+			return cmd, fmt.Errorf("template not found: %s (using last saved command)", cmd.Template)
+		}
+		return cmd, fmt.Errorf("template not found: %s", cmd.Template)
+	}
+	resolved := Apply(tpl, cmd.Values)
+	cmd.Cmd = resolved.Cmd
+	cmd.Dir = resolved.Dir
+	if cmd.Shell == "" {
+		cmd.Shell = tpl.Shell
+	}
+	if cmd.Group == "" {
+		cmd.Group = tpl.Group
+	}
+	cmd.Slots = tpl.Slots
+	return cmd, nil
 }

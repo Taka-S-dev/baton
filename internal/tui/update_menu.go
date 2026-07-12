@@ -10,14 +10,8 @@ import (
 
 func (m Model) updateProjectSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		dir := filepath.Join(m.projectsDir, m.projects[m.listCursor])
 		if err := m.loadProject(dir); err != nil {
@@ -35,14 +29,8 @@ func (m Model) updateProjectSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		m.mainMenuCursor = m.listCursor
 		switch m.listItems[m.listCursor] {
@@ -88,6 +76,9 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listItems = names
 			m.listCursor = 0
 			m.updateStepsViewport()
+		case "Manage commands":
+			m.screen = ScreenManageCommands
+			m.listCursor = 0
 		case "Manage aliases":
 			m.screen = ScreenAliasMgmt
 			m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
@@ -111,14 +102,8 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateSwitchConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		dir := filepath.Join(m.projectsDir, m.projects[m.listCursor])
 		if err := m.loadProject(dir); err != nil {

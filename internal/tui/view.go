@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -58,20 +59,60 @@ func (m Model) View() string {
 		view = m.viewEditList(w)
 	case ScreenSwitchConfig:
 		view = m.viewSingleSelect("Switch config", w)
+	case ScreenManageCommands:
+		view = m.viewManageCommands(w)
+	case ScreenCreateCommandKind:
+		view = m.viewSingleSelect("Create command", w)
+	case ScreenCommandForm:
+		view = m.viewCommandForm(w)
+	case ScreenEditCommandPick:
+		view = m.viewSingleSelect("Edit command", w)
+	case ScreenCreateCommandName, ScreenCreateCommandTemplate:
+		view = m.viewCreateCommand(w)
+	case ScreenEditCommandName, ScreenEditCommandTemplate:
+		view = m.viewEditCommand(w)
+	case ScreenDeleteCommand:
+		view = m.viewDeleteList("Delete commands", m.listItems, w)
 	}
 	if m.errMsg != "" {
 		view += "\n" + red("  Error: "+m.errMsg) + "\n"
+	}
+	if m.loadWarning != "" && m.screen == ScreenMainMenu {
+		view += "\n" + yellow("  Warning: "+m.loadWarning) + "\n"
 	}
 	return view
 }
 
 // ── Project select / main menu ───────────────────────────────────────────────
 
+// logoBox renders the boxed app name. The name defaults to BATON and can be
+// overridden with the BATON_DISPLAY_NAME environment variable (ASCII
+// recommended — wide characters break the box alignment).
+func logoBox() []string {
+	name := os.Getenv("BATON_DISPLAY_NAME")
+	if name == "" {
+		name = "BATON"
+	}
+	runes := []rune(strings.ToUpper(name))
+	parts := make([]string, len(runes))
+	for i, r := range runes {
+		parts[i] = string(r)
+	}
+	label := strings.Join(parts, " ")
+	innerW := len([]rune(label)) + 4
+	return []string{
+		"  ┌" + strings.Repeat("─", innerW) + "┐",
+		"  │  " + bold(white(label)) + "  │",
+		"  └" + strings.Repeat("─", innerW) + "┘",
+	}
+}
+
 func (m Model) viewProjectSelect(w int) string {
 	var b strings.Builder
-	b.WriteString("\n  ┌───────────────┐\n")
-	b.WriteString("  │  " + bold(white("B A T O N")) + "    │\n")
-	b.WriteString("  └───────────────┘\n")
+	b.WriteString("\n")
+	for _, line := range logoBox() {
+		b.WriteString(line + "\n")
+	}
 	b.WriteString("  " + gray("Command Runner") + "\n\n")
 	b.WriteString(hlineLabel(w, "Projects") + "\n\n")
 	for i, p := range m.projects {
@@ -93,15 +134,16 @@ type menuItemInfo struct {
 }
 
 var menuItemInfos = map[string]menuItemInfo{
-	"Run workflow":    {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
-	"Run manually":    {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
-	"Create workflow": {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
-	"Edit workflow":   {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
-	"Delete workflow": {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Space", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
-	"Manage aliases":  {desc: "Reusable command groups, selectable in Run Manually.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage lists":    {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
-	"Switch config":   {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
-	"Exit":            {desc: "Quit baton.", shortcuts: [][2]string{{"Enter", "Quit"}}},
+	"Run workflow":             {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
+	"Run manually":             {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
+	"Create workflow":          {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
+	"Edit workflow":            {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
+	"Delete workflow":          {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Space", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
+	"Manage commands":          {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage aliases":           {desc: "Reusable command groups, selectable in Run Manually.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage lists":             {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
+	"Switch config":            {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
+	"Exit":                     {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
 
 func (m Model) viewMainMenu(w int) string {
@@ -112,7 +154,7 @@ func (m Model) viewMainMenu(w int) string {
 	groups := []group{
 		{"Run", []string{"Run workflow", "Run manually"}},
 		{"Workflow", []string{"Create workflow", "Edit workflow", "Delete workflow"}},
-		{"Manage", []string{"Manage aliases", "Manage lists"}},
+		{"Manage", []string{"Manage commands", "Manage aliases", "Manage lists"}},
 		{"", []string{"Switch config", "Exit"}},
 	}
 
@@ -122,9 +164,7 @@ func (m Model) viewMainMenu(w int) string {
 	// Build left pane lines
 	var leftLines []string
 	leftLines = append(leftLines, "")
-	leftLines = append(leftLines, "  ┌───────────────┐")
-	leftLines = append(leftLines, "  │  "+bold(white("B A T O N"))+"    │")
-	leftLines = append(leftLines, "  └───────────────┘")
+	leftLines = append(leftLines, logoBox()...)
 	if m.projectDir != "" {
 		leftLines = append(leftLines, "  "+gray("project: ")+white(filepath.Base(m.projectDir)))
 	} else {
@@ -360,6 +400,12 @@ func (m Model) viewMultiSelect(w int) string {
 			if item.isAlias() {
 				steps := strings.Join(item.alias.Steps, gray(" > "))
 				label = cyan("@") + " " + item.alias.Name + "  " + sGroup.Render("[alias]") + "  " + gray(steps)
+			} else if item.cmd.Template != "" {
+				grp := ""
+				if item.cmd.Group != "" {
+					grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
+				}
+				label = cyan("$") + " " + item.cmd.Name + grp + "  " + gray("("+item.cmd.Template+")")
 			} else {
 				grp := ""
 				if item.cmd.Group != "" {
@@ -392,7 +438,17 @@ func (m Model) viewMultiSelect(w int) string {
 			b.WriteString(hlineLabel(w, "alias steps") + "\n")
 			steps := strings.Join(hovered.alias.Steps, gray(" > "))
 			b.WriteString("  " + steps + "\n")
-		} else {
+		} else if hovered.cmd != nil && hovered.cmd.Template != "" {
+			b.WriteString(hlineLabel(w, "command") + "\n")
+			b.WriteString("  " + dim("template: ") + hovered.cmd.Template + "\n")
+			if len(hovered.cmd.Values) > 0 {
+				b.WriteString("  " + dim("values:") + "\n")
+				for k, v := range hovered.cmd.Values {
+					b.WriteString("    " + gray(k) + " = " + v + "\n")
+				}
+			}
+			b.WriteString("  " + gray("$ "+hovered.cmd.Cmd) + "\n")
+		} else if hovered.cmd != nil {
 			b.WriteString(hlineLabel(w, "command preview") + "\n")
 			cmdStr := hovered.cmd.Cmd
 			maxLen := w - 10
@@ -613,12 +669,14 @@ func (m Model) viewConfirmRun(w int) string {
 				gray(""), i+1, gray(""), cyan("@"), item.Name, gray("("+steps+")")))
 		} else {
 			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
-			b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
-			workdir := item.Cmd.Dir
-			if workdir == "" {
-				workdir = "."
+			if item.Cmd != nil {
+				b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
+				workdir := item.Cmd.Dir
+				if workdir == "" {
+					workdir = "."
+				}
+				b.WriteString("         " + dim("workdir: "+workdir) + "\n")
 			}
-			b.WriteString("         " + dim("workdir: "+workdir) + "\n")
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n\n")
@@ -877,6 +935,108 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		b.WriteString("  " + gray("↑↓ Space: toggle   Enter: confirm   Esc: back") + "\n")
 	}
 	return b.String()
+}
+
+// ── Manage commands ───────────────────────────────────────────────────────────
+
+func (m Model) viewManageCommands(w int) string {
+	var b strings.Builder
+	b.WriteString("\n" + header("Manage commands", w) + "\n\n")
+	items := []string{"Create command", "Edit command", "Delete command"}
+	for i, item := range items {
+		if i == m.listCursor {
+			b.WriteString("  " + cyanBold("▶") + " " + item + "\n")
+		} else {
+			b.WriteString("    " + item + "\n")
+		}
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("↑↓ Enter: select   Esc: back") + "\n")
+	return b.String()
+}
+
+func (m Model) viewCreateCommand(w int) string {
+	if m.sce == nil {
+		return ""
+	}
+	sce := m.sce
+	if m.screen == ScreenCreateCommandTemplate {
+		return m.viewTemplatePick(w, sce.templateRefIdx)
+	}
+	return m.viewCommandNameInput("Create command", w, sce)
+}
+
+func (m Model) viewTemplatePick(w, cursor int) string {
+	var b strings.Builder
+	b.WriteString("\n" + header("Select template", w) + "\n\n")
+	candidates := m.templateCandidates()
+	if len(candidates) == 0 {
+		b.WriteString("  " + gray("(no commands with {slots} defined)") + "\n")
+	}
+	for i, cmd := range candidates {
+		if i == cursor {
+			b.WriteString("  " + cyanBold("▶") + " " + cmd.Name + "   " + gray("$ "+cmd.Cmd) + "\n")
+		} else {
+			b.WriteString("    " + cmd.Name + "   " + gray("$ "+cmd.Cmd) + "\n")
+		}
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("↑↓ Enter: select   Esc: back") + "\n")
+	return b.String()
+}
+
+func (m Model) viewCommandNameInput(title string, w int, sce *commandEditState) string {
+	var b strings.Builder
+	b.WriteString("\n" + header(title, w) + "\n\n")
+	b.WriteString("  " + m.nameInput.View() + "\n")
+	if candidates := m.templateCandidates(); sce.templateRefIdx >= 0 && sce.templateRefIdx < len(candidates) {
+		b.WriteString("  Template: " + candidates[sce.templateRefIdx].Name + "\n")
+	}
+	if len(sce.currentValues) > 0 {
+		b.WriteString("\n" + hlineLabel(w, "values") + "\n")
+		for k, v := range sce.currentValues {
+			b.WriteString("  " + gray(k+" = "+v) + "\n")
+		}
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("Enter: confirm   Esc: back") + "\n")
+	return b.String()
+}
+
+func (m Model) viewCommandForm(w int) string {
+	if m.cf == nil {
+		return ""
+	}
+	cf := m.cf
+	title := "Create command"
+	if cf.mode == 1 {
+		title = "Edit command"
+	}
+	var b strings.Builder
+	b.WriteString("\n" + header(title, w) + "\n\n")
+	for i, label := range commandFormLabels {
+		if i == cf.fieldIdx {
+			b.WriteString("  " + m.nameInput.View() + "\n")
+		} else if cf.fields[i] != "" {
+			b.WriteString("  " + gray(label+" > ") + cf.fields[i] + "\n")
+		} else {
+			b.WriteString("  " + gray(label+" > ") + "\n")
+		}
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("Enter: next / save   Esc: previous / cancel") + "\n")
+	return b.String()
+}
+
+func (m Model) viewEditCommand(w int) string {
+	if m.sce == nil || m.sce.editIdx < 0 || m.sce.editIdx >= len(m.config.Commands) {
+		return ""
+	}
+	sce := m.sce
+	if m.screen == ScreenEditCommandTemplate {
+		return m.viewTemplatePick(w, sce.templateRefIdx)
+	}
+	return m.viewCommandNameInput("Edit command", w, sce)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

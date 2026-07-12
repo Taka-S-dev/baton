@@ -23,7 +23,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Forward non-key messages to textinput (handles internal blink tick).
 	if _, ok := msg.(tea.KeyMsg); !ok {
-		if m.screen == ScreenNameInput {
+		if m.screen == ScreenNameInput || m.screen == ScreenCreateCommandName || m.screen == ScreenEditCommandName || m.screen == ScreenCommandForm {
 			ti, c := m.nameInput.Update(msg)
 			m.nameInput = ti
 			return m, c
@@ -113,6 +113,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateManageLists(msg)
 		case ScreenEditList:
 			return m.updateEditList(msg)
+		case ScreenManageCommands:
+			return m.updateManageCommands(msg)
+		case ScreenCreateCommandKind:
+			return m.updateCreateCommandKind(msg)
+		case ScreenCommandForm:
+			return m.updateCommandForm(msg)
+		case ScreenEditCommandPick:
+			return m.updateEditCommandPick(msg)
+		case ScreenCreateCommandName, ScreenCreateCommandTemplate:
+			return m.updateCreateCommand(msg)
+		case ScreenEditCommandName, ScreenEditCommandTemplate:
+			return m.updateEditCommand(msg)
+		case ScreenDeleteCommand:
+			return m.updateDeleteCommand(msg)
 		case ScreenSwitchConfig:
 			return m.updateSwitchConfig(msg)
 		}

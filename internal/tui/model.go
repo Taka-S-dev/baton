@@ -46,6 +46,15 @@ const (
 	ScreenManageLists
 	ScreenEditList
 	ScreenSwitchConfig
+	ScreenManageCommands
+	ScreenEditCommandPick
+	ScreenCreateCommandKind
+	ScreenCreateCommandName
+	ScreenCreateCommandTemplate
+	ScreenEditCommandName
+	ScreenEditCommandTemplate
+	ScreenCommandForm
+	ScreenDeleteCommand
 )
 
 type nameInputMode int
@@ -86,10 +95,7 @@ func (i msItem) group() string {
 	if i.alias != nil {
 		return "alias"
 	}
-	if i.cmd.Group != "" {
-		return i.cmd.Group
-	}
-	return ""
+	return i.cmd.Group
 }
 
 func (i msItem) isAlias() bool { return i.alias != nil }
@@ -178,6 +184,27 @@ type listEditState struct {
 	editLblTI  textinput.Model
 }
 
+// commandEditState holds state for creating/editing a template-derived command.
+type commandEditState struct {
+	mode           int // 0=create, 1=edit
+	editIdx        int // for edit mode
+	name           string
+	templateRefIdx int
+	currentSlots   []slot.Def
+	currentSlotIdx int
+	currentValues  map[string]string
+}
+
+// commandFormState holds state for writing a concrete command directly.
+type commandFormState struct {
+	mode     int // 0=create, 1=edit
+	editIdx  int // for edit mode
+	fieldIdx int
+	fields   [4]string // name, cmd, workdir, group
+}
+
+var commandFormLabels = [4]string{"Name", "Cmd", "Workdir (optional)", "Group (optional)"}
+
 // Model is the main bubbletea model.
 type Model struct {
 	dryRun           bool
@@ -239,13 +266,20 @@ type Model struct {
 	// List edit
 	le *listEditState
 
+	// Command create/edit (template-derived)
+	sce *commandEditState
+
+	// Command form (direct input)
+	cf *commandFormState
+
 	editTargetIdx    int
 	mainMenuCursor   int
 	lastWorkflow     string
-	errMsg         string
-	deleteConfirm  bool
-	deleteSelected []int
-	deleteBtn      int // 0=No (default), 1=Yes
+	errMsg           string
+	loadWarning      string
+	deleteConfirm    bool
+	deleteSelected   []int
+	deleteBtn        int // 0=No (default), 1=Yes
 }
 
 // New creates the initial model.
@@ -262,7 +296,7 @@ func New(dryRun bool) (Model, error) {
 	cmdCounts := make(map[string]int, len(projects))
 	for _, p := range projects {
 		if cfg, err := config.LoadConfig(filepath.Join(projectsDir, p)); err == nil {
-			cmdCounts[p] = len(cfg.Commands)
+			cmdCounts[p] = len(cfg.AllCommands())
 		}
 	}
 
@@ -306,10 +340,13 @@ func (m *Model) loadProject(projectDir string) error {
 		return err
 	}
 	m.projectDir = projectDir
-	m.configFile = "config.json"
-	if _, err := os.Stat(filepath.Join(projectDir, "config.json")); err != nil {
-		m.configFile = "config.tsv"
+	var files []string
+	for _, f := range []string{"commands.json", "templates.json", "template.json", "commands.tsv", "templates.tsv", "config.tsv", "commands.local.json", "config.json"} {
+		if _, err := os.Stat(filepath.Join(projectDir, f)); err == nil {
+			files = append(files, f)
+		}
 	}
+	m.configFile = strings.Join(files, " + ")
 	m.config = cfg
 	workflows, err := store.LoadWorkflows(projectDir)
 	if err != nil {
@@ -323,7 +360,30 @@ func (m *Model) loadProject(projectDir string) error {
 	m.aliases = aliases
 	m.lists = slot.LoadLists(filepath.Join(projectDir, "lists"))
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
+
+	var warnings []string
+	for _, cmd := range cfg.Commands {
+		if cmd.Template == "" {
+			continue
+		}
+		if _, ok := cfg.FindCommand(cmd.Template); !ok {
+			warnings = append(warnings, "missing template: "+cmd.Name+" → "+cmd.Template)
+		}
+	}
+	seen := make(map[string]bool)
+	for _, cmd := range cfg.AllCommands() {
+		if seen[cmd.Name] {
+			warnings = append(warnings, "duplicate command name: "+cmd.Name)
+		}
+		seen[cmd.Name] = true
+	}
+	m.loadWarning = strings.Join(warnings, "; ")
 	return nil
+}
+
+// saveConfig persists user commands to commands.local.json.
+func (m *Model) saveConfig() error {
+	return store.SaveConfig(m.projectDir, m.config)
 }
 
 func (m *Model) gotoManageLists() {
@@ -344,6 +404,7 @@ func (m *Model) gotoMainMenu() {
 		"Create workflow",
 		"Edit workflow",
 		"Delete workflow",
+		"Manage commands",
 		"Manage aliases",
 		"Manage lists",
 		"Switch config",
@@ -354,6 +415,19 @@ func (m *Model) gotoMainMenu() {
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return nil }
+
+// workflowStepCommand resolves a workflow step name to a displayable command,
+// applying stored workflow vars (template-derived commands are baked at load).
+func (m *Model) workflowStepCommand(wf mdl.Workflow, name string) (mdl.Command, bool) {
+	cmd, ok := m.config.FindCommand(name)
+	if !ok {
+		return mdl.Command{}, false
+	}
+	if vars, ok := wf.Vars[name]; ok {
+		cmd = slot.Apply(cmd, vars)
+	}
+	return cmd, true
+}
 
 // updateStepsViewport rebuilds the steps viewport content for the currently hovered workflow.
 func (m *Model) updateStepsViewport() {
@@ -374,17 +448,9 @@ func (m *Model) updateStepsViewport() {
 	for j, cmdName := range wf.Commands {
 		cmdStr := ""
 		dirStr := ""
-		for _, cmd := range m.config.Commands {
-			if cmd.Name == cmdName {
-				if wf.Vars != nil {
-					if vars, ok := wf.Vars[cmdName]; ok {
-						cmd = slot.Apply(cmd, vars)
-					}
-				}
-				cmdStr = cmd.Cmd
-				dirStr = cmd.Dir
-				break
-			}
+		if cmd, ok := m.workflowStepCommand(wf, cmdName); ok {
+			cmdStr = cmd.Cmd
+			dirStr = cmd.Dir
 		}
 		prefix := fmt.Sprintf("  %d. %-16s", j+1, cmdName)
 		indent := strings.Repeat(" ", len(prefix)+2)

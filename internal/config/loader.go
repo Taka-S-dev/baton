@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 // FindProjectsDir locates the projects/ directory.
@@ -45,6 +46,17 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
+// firstExisting returns the first of names that exists in dir.
+func firstExisting(dir string, names ...string) (string, bool) {
+	for _, name := range names {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
+}
+
 // ListProjects returns subdirectory names inside projectsDir.
 func ListProjects(projectsDir string) []string {
 	entries, err := os.ReadDir(projectsDir)
@@ -60,15 +72,57 @@ func ListProjects(projectsDir string) []string {
 	return out
 }
 
-// LoadConfig loads config.json (preferred) or config.tsv from projectDir.
+// LoadConfig loads the hand-written layer (commands.json and/or
+// commands.tsv, never written back) and commands.local.json (app-managed
+// user commands). Legacy names are still readable: templates.json,
+// template.json, templates.tsv, config.tsv, config.json, and the old
+// "saved_commands" section (converted to template-derived commands).
 func LoadConfig(projectDir string) (model.Config, error) {
-	if _, err := os.Stat(filepath.Join(projectDir, "config.json")); err == nil {
-		return loadJSON(filepath.Join(projectDir, "config.json"))
+	cfg := model.Config{}
+
+	if path, ok := firstExisting(projectDir, "commands.json", "templates.json", "template.json"); ok {
+		base, err := loadJSON(path)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Base = base.Commands
 	}
-	if _, err := os.Stat(filepath.Join(projectDir, "config.tsv")); err == nil {
-		return loadTSV(filepath.Join(projectDir, "config.tsv"))
+
+	// Loaded unconditionally so that creating commands via the TUI
+	// never hides TSV-defined commands.
+	if path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv"); ok {
+		cfgTSV, err := loadTSV(path)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Base = append(cfg.Base, cfgTSV.Commands...)
 	}
-	return model.Config{}, nil
+
+	if path, ok := firstExisting(projectDir, "commands.local.json", "config.json"); ok {
+		cfgJSON, err := loadJSON(path)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Commands = cfgJSON.Commands
+	}
+
+	// Re-bake template-derived commands so template edits propagate.
+	// Errors are non-fatal: the last baked cmd keeps the entry runnable,
+	// and the TUI surfaces missing templates as a warning.
+	for i := range cfg.Commands {
+		if baked, err := slot.MaterializeCommand(cfg.Commands[i], cfg); err == nil {
+			cfg.Commands[i] = baked
+		}
+	}
+
+	return cfg, nil
+}
+
+// legacySavedCommand is the pre-unification "saved_commands" entry shape.
+type legacySavedCommand struct {
+	Name        string            `json:"name"`
+	TemplateRef string            `json:"template_ref"`
+	Values      map[string]string `json:"values"`
 }
 
 func loadJSON(path string) (model.Config, error) {
@@ -77,7 +131,25 @@ func loadJSON(path string) (model.Config, error) {
 		return model.Config{}, err
 	}
 	var cfg model.Config
-	return cfg, json.Unmarshal(data, &cfg)
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return model.Config{}, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+
+	// Convert the legacy "saved_commands" section into template-derived
+	// commands. They are migrated to the unified format on next save.
+	var legacy struct {
+		SavedCommands []legacySavedCommand `json:"saved_commands"`
+	}
+	if err := json.Unmarshal(data, &legacy); err == nil {
+		for _, sc := range legacy.SavedCommands {
+			cfg.Commands = append(cfg.Commands, model.Command{
+				Name:     sc.Name,
+				Template: sc.TemplateRef,
+				Values:   sc.Values,
+			})
+		}
+	}
+	return cfg, nil
 }
 
 func loadTSV(path string) (model.Config, error) {
@@ -106,7 +178,7 @@ func loadTSV(path string) (model.Config, error) {
 			Shell: get(4),
 		}
 		if v := get(5); v != "" {
-			cmd.Vars = parseVarsStr(v)
+			cmd.Slots = parseVarsStr(v)
 		}
 		if cmd.Name != "" && cmd.Cmd != "" {
 			commands = append(commands, cmd)

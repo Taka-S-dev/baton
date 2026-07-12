@@ -30,7 +30,7 @@ func SaveWorkflows(projectDir string, workflows []model.Workflow) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(projectDir, "workflows.json"), data, 0644)
+	return writeFileAtomic(filepath.Join(projectDir, "workflows.json"), data)
 }
 
 func LoadAliases(projectDir string) ([]model.Alias, error) {
@@ -53,7 +53,7 @@ func SaveAliases(projectDir string, aliases []model.Alias) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(projectDir, "aliases.json"), data, 0644)
+	return writeFileAtomic(filepath.Join(projectDir, "aliases.json"), data)
 }
 
 func LoadLastWorkflow(projectDir string) string {
@@ -66,4 +66,30 @@ func LoadLastWorkflow(projectDir string) string {
 
 func SaveLastWorkflow(projectDir, name string) {
 	_ = os.WriteFile(filepath.Join(projectDir, ".last_workflow"), []byte(name), 0644)
+}
+
+// SaveConfig writes app-managed user commands to commands.local.json.
+// The hand-written layer (Base) is excluded via the json:"-" tag.
+// A legacy config.json is removed after a successful write so the
+// project migrates to the new name.
+func SaveConfig(projectDir string, cfg model.Config) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := writeFileAtomic(filepath.Join(projectDir, "commands.local.json"), data); err != nil {
+		return err
+	}
+	_ = os.Remove(filepath.Join(projectDir, "config.json"))
+	return nil
+}
+
+// writeFileAtomic writes to a temp file then renames it over the target,
+// so a crash mid-write never leaves a truncated file.
+func writeFileAtomic(path string, data []byte) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }

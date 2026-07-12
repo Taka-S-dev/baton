@@ -70,20 +70,19 @@ func (m Model) runNext() tea.Cmd {
 	if item.IsAlias() {
 		var cmds []mdl.RunItem
 		for _, stepName := range item.Alias.Steps {
-			for i := range m.config.Commands {
-				if m.config.Commands[i].Name == stepName {
-					c := m.config.Commands[i]
-					if item.VarMap != nil {
-						c = slot.Apply(c, item.VarMap)
-					} else if item.Alias.Vars != nil {
-						if vars, ok := item.Alias.Vars[stepName]; ok {
-							c = slot.Apply(c, vars)
-						}
-					}
-					cmds = append(cmds, mdl.RunItem{Name: stepName, Cmd: &c})
-					break
+			c, ok := m.lookupStepCommand(stepName)
+			if !ok {
+				continue
+			}
+			if item.VarMap != nil {
+				c = slot.Apply(c, item.VarMap)
+			} else if item.Alias.Vars != nil {
+				if vars, ok := item.Alias.Vars[stepName]; ok {
+					c = slot.Apply(c, vars)
 				}
 			}
+			cCopy := c
+			cmds = append(cmds, mdl.RunItem{Name: stepName, Cmd: &cCopy})
 		}
 		newItems := make([]mdl.RunItem, 0, len(r.items)-1+len(cmds))
 		newItems = append(newItems, r.items[:r.current]...)
@@ -140,14 +139,8 @@ func (m Model) updateRetry(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		"Abort",
 	}
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(items)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(items))
 	case "enter":
 		switch m.listCursor {
 		case 0:
@@ -195,27 +188,20 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		store.SaveLastWorkflow(m.projectDir, wf.Name)
 		m.lastWorkflow = wf.Name
 
-		// Apply saved vars first; any remaining {slots} are resolved interactively.
-		var preCmds []mdl.Command
+		// Apply stored vars first; any remaining {slots} are resolved interactively.
+		var msItems []msItem
 		var names []string
 		for _, name := range wf.Commands {
-			for i := range m.config.Commands {
-				if m.config.Commands[i].Name == name {
-					cmd := m.config.Commands[i]
-					if wf.Vars != nil {
-						if vars, ok := wf.Vars[name]; ok {
-							cmd = slot.Apply(cmd, vars)
-						}
-					}
-					preCmds = append(preCmds, cmd)
-					names = append(names, name)
-					break
-				}
+			cmd, ok := m.config.FindCommand(name)
+			if !ok {
+				continue
 			}
-		}
-		msItems := make([]msItem, len(preCmds))
-		for i := range preCmds {
-			msItems[i] = msItem{cmd: &preCmds[i]}
+			if vars, ok := wf.Vars[name]; ok {
+				cmd = slot.Apply(cmd, vars)
+			}
+			cmdCopy := cmd
+			msItems = append(msItems, msItem{cmd: &cmdCopy})
+			names = append(names, name)
 		}
 		m.resolve = &resolveFlowState{
 			purpose:       purposeRunWorkflow,

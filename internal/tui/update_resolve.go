@@ -20,6 +20,9 @@ func (m *Model) setupMultiSelect(includeAliases bool) tea.Cmd {
 	m.msViewStart = 0
 	m.msSelected = nil
 	m.msActiveField = 0
+	for i := range m.config.Base {
+		m.msItems = append(m.msItems, msItem{cmd: &m.config.Base[i]})
+	}
 	for i := range m.config.Commands {
 		m.msItems = append(m.msItems, msItem{cmd: &m.config.Commands[i]})
 	}
@@ -233,21 +236,18 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 			return m.openSlotPick(r.currentSlots[r.currentSlotIdx], item.cmd)
 		}
 
-		slots := slot.GetSlots(*item.cmd)
+		// Command (template-derived ones are baked at load time).
+		// Remaining {slots} — including ones skipped at creation — are
+		// resolved interactively.
 		if r.currentValues == nil {
 			r.currentValues = make(map[string]string)
-			r.currentSlots = slots
+			r.currentSlots = slot.GetSlots(*item.cmd)
 			r.currentSlotIdx = 0
 		}
 		if r.currentSlotIdx >= len(r.currentSlots) {
 			resolved := slot.Apply(*item.cmd, r.currentValues)
 			if r.itemNotes[r.currentIdx] == "" {
-				dir := resolved.Dir
-				if dir == "" {
-					dir = "."
-				}
-				note := "$ " + resolved.Cmd + "  (workdir: " + dir + ")"
-				r.itemNotes[r.currentIdx] = note
+				r.itemNotes[r.currentIdx] = cmdNote(resolved)
 			}
 			if (r.purpose == purposeCreateWorkflow || r.purpose == purposeCreateAlias) && len(r.currentValues) > 0 {
 				r.workflowVars[item.cmd.Name] = copyMap(r.currentValues)
@@ -268,18 +268,50 @@ func (m Model) collectAliasSlots(a *mdl.Alias) []slot.Def {
 	seen := make(map[string]bool)
 	var slots []slot.Def
 	for _, stepName := range a.Steps {
-		for _, cmd := range m.config.Commands {
-			if cmd.Name == stepName {
-				for _, s := range slot.GetSlots(cmd) {
-					if !seen[s.Name] {
-						seen[s.Name] = true
-						slots = append(slots, s)
-					}
-				}
+		cmd, ok := m.lookupStepCommand(stepName)
+		if !ok {
+			continue
+		}
+		for _, s := range slot.GetSlots(cmd) {
+			if !seen[s.Name] {
+				seen[s.Name] = true
+				slots = append(slots, s)
 			}
 		}
 	}
 	return slots
+}
+
+// lookupStepCommand resolves a step name to a runnable command
+// (template-derived commands are already baked at load time).
+func (m Model) lookupStepCommand(name string) (mdl.Command, bool) {
+	return m.config.FindCommand(name)
+}
+
+// cmdNote formats the "$ cmd (workdir: dir)" line shown in list contexts.
+func cmdNote(cmd mdl.Command) string {
+	dir := cmd.Dir
+	if dir == "" {
+		dir = "."
+	}
+	return "$ " + cmd.Cmd + "  (workdir: " + dir + ")"
+}
+
+// partialNote returns the display note for an item mid-resolution, or ""
+// when the item has no directly displayable command (aliases).
+func (m Model) partialNote(item msItem, values map[string]string) string {
+	if item.cmd == nil {
+		return ""
+	}
+	return cmdNote(slot.Apply(*item.cmd, values))
+}
+
+// itemNeedsSlots reports whether the item still has slots to resolve interactively.
+func (m Model) itemNeedsSlots(item msItem) bool {
+	if item.isAlias() {
+		return item.alias.Vars == nil && len(m.collectAliasSlots(item.alias)) > 0
+	}
+	return len(slot.GetSlots(*item.cmd)) > 0
 }
 
 func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
@@ -376,13 +408,22 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if sp.canSkip && sp.cursor == skipRow {
+			if m.sce != nil {
+				return m.skipCommandEditSlot()
+			}
 			return m.skipSlot()
 		}
 		if sp.cursor == len(sp.filtered) {
 			if sp.search != "" {
+				if m.sce != nil {
+					return m.acceptCommandEditSlotValue(sp.search)
+				}
 				return m.acceptSlotValue(sp.search)
 			}
 		} else {
+			if m.sce != nil {
+				return m.acceptCommandEditSlotValue(sp.filtered[sp.cursor].Value)
+			}
 			return m.acceptSlotValue(sp.filtered[sp.cursor].Value)
 		}
 	case "esc":
@@ -391,6 +432,9 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			sp.applyFilter()
 			sp.cursor = 0
 			return m, nil
+		}
+		if m.sce != nil {
+			return m.goBackCommandEditSlot()
 		}
 		return m.goBackInResolve()
 	default:
@@ -409,13 +453,8 @@ func (m Model) skipSlot() (tea.Model, tea.Cmd) {
 
 	if r.currentIdx < len(r.rawItems) {
 		item := r.rawItems[r.currentIdx]
-		if !item.isAlias() {
-			partial := slot.Apply(*item.cmd, r.currentValues)
-			dir := partial.Dir
-			if dir == "" {
-				dir = "."
-			}
-			r.itemNotes[r.currentIdx] = "$ " + partial.Cmd + "  (workdir: " + dir + ")"
+		if note := m.partialNote(item, r.currentValues); note != "" {
+			r.itemNotes[r.currentIdx] = note
 		}
 	}
 
@@ -434,13 +473,7 @@ func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 
 	if r.currentIdx < len(r.rawItems) {
 		item := r.rawItems[r.currentIdx]
-		if !item.isAlias() {
-			partial := slot.Apply(*item.cmd, r.currentValues)
-			partialDir := partial.Dir
-			if partialDir == "" {
-				partialDir = "."
-			}
-			note := "$ " + partial.Cmd + "  (workdir: " + partialDir + ")"
+		if note := m.partialNote(item, r.currentValues); note != "" {
 			r.itemNotes[r.currentIdx] = note
 		}
 	}
@@ -492,14 +525,8 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 	r.itemNotes[r.currentIdx] = ""
 
 	for r.currentIdx > 0 {
-		item := r.rawItems[r.currentIdx]
-		if !item.isAlias() && len(slot.GetSlots(*item.cmd)) > 0 {
+		if m.itemNeedsSlots(r.rawItems[r.currentIdx]) {
 			break
-		}
-		if item.isAlias() && item.alias.Vars == nil {
-			if len(m.collectAliasSlots(item.alias)) > 0 {
-				break
-			}
 		}
 		r.currentIdx--
 		if len(r.resolved) > 0 {
@@ -509,10 +536,7 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 	}
 
 	// If we landed on an item with no slots, no earlier slotted item exists — go back to selection.
-	landed := r.rawItems[r.currentIdx]
-	hasSlots := (!landed.isAlias() && len(slot.GetSlots(*landed.cmd)) > 0) ||
-		(landed.isAlias() && landed.alias.Vars == nil && len(m.collectAliasSlots(landed.alias)) > 0)
-	if !hasSlots {
+	if !m.itemNeedsSlots(r.rawItems[r.currentIdx]) {
 		m.resolve = nil
 		m.sp = nil
 		switch r.purpose {
@@ -538,7 +562,7 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 func (m Model) openConfirmVars(vars map[string]map[string]string) (tea.Model, tea.Cmd) {
 	var cmds []mdl.Command
 	for _, item := range m.resolve.rawItems {
-		if item.isAlias() {
+		if item.isAlias() || item.cmd == nil {
 			continue
 		}
 		if _, ok := vars[item.cmd.Name]; !ok {
@@ -561,7 +585,11 @@ func (m Model) updateConfirmVars(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cv.btn = 1 - cv.btn
 	case "enter":
 		if cv.btn == 0 {
-			return m.openNameInput(nameInputMode(m.resolve.purpose - 1))
+			mode := nameInputWorkflow
+			if m.resolve.purpose == purposeCreateAlias {
+				mode = nameInputAlias
+			}
+			return m.openNameInput(mode)
 		}
 		fallthrough
 	case "esc":

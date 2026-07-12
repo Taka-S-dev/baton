@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"sort"
-
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
@@ -13,14 +11,8 @@ import (
 
 func (m Model) updateAliasMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		switch m.listItems[m.listCursor] {
 		case "Create alias":
@@ -51,14 +43,8 @@ func (m Model) updateAliasMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateEditAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		if len(m.aliases) > 0 {
 			m.editTargetIdx = m.listCursor
@@ -76,14 +62,8 @@ func (m Model) updateEditAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateEditAliasMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		switch m.listItems[m.listCursor] {
 		case "Rename":
@@ -109,74 +89,20 @@ func (m Model) updateEditAliasMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateDeleteAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	gotoAliasMgmt := func() {
-		m.screen = ScreenAliasMgmt
-		m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-		m.listCursor = 0
-	}
-	if m.deleteConfirm {
-		switch msg.String() {
-		case "tab", "left", "right", "h", "l":
-			m.deleteBtn = 1 - m.deleteBtn
-		case "enter":
-			if m.deleteBtn == 1 {
-				indices := m.deleteSelected
-				sort.Sort(sort.Reverse(sort.IntSlice(indices)))
-				for _, i := range indices {
-					m.aliases = append(m.aliases[:i], m.aliases[i+1:]...)
-				}
-				if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
-					m.errMsg = "failed to save aliases: " + err.Error()
-				}
-				m.deleteSelected = nil
-				m.deleteConfirm = false
-				m.deleteBtn = 0
-				gotoAliasMgmt()
-			} else {
-				m.deleteConfirm = false
-				m.deleteBtn = 0
+	return m.updateDeleteList(msg, len(m.aliases), nil,
+		func() {
+			m.screen = ScreenAliasMgmt
+			m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
+			m.listCursor = 0
+		},
+		func(indices []int) {
+			for _, i := range indices {
+				m.aliases = append(m.aliases[:i], m.aliases[i+1:]...)
 			}
-		case "esc":
-			m.deleteConfirm = false
-			m.deleteBtn = 0
-		}
-		return m, nil
-	}
-	switch msg.String() {
-	case "up":
-		if m.listCursor > 0 {
-			m.listCursor--
-		}
-	case "down":
-		if m.listCursor < len(m.listItems)-1 {
-			m.listCursor++
-		}
-	case " ", "　":
-		found := false
-		for i, s := range m.deleteSelected {
-			if s == m.listCursor {
-				m.deleteSelected = append(m.deleteSelected[:i], m.deleteSelected[i+1:]...)
-				found = true
-				break
+			if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
+				m.errMsg = "failed to save aliases: " + err.Error()
 			}
-		}
-		if !found {
-			m.deleteSelected = append(m.deleteSelected, m.listCursor)
-		}
-	case "enter":
-		if len(m.aliases) == 0 {
-			break
-		}
-		if len(m.deleteSelected) == 0 {
-			m.deleteSelected = []int{m.listCursor}
-		}
-		m.deleteConfirm = true
-		m.deleteBtn = 0
-	case "esc":
-		m.deleteSelected = nil
-		gotoAliasMgmt()
-	}
-	return m, nil
+		})
 }
 
 // ── Save / rename alias ───────────────────────────────────────────────────────
