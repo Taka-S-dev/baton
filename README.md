@@ -19,7 +19,9 @@ A terminal-based workflow runner for Windows, Linux, and macOS. Define commands 
 - Save and reuse command combinations as workflows
 - Combine multiple commands into a single alias
 - `{placeholder}` substitution — pick values from a selection list at runtime
-- Optional `vars` field to map slot names to named lists
+- Create commands from the TUI: write one directly, or derive one from any
+  slotted command (template) with pre-filled values
+- Optional `slots` field to map slot names to named lists
 - Supports `sh` (Linux/macOS), `cmd.exe` (Windows), and PowerShell per command
 - Remembers the last used workflow
 - Retry from the failed step when a command fails
@@ -43,10 +45,11 @@ baton/
 │       ├── update_resolve.go # Multi-select, slot resolution, confirm vars
 │       ├── update_workflow.go# Workflow CRUD
 │       ├── update_alias.go   # Alias CRUD
+│       ├── update_manage_commands.go # Command CRUD (direct input / from template)
 │       ├── update_list.go    # List and name-input screens
 │       ├── view.go           # All rendering functions
 │       └── styles.go         # Lipgloss styles and helper render functions
-└── projects.example/         # Sample project to copy as a starting point
+└── projects.example/         # Sample projects (JSON and TSV) to copy as a starting point
 ```
 
 The TUI follows the standard [Bubble Tea](https://github.com/charmbracelet/bubbletea) architecture (Elm-style Model/Update/View). Each screen has a corresponding `update*` and `view*` function. Slot resolution and workflow/alias creation share a common `resolveFlowState` that drives multi-step placeholder prompting across multiple commands.
@@ -75,7 +78,7 @@ Requires Go 1.24+.
 
 ## Quick start
 
-A sample project is included in `projects.example/`. Copy it to get started:
+Sample projects are included in `projects.example/` — `example-json` (JSON) and `example-tsv` (TSV). Copy them to get started:
 
 ```
 cp -r projects.example projects   # Linux/macOS
@@ -95,14 +98,14 @@ baton looks for a `projects/` directory in this order:
 2. `projects/` folder adjacent to the executable
 3. `~/.config/baton/projects/` (Linux / macOS)
 
-Create a subfolder for each project and add `config.json` or `config.tsv` inside it:
+Create a subfolder for each project and add `commands.json` or `commands.tsv` inside it:
 
 ```
 ~/.config/baton/projects/    (Linux/macOS)
 ├── projectA/
-│   └── config.json
+│   └── commands.json
 └── projectB/
-    └── config.tsv
+    └── commands.tsv
 ```
 
 ```
@@ -110,30 +113,40 @@ any-folder/                  (Windows, or portable install)
 ├── baton.exe
 └── projects/
     ├── projectA/
-    │   └── config.json
+    │   └── commands.json
     └── projectB/
-        └── config.tsv
+        └── commands.tsv
 ```
 
 If multiple projects exist, baton shows a selection screen on startup. Use **Switch config** from the main menu to switch projects at any time.
 
 ## Configuration
 
-### config.json
+A project has two command layers:
+
+| File | Written by | Contents |
+|------|-----------|----------|
+| `commands.json` / `commands.tsv` | You (hand-written; baton never modifies it) | Command definitions — plain ones, and slotted ones that double as templates |
+| `commands.local.json` | baton (via **Manage commands**) | Commands you created in the TUI |
+
+Both layers can coexist; names in `commands.local.json` take priority.
+Legacy file names (`templates.json`, `template.json`, `templates.tsv`, `config.tsv`, `config.json`) are still readable.
+
+### commands.json
 
 ```json
 {
   "commands": [
-    { "name": "build",  "group": "make",   "workdir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } },
+    { "name": "build",  "group": "make",   "workdir": "{projDir}", "cmd": "echo building {projCmd}", "slots": { "projDir": "project", "projCmd": "project" } },
     { "name": "test",   "group": "make",   "workdir": "{project}", "cmd": "echo testing {project}" },
-    { "name": "deploy", "group": "deploy", "workdir": "",          "cmd": "echo deploying {env}" }
+    { "name": "deploy", "group": "deploy", "cmd": "echo deploying {env}" }
   ]
 }
 ```
 
-### config.tsv
+### commands.tsv
 
-Tab-separated alternative to `config.json`. If both files exist, `config.json` takes priority.
+Tab-separated alternative to `commands.json` (both can coexist; entries are merged).
 
 ```
 name	group	workdir	cmd	shell	vars
@@ -149,9 +162,23 @@ deploy	deploy		echo deploying {env}
 | `name`  | Yes      | Command name |
 | `group` | No       | Group label for filtering |
 | `workdir`   | No       | Working directory (leave empty to use current). Supports `{placeholders}` |
-| `cmd`   | Yes      | Command to execute. Supports `{placeholders}` |
+| `cmd`   | Yes*     | Command to execute. Supports `{placeholders}` |
 | `shell` | No       | `"ps"` for PowerShell (`powershell` on Windows, `pwsh` on Linux/macOS), omit to use the platform default (`cmd /C` on Windows, `sh -c` elsewhere) |
-| `vars`  | No       | Maps slot names to list names (see Placeholders) |
+| `slots` | No       | Maps slot names to list names (see Placeholders). `vars` is accepted as a legacy alias (and is the TSV column name) |
+| `template` | No    | Name of a slotted command this entry derives from (used by TUI-created commands) |
+| `values` | No      | Slot values applied to the template. The baked `cmd` is recomputed from `template` + `values` on every load, so template edits propagate |
+
+*Required unless `template` is set.
+
+### Template-derived commands
+
+Any command containing `{slots}` can act as a template. **Manage commands → Create command → From template** picks one, fills its slots (each can be skipped to resolve at run time), and saves the result to `commands.local.json`:
+
+```json
+{ "name": "build-api", "cmd": "echo building Z:\\api", "workdir": "Z:\\api", "template": "build", "values": { "projDir": "Z:\\api", "projCmd": "Z:\\api" } }
+```
+
+The `cmd`/`workdir` are baked for readability and as a fallback if the template is deleted; `template` + `values` remain the source of truth.
 
 ## Placeholders and Selection Lists
 
@@ -169,12 +196,12 @@ Create lists via **Manage lists** from the main menu. Each list is stored as a `
 
 By default, `{name}` selects from the list named `name`. The same placeholder in `cmd` and `workdir` is prompted once and applied to both.
 
-### vars — mapping slot names to lists
+### slots — mapping slot names to lists
 
-Use `vars` to map different slot names to the same list:
+Use `slots` to map different slot names to the same list:
 
 ```json
-{ "workdir": "{projDir}", "cmd": "echo building {projCmd}", "vars": { "projDir": "project", "projCmd": "project" } }
+{ "workdir": "{projDir}", "cmd": "echo building {projCmd}", "slots": { "projDir": "project", "projCmd": "project" } }
 ```
 
 Both `{projDir}` and `{projCmd}` will select from the `project` list, each prompted separately.
@@ -183,6 +210,7 @@ Both `{projDir}` and `{projCmd}` will select from the `project` list, each promp
 
 - **Run manually** — baton prompts for each placeholder before execution
 - **Workflows and aliases** — baton prompts when creating; values are saved and reused at run time
+- Placeholders can be **skipped** when creating a workflow or a template-derived command — skipped ones are prompted at run time instead
 
 #### Navigation during placeholder selection
 
@@ -207,6 +235,7 @@ baton [--dry-run]
     Create workflow
     Edit workflow
     Delete workflow
+    Manage commands
     Manage aliases
     Manage lists
     Switch config
