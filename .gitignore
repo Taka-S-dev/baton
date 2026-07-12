@@ -24,6 +24,7 @@ projects/
 projects.example/**/.last_workflow
 projects.example/**/workflows.json
 projects.example/**/aliases.json
+projects.example/**/commands.local.json
 
 # Exclude binaries
 *.exe

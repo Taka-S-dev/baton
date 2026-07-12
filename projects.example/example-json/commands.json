@@ -1,0 +1,10 @@
+{
+  "commands": [
+    { "name": "build",   "group": "make",   "workdir": "{projDir}", "cmd": "echo building {projCmd}", "slots": { "projDir": "project", "projCmd": "project" } },
+    { "name": "test",    "group": "make",   "workdir": "{project}", "cmd": "echo testing {project}" },
+    { "name": "clean",   "group": "make",   "workdir": "{project}", "cmd": "echo cleaning {project}" },
+    { "name": "deploy",  "group": "deploy", "cmd": "echo deploying {env}" },
+    { "name": "restart", "group": "deploy", "cmd": "echo restarting {env}" },
+    { "name": "hello",   "group": "misc",   "cmd": "echo hello baton" }
+  ]
+}
