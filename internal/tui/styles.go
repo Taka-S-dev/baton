@@ -8,21 +8,21 @@ import (
 )
 
 var (
-	sCyan     = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
-	sGray     = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	sWhite    = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-	sGreen    = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
-	sYellow   = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))
-	sRed      = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	sBold     = lipgloss.NewStyle().Bold(true)
-	sDim      = lipgloss.NewStyle().Faint(true)
+	sCyan       = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
+	sGray       = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	sWhite      = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	sGreen      = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
+	sYellow     = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))
+	sRed        = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	sBold       = lipgloss.NewStyle().Bold(true)
+	sDim        = lipgloss.NewStyle().Faint(true)
 	sCursor     = lipgloss.NewStyle().Background(lipgloss.Color("238")).Foreground(lipgloss.Color("97"))
 	sMenuSelect = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("255")).Bold(true).Width(26)
-	sSelNum   = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
-	sGroup    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	sCyanBold  = lipgloss.NewStyle().Foreground(lipgloss.Color("36")).Bold(true)
-	sSlotVar   = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true) // bright cyan, consistent across terminals
-	sGreenBold = lipgloss.NewStyle().Foreground(lipgloss.Color("92")).Bold(true)
+	sSelNum     = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
+	sGroup      = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	sCyanBold   = lipgloss.NewStyle().Foreground(lipgloss.Color("36")).Bold(true)
+	sSlotVar    = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true) // bright cyan, consistent across terminals
+	sGreenBold  = lipgloss.NewStyle().Foreground(lipgloss.Color("92")).Bold(true)
 
 	sBtnSelected = lipgloss.NewStyle().
 			Padding(0, 2).

@@ -131,21 +131,21 @@ func (m Model) viewProjectSelect(w int) string {
 }
 
 type menuItemInfo struct {
-	desc     string
+	desc      string
 	shortcuts [][2]string
 }
 
 var menuItemInfos = map[string]menuItemInfo{
-	"Run workflow":             {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
-	"Run manually":             {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
-	"Create workflow":          {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
-	"Edit workflow":            {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
-	"Delete workflow":          {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Space", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
-	"Manage commands":          {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage aliases":           {desc: "Reusable command groups, selectable in Run Manually.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage lists":             {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
-	"Switch config":            {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
-	"Exit":                     {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
+	"Run workflow":    {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
+	"Run manually":    {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
+	"Create workflow": {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
+	"Edit workflow":   {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
+	"Delete workflow": {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Space", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
+	"Manage commands": {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage aliases":  {desc: "Reusable command groups, selectable in Run Manually.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage lists":    {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
+	"Switch config":   {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
+	"Exit":            {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
 
 func (m Model) viewMainMenu(w int) string {
@@ -627,7 +627,7 @@ func (m Model) viewSlotPick(w int) string {
 					rawLine = e.Value
 				}
 			}
-			b.WriteString(sCursor.Width(w-2).Render("    " + rawLine) + "\n")
+			b.WriteString(sCursor.Width(w-2).Render("    "+rawLine) + "\n")
 		} else {
 			var line string
 			if isSkip {
@@ -1185,4 +1185,3 @@ func sortedKeys(m map[string]string) []string {
 	sort.Strings(keys)
 	return keys
 }
-

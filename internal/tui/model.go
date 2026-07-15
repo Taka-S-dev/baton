@@ -102,10 +102,10 @@ func (i msItem) isAlias() bool { return i.alias != nil }
 
 // slotPickState holds state for the slot-picking screen.
 type slotPickState struct {
-	slotName  string
-	listName  string
-	entries   []mdl.ListEntry
-	filtered  []mdl.ListEntry
+	slotName string
+	listName string
+	entries  []mdl.ListEntry
+	filtered []mdl.ListEntry
 	cursor   int
 	search   string
 	canSkip  bool // true when creating a workflow/alias
@@ -171,17 +171,17 @@ type runningState struct {
 
 // listEditState holds state for list editing.
 type listEditState struct {
-	name    string
-	entries []mdl.ListEntry
-	cursor  int
-	adding  bool
-	addVal  string
-	addLbl  string
-	addFld  int // 0=value, 1=label
-	editing    bool
-	editFld    int // 0=value, 1=label
-	editValTI  textinput.Model
-	editLblTI  textinput.Model
+	name      string
+	entries   []mdl.ListEntry
+	cursor    int
+	adding    bool
+	addVal    string
+	addLbl    string
+	addFld    int // 0=value, 1=label
+	editing   bool
+	editFld   int // 0=value, 1=label
+	editValTI textinput.Model
+	editLblTI textinput.Model
 }
 
 // commandEditState holds state for creating/editing a template-derived command.
@@ -235,13 +235,13 @@ type Model struct {
 	listItems  []string
 
 	// Multi-select
-	msItems      []msItem
-	msCursor     int
-	msViewStart  int
-	msSelected   []int
+	msItems       []msItem
+	msCursor      int
+	msViewStart   int
+	msSelected    []int
 	msActiveField int
-	msSearchTI   textinput.Model
-	msGroupTI    textinput.Model
+	msSearchTI    textinput.Model
+	msGroupTI     textinput.Model
 
 	// Slot picking
 	sp *slotPickState
@@ -250,9 +250,9 @@ type Model struct {
 	resolve *resolveFlowState
 
 	// Confirm run
-	confirmRunItems  []mdl.RunItem
-	confirmRunLabel  string
-	confirmRunBtn    int
+	confirmRunItems []mdl.RunItem
+	confirmRunLabel string
+	confirmRunBtn   int
 
 	// Confirm vars
 	cv *confirmVarsState
@@ -266,8 +266,8 @@ type Model struct {
 	nameInputErr  string
 
 	// Sub-models
-	spinner     spinner.Model
-	stepsVP     viewport.Model
+	spinner      spinner.Model
+	stepsVP      viewport.Model
 	stepsFocused bool
 
 	// List edit
@@ -279,14 +279,14 @@ type Model struct {
 	// Command form (direct input)
 	cf *commandFormState
 
-	editTargetIdx    int
-	mainMenuCursor   int
-	lastWorkflow     string
-	errMsg           string
-	loadWarning      string
-	deleteConfirm    bool
-	deleteSelected   []int
-	deleteBtn        int // 0=No (default), 1=Yes
+	editTargetIdx  int
+	mainMenuCursor int
+	lastWorkflow   string
+	errMsg         string
+	loadWarning    string
+	deleteConfirm  bool
+	deleteSelected []int
+	deleteBtn      int // 0=No (default), 1=Yes
 }
 
 // New creates the initial model.
