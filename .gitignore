@@ -11,7 +11,8 @@ projects/
 !*.go
 !go.mod
 !go.sum
-!*.md
+!/README.md
+!projects.example/**/*.md
 !*.yml
 !LICENSE
 !.gitignore
