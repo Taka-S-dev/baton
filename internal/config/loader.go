@@ -166,7 +166,7 @@ func loadTSV(path string) (model.Config, error) {
 		parts := strings.Split(line, "\t")
 		get := func(idx int) string {
 			if idx < len(parts) {
-				return strings.TrimSpace(parts[idx])
+				return unquoteTSVField(strings.TrimSpace(parts[idx]))
 			}
 			return ""
 		}
@@ -185,6 +185,16 @@ func loadTSV(path string) (model.Config, error) {
 		}
 	}
 	return model.Config{Commands: commands}, nil
+}
+
+// unquoteTSVField strips Excel-style field quoting: Excel wraps cells that
+// contain commas in double quotes and doubles embedded quotes when saving
+// as TSV ("a,b" / "say ""hi""").
+func unquoteTSVField(s string) string {
+	if len(s) >= 2 && strings.HasPrefix(s, `"`) && strings.HasSuffix(s, `"`) {
+		return strings.ReplaceAll(s[1:len(s)-1], `""`, `"`)
+	}
+	return s
 }
 
 func parseVarsStr(s string) map[string]string {

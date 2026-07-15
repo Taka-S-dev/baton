@@ -47,6 +47,29 @@ func TestLoadTSV_UnusedVarDoesNotAffectListName(t *testing.T) {
 	}
 }
 
+// TestLoadTSV_ExcelQuotedVars ensures Excel-style quoted fields are
+// unquoted: Excel wraps cells containing commas in double quotes when
+// saving as TSV.
+func TestLoadTSV_ExcelQuotedVars(t *testing.T) {
+	dir := t.TempDir()
+	tsv := "name\tgroup\tworkdir\tcmd\tshell\tvars\n" +
+		"say2\tutility\t\techo {message} {env}\t\t\"message=messages,env=environments\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Base) != 1 {
+		t.Fatalf("want 1 command, got %d", len(cfg.Base))
+	}
+	slots := cfg.Base[0].Slots
+	if slots["message"] != "messages" || slots["env"] != "environments" {
+		t.Errorf("quoted vars field not parsed: %+v", slots)
+	}
+}
+
 // TestLoadConfig_TSVAndJSONCoexist guards the TSV-main workflow: creating
 // config.json via the TUI (saved commands) must not hide TSV commands.
 func TestLoadConfig_TSVAndJSONCoexist(t *testing.T) {
