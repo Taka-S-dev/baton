@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
@@ -1024,9 +1025,133 @@ func (m Model) viewCommandForm(w int) string {
 			b.WriteString("  " + gray(label+" > ") + "\n")
 		}
 	}
+
+	// Placeholder picker: opens as a centered floating window (Tab).
+	if cf.slotPickFocus {
+		return m.viewPlaceholderWindow(w)
+	}
+	if cf.slotInsertAvailable(len(m.lists)) {
+		b.WriteString("\n  " + dim("Tab: insert placeholder from a list") + "\n")
+	}
+	if lines := m.slotValidationLines(cf); len(lines) > 0 {
+		b.WriteString("\n")
+		for _, l := range lines {
+			b.WriteString("  " + l + "\n")
+		}
+	}
+
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("Enter: next / save   Esc: previous / cancel") + "\n")
 	return b.String()
+}
+
+// viewPlaceholderWindow renders the placeholder picker as a centered
+// floating window (LazyVim style) while it has key focus: list names in
+// the left pane, the selected list's entries in the right pane. The field
+// being edited is echoed at the top so the insertion context stays visible.
+func (m Model) viewPlaceholderWindow(w int) string {
+	cf := m.cf
+	names := m.sortedListNames()
+
+	// Left pane: list names with cursor (dimmed while the right pane is focused).
+	var left strings.Builder
+	for i, name := range names {
+		if i == cf.slotPickCursor {
+			if cf.slotPickPane == 0 {
+				left.WriteString(cyanBold("▶ ") + white("{"+name+"}") + "\n")
+			} else {
+				left.WriteString(gray("▶ ") + white("{"+name+"}") + "\n")
+			}
+		} else {
+			left.WriteString("  " + gray("{"+name+"}") + "\n")
+		}
+	}
+
+	// Right pane: entries of the selected list (value + label). The pane
+	// takes focus with → and inserts the selected value directly.
+	const maxRows = 8
+	var right strings.Builder
+	if cf.slotPickCursor < len(names) {
+		entries := m.lists[names[cf.slotPickCursor]]
+		if len(entries) == 0 {
+			right.WriteString(dim("(empty)") + "\n")
+		}
+		start := 0
+		if cf.slotPickPane == 1 && cf.slotPickValueCursor >= maxRows {
+			start = cf.slotPickValueCursor - maxRows + 1
+		}
+		if start > 0 {
+			right.WriteString(dim(fmt.Sprintf("…%d above", start)) + "\n")
+		}
+		for i := start; i < len(entries); i++ {
+			if i >= start+maxRows {
+				right.WriteString(dim(fmt.Sprintf("…+%d more", len(entries)-i)) + "\n")
+				break
+			}
+			e := entries[i]
+			line := e.Value
+			if e.Label != "" {
+				line += "  " + gray(e.Label)
+			}
+			if cf.slotPickPane == 1 && i == cf.slotPickValueCursor {
+				right.WriteString(cyanBold("▶ ") + line + "\n")
+			} else {
+				right.WriteString("  " + line + "\n")
+			}
+		}
+	}
+	rightPane := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(lipgloss.Color("240")).
+		PaddingLeft(2).
+		Render(strings.TrimRight(right.String(), "\n"))
+
+	panes := lipgloss.JoinHorizontal(lipgloss.Top,
+		lipgloss.NewStyle().PaddingRight(2).Render(strings.TrimRight(left.String(), "\n")),
+		rightPane)
+
+	help := "↑↓ move   →: values   Enter: insert {placeholder}   Esc: close"
+	if cf.slotPickPane == 1 {
+		help = "↑↓ move   ←: lists   Enter: insert value   Esc: close"
+	}
+	content := cyanBold(" Insert placeholder / value ") + "\n\n" +
+		m.nameInput.View() + "\n\n" +
+		panes + "\n\n" +
+		gray(help)
+
+	win := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("36")).
+		Padding(0, 2).
+		Render(content)
+
+	h := m.height
+	if h == 0 {
+		h = 24
+	}
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, win)
+}
+
+// slotValidationLines checks every {slot} in the cmd/workdir fields against
+// the selection lists, so typos surface while typing instead of at run time.
+func (m Model) slotValidationLines(cf *commandFormState) []string {
+	cmdStr, dirStr := cf.fields[1], cf.fields[2]
+	switch cf.fieldIdx {
+	case 1:
+		cmdStr = m.nameInput.Value()
+	case 2:
+		dirStr = m.nameInput.Value()
+	}
+	probe := mdl.Command{Cmd: cmdStr, Dir: dirStr}
+	var lines []string
+	for _, s := range slot.GetSlots(probe) {
+		if _, ok := m.lists[s.ListName]; ok {
+			lines = append(lines, green("✓")+" "+gray("{"+s.Name+"} → "+s.ListName))
+		} else {
+			lines = append(lines, yellow("⚠")+" "+gray("{"+s.Name+"} → ")+yellow("no list (free input at run time)"))
+		}
+	}
+	return lines
 }
 
 func (m Model) viewEditCommand(w int) string {

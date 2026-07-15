@@ -24,6 +24,16 @@ func (m *Model) moveListCursor(key string, n int) bool {
 	return false
 }
 
+// sortedListNames returns the selection-list names in stable order.
+func (m Model) sortedListNames() []string {
+	names := make([]string, 0, len(m.lists))
+	for k := range m.lists {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // toggleDeleteSelected toggles idx in the delete-selection set.
 func (m *Model) toggleDeleteSelected(idx int) {
 	for i, s := range m.deleteSelected {

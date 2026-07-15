@@ -201,6 +201,13 @@ type commandFormState struct {
 	editIdx  int // for edit mode
 	fieldIdx int
 	fields   [4]string // name, cmd, workdir, group
+
+	// Placeholder picker window: left pane picks a list name to insert
+	// {name}; the right pane picks a concrete value to insert directly.
+	slotPickFocus       bool
+	slotPickCursor      int
+	slotPickPane        int // 0=list names, 1=values
+	slotPickValueCursor int
 }
 
 var commandFormLabels = [4]string{"Name", "Cmd", "Workdir (optional)", "Group (optional)"}

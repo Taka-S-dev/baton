@@ -96,6 +96,12 @@ func (m *Model) closeCommandForm() {
 	m.screen = ScreenManageCommands
 }
 
+// slotInsertAvailable reports whether the slot-insert panel applies to the
+// current form field (only cmd and workdir accept {slot} placeholders).
+func (cf *commandFormState) slotInsertAvailable(listCount int) bool {
+	return (cf.fieldIdx == 1 || cf.fieldIdx == 2) && listCount > 0
+}
+
 func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.cf == nil {
 		return m, nil
@@ -104,13 +110,80 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	gotoField := func(idx int) tea.Cmd {
 		cf.fieldIdx = idx
+		cf.slotPickFocus = false
 		m.nameInput.Prompt = commandFormLabels[idx] + " > "
 		m.nameInput.SetValue(cf.fields[idx])
 		m.nameInput.CursorEnd()
 		return m.nameInput.Focus()
 	}
 
+	// Placeholder picker window has key focus. Left pane inserts {name},
+	// right pane inserts the selected concrete value, both at the cursor
+	// position of the field being edited.
+	if cf.slotPickFocus {
+		names := m.sortedListNames()
+		var entries []mdl.ListEntry
+		if cf.slotPickCursor < len(names) {
+			entries = m.lists[names[cf.slotPickCursor]]
+		}
+		insertAtCursor := func(text string) {
+			v := []rune(m.nameInput.Value())
+			pos := m.nameInput.Position()
+			if pos > len(v) {
+				pos = len(v)
+			}
+			m.nameInput.SetValue(string(v[:pos]) + text + string(v[pos:]))
+			m.nameInput.SetCursor(pos + len([]rune(text)))
+			cf.slotPickFocus = false
+		}
+
+		switch msg.String() {
+		case "up":
+			if cf.slotPickPane == 1 {
+				if cf.slotPickValueCursor > 0 {
+					cf.slotPickValueCursor--
+				}
+			} else if cf.slotPickCursor > 0 {
+				cf.slotPickCursor--
+				cf.slotPickValueCursor = 0
+			}
+		case "down":
+			if cf.slotPickPane == 1 {
+				if cf.slotPickValueCursor < len(entries)-1 {
+					cf.slotPickValueCursor++
+				}
+			} else if cf.slotPickCursor < len(names)-1 {
+				cf.slotPickCursor++
+				cf.slotPickValueCursor = 0
+			}
+		case "right":
+			if cf.slotPickPane == 0 && len(entries) > 0 {
+				cf.slotPickPane = 1
+				cf.slotPickValueCursor = 0
+			}
+		case "left":
+			cf.slotPickPane = 0
+		case "enter":
+			if cf.slotPickPane == 1 && cf.slotPickValueCursor < len(entries) {
+				insertAtCursor(entries[cf.slotPickValueCursor].Value)
+			} else if cf.slotPickPane == 0 && cf.slotPickCursor < len(names) {
+				insertAtCursor("{" + names[cf.slotPickCursor] + "}")
+			}
+		case "tab", "esc":
+			cf.slotPickFocus = false
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
+	case "tab":
+		if cf.slotInsertAvailable(len(m.lists)) {
+			cf.slotPickFocus = true
+			cf.slotPickCursor = 0
+			cf.slotPickPane = 0
+			cf.slotPickValueCursor = 0
+		}
+		return m, nil
 	case "enter":
 		cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
 		if cf.fieldIdx < len(cf.fields)-1 {
