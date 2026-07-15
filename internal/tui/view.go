@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -443,8 +444,8 @@ func (m Model) viewMultiSelect(w int) string {
 			b.WriteString("  " + dim("template: ") + hovered.cmd.Template + "\n")
 			if len(hovered.cmd.Values) > 0 {
 				b.WriteString("  " + dim("values:") + "\n")
-				for k, v := range hovered.cmd.Values {
-					b.WriteString("    " + gray(k) + " = " + v + "\n")
+				for _, k := range sortedKeys(hovered.cmd.Values) {
+					b.WriteString("    " + gray(k) + " = " + hovered.cmd.Values[k] + "\n")
 				}
 			}
 			b.WriteString("  " + gray("$ "+hovered.cmd.Cmd) + "\n")
@@ -994,8 +995,8 @@ func (m Model) viewCommandNameInput(title string, w int, sce *commandEditState) 
 	}
 	if len(sce.currentValues) > 0 {
 		b.WriteString("\n" + hlineLabel(w, "values") + "\n")
-		for k, v := range sce.currentValues {
-			b.WriteString("  " + gray(k+" = "+v) + "\n")
+		for _, k := range sortedKeys(sce.currentValues) {
+			b.WriteString("  " + gray(k+" = "+sce.currentValues[k]) + "\n")
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n")
@@ -1046,5 +1047,17 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// sortedKeys returns the map's keys in stable order. Views must never range
+// over a map directly: Go randomizes iteration order per run, so lines would
+// swap on every re-render (visible as flickering while a cursor blinks).
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
