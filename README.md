@@ -212,6 +212,15 @@ Both `{projDir}` and `{projCmd}` will select from the `project` list, each promp
 - **Workflows and aliases** — baton prompts when creating; values are saved and reused at run time
 - Placeholders can be **skipped** when creating a workflow or a template-derived command — skipped ones are prompted at run time instead
 
+### Placeholder picker
+
+When writing a command directly (**Manage commands → Create command → Write directly**), press `Tab` in the cmd / workdir field to open a two-pane picker window:
+
+- the **left pane** lists the selection lists — `Enter` inserts a `{placeholder}` at the cursor
+- the **right pane** (focus with `→`) shows the selected list's entries — `Enter` inserts the concrete value instead
+
+Hand-typed `{slots}` are validated as you type: `✓` when a matching list exists, `⚠` when the value will fall back to free input at run time.
+
 #### Navigation during placeholder selection
 
 - Type to filter the list

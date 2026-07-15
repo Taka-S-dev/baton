@@ -1,17 +1,20 @@
 # example-json
 
-JSONで手書きする場合の構成例。
+Minimal project layout using hand-written JSON.
 
 ```
 example-json/
-├── commands.json        ← コマンド定義（手書きの層。batonは読むだけで書き換えない）
-├── lists/               ← スロットの選択肢（value \t label）
-├── workflows.json       ← ワークフロー（TUIが管理。手書きも可）
-└── commands.local.json  ← TUIの Manage commands で作ったコマンド（自動生成）
+├── commands.json        <- command definitions (hand-written; baton never modifies it)
+├── lists/               <- selection lists for placeholders (value \t label)
+├── workflows.json       <- workflows (managed by the TUI; hand-editable)
+└── commands.local.json  <- commands created via Manage commands (generated)
 ```
 
-- 「テンプレート」はファイルではなく行の性質: `{slot}` を含むコマンドが
-  TUIの Create command → From template の元ネタになる
-- `{slot}` がないコマンド（hello）はそのまま実行できる
-- `slots` はスロット名→リスト名の対応（省略時はスロット名と同名のリストを使う）
-- 旧名（templates.json / template.json / config.json）も互換で読める
+- Being a template is a per-row property, not a file: any command
+  containing `{slot}` placeholders becomes a source for
+  **Create command → From template**
+- Commands without slots (`hello`) run as-is
+- `slots` maps a slot name to a selection-list name (defaults to the
+  slot name itself when omitted)
+- Legacy file names (`templates.json`, `template.json`, `config.json`)
+  are still readable
