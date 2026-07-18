@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
@@ -1069,6 +1070,35 @@ func (m Model) viewPlaceholderWindow(w int) string {
 
 	// Right pane: entries of the selected list (value + label). The pane
 	// takes focus with → and inserts the selected value directly.
+	//
+	// The pane width is fixed to the widest entry across ALL lists (clamped
+	// to the terminal width) so the window frame keeps the same size while
+	// the cursor moves between lists; values that don't fit are truncated
+	// with an ellipsis instead of stretching the frame.
+	leftW := 0
+	for _, name := range names {
+		if lw := 2 + lipgloss.Width("{"+name+"}"); lw > leftW {
+			leftW = lw
+		}
+	}
+	rightW := 9 // room for "(empty)" and the scroll markers
+	for _, name := range names {
+		for _, e := range m.lists[name] {
+			lw := 2 + lipgloss.Width(e.Value)
+			if e.Label != "" {
+				lw += 2 + lipgloss.Width(e.Label)
+			}
+			if lw > rightW {
+				rightW = lw
+			}
+		}
+	}
+	// Chrome around the right pane's content: window border+padding (6),
+	// left pane + its gap (leftW+2), divider + right pane padding (3).
+	if maxRight := w - leftW - 11; maxRight >= 8 && rightW > maxRight {
+		rightW = maxRight
+	}
+
 	const maxRows = 8
 	var right strings.Builder
 	if cf.slotPickCursor < len(names) {
@@ -1089,9 +1119,13 @@ func (m Model) viewPlaceholderWindow(w int) string {
 				break
 			}
 			e := entries[i]
-			line := e.Value
+			avail := rightW - 2 // cursor prefix
+			val := ansi.Truncate(e.Value, avail, "…")
+			line := val
 			if e.Label != "" {
-				line += "  " + gray(e.Label)
+				if rem := avail - lipgloss.Width(val) - 2; rem > 0 {
+					line += "  " + gray(ansi.Truncate(e.Label, rem, "…"))
+				}
 			}
 			if cf.slotPickPane == 1 && i == cf.slotPickValueCursor {
 				right.WriteString(cyanBold("▶ ") + line + "\n")
@@ -1104,6 +1138,7 @@ func (m Model) viewPlaceholderWindow(w int) string {
 		Border(lipgloss.NormalBorder(), false, false, false, true).
 		BorderForeground(lipgloss.Color("240")).
 		PaddingLeft(2).
+		Width(rightW + 2).
 		Render(strings.TrimRight(right.String(), "\n"))
 
 	panes := lipgloss.JoinHorizontal(lipgloss.Top,
@@ -1114,9 +1149,36 @@ func (m Model) viewPlaceholderWindow(w int) string {
 	if cf.slotPickPane == 1 {
 		help = "↑↓ move   ←: lists   Enter: insert value   Esc: close"
 	}
+
+	// Full-text footer: list rows are truncated to keep the frame stable,
+	// so while the value pane is focused the selected entry is echoed in
+	// full above the help line, wrapped to the window's existing width.
+	footer := ""
+	if cf.slotPickPane == 1 && cf.slotPickCursor < len(names) {
+		if entries := m.lists[names[cf.slotPickCursor]]; cf.slotPickValueCursor < len(entries) {
+			e := entries[cf.slotPickValueCursor]
+			need := 2 + lipgloss.Width(e.Value)
+			if e.Label != "" {
+				need += 2 + lipgloss.Width(e.Label)
+			}
+			if need > rightW {
+				full := e.Value
+				if e.Label != "" {
+					full += "  " + e.Label
+				}
+				innerW := lipgloss.Width(panes)
+				if hw := lipgloss.Width(help); hw > innerW {
+					innerW = hw
+				}
+				footer = dim(lipgloss.NewStyle().Width(innerW).Render(full)) + "\n\n"
+			}
+		}
+	}
+
 	content := cyanBold(" Insert placeholder / value ") + "\n\n" +
 		m.nameInput.View() + "\n\n" +
 		panes + "\n\n" +
+		footer +
 		gray(help)
 
 	win := lipgloss.NewStyle().
