@@ -1031,9 +1031,6 @@ func (m Model) viewCommandForm(w int) string {
 	if cf.slotPickFocus {
 		return m.viewPlaceholderWindow(w)
 	}
-	if cf.slotInsertAvailable(len(m.lists)) {
-		b.WriteString("\n  " + dim("Tab: insert placeholder from a list") + "\n")
-	}
 	if lines := m.slotValidationLines(cf); len(lines) > 0 {
 		b.WriteString("\n")
 		for _, l := range lines {
@@ -1042,7 +1039,11 @@ func (m Model) viewCommandForm(w int) string {
 	}
 
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("Enter: next / save   Esc: previous / cancel") + "\n")
+	guide := "Enter: next / save   Esc: previous / cancel"
+	if cf.slotInsertAvailable(len(m.lists)) {
+		guide = "Tab: insert placeholder   " + guide
+	}
+	b.WriteString("  " + gray(guide) + "\n")
 	return b.String()
 }
 
