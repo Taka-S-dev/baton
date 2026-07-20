@@ -1,7 +1,8 @@
-name	group	workdir	cmd	shell	vars
+name	group	workdir	cmd	shell	slots
 build	make	{projDir}	echo building {projCmd}		projDir=project,projCmd=project
 test	make	{project}	echo testing {project}
 clean	make	{project}	echo cleaning {project}
 deploy	deploy		echo deploying {env}
 restart	deploy		echo restarting {env}
 hello	misc		echo hello baton
+where	misc		echo project root is {$root}

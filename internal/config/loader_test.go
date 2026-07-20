@@ -161,3 +161,21 @@ func TestMissingTemplateFallsBackToBakedCmd(t *testing.T) {
 		t.Errorf("baked cmd fallback lost: got %q", cfg.Commands[0].Cmd)
 	}
 }
+
+// TestExampleProjectsLoad guards the shipped sample projects against rot:
+// they must load without errors and contain the documented commands.
+func TestExampleProjectsLoad(t *testing.T) {
+	for _, dir := range []string{"example-json", "example-tsv"} {
+		cfg, err := LoadConfig(filepath.Join("..", "..", "projects.example", dir))
+		if err != nil {
+			t.Fatalf("%s: %v", dir, err)
+		}
+		if len(cfg.Base) < 6 {
+			t.Errorf("%s: only %d commands loaded", dir, len(cfg.Base))
+		}
+		found, ok := cfg.FindCommand("build")
+		if !ok || found.Slots["projDir"] != "project" {
+			t.Errorf("%s: build command slots not loaded: %+v", dir, found)
+		}
+	}
+}

@@ -162,7 +162,7 @@ Legacy file names (`templates.json`, `template.json`, `templates.tsv`, `config.t
 Tab-separated alternative to `commands.json` (both can coexist; entries are merged).
 
 ```
-name	group	workdir	cmd	shell	vars
+name	group	workdir	cmd	shell	slots
 build	make	{projDir}	echo building {projCmd}		projDir=project,projCmd=project
 test	make	{project}	echo testing {project}
 deploy	deploy		echo deploying {env}
@@ -177,7 +177,7 @@ deploy	deploy		echo deploying {env}
 | `workdir`   | No       | Working directory (leave empty to use current). Supports `{placeholders}` |
 | `cmd`   | Yes*     | Command to execute. Supports `{placeholders}` |
 | `shell` | No       | `"ps"` for PowerShell (`powershell` on Windows, `pwsh` on Linux/macOS), omit to use the platform default (`cmd /C` on Windows, `sh -c` elsewhere) |
-| `slots` | No       | Maps slot names to list names (see Placeholders). `vars` is accepted as a legacy alias (and is the TSV column name) |
+| `slots` | No       | Maps slot names to list names (see Placeholders). `vars` is accepted as a legacy alias |
 | `template` | No    | Name of a slotted command this entry derives from (used by TUI-created commands) |
 | `values` | No      | Slot values applied to the template. The baked `cmd` is recomputed from `template` + `values` on every load, so template edits propagate |
 

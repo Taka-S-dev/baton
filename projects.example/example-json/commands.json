@@ -5,6 +5,7 @@
     { "name": "clean",   "group": "make",   "workdir": "{project}", "cmd": "echo cleaning {project}" },
     { "name": "deploy",  "group": "deploy", "cmd": "echo deploying {env}" },
     { "name": "restart", "group": "deploy", "cmd": "echo restarting {env}" },
-    { "name": "hello",   "group": "misc",   "cmd": "echo hello baton" }
+    { "name": "hello",   "group": "misc",   "cmd": "echo hello baton" },
+    { "name": "where",   "group": "misc",   "cmd": "echo project root is {$root}" }
   ]
 }

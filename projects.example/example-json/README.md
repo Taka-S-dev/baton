@@ -6,6 +6,7 @@ Minimal project layout using hand-written JSON.
 example-json/
 ├── commands.json        <- command definitions (hand-written; baton never modifies it)
 ├── lists/               <- selection lists for placeholders (value \t label)
+├── vars.tsv             <- variable table: {$name} globals + saved commands' fixed values
 ├── workflows.json       <- workflows (managed by the TUI; hand-editable)
 └── commands.local.json  <- commands created via Manage commands (generated)
 ```
@@ -16,5 +17,7 @@ example-json/
 - Commands without slots (`hello`) run as-is
 - `slots` maps a slot name to a selection-list name (defaults to the
   slot name itself when omitted)
+- `{$root}` in the `where` command resolves from vars.tsv — edit that
+  one line when the project moves to another folder or machine
 - Legacy file names (`templates.json`, `template.json`, `config.json`)
   are still readable
