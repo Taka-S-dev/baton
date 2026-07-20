@@ -214,7 +214,7 @@ Both `{projDir}` and `{projCmd}` will select from the `project` list, each promp
 
 ### Placeholder picker
 
-When writing a command directly (**Manage commands → Create command → Write directly**), press `Tab` in the cmd / workdir field to open a two-pane picker window:
+When writing a command directly (**Manage commands → Create command → Write directly**), the form asks for name, cmd, workdir, group, and shell (leave empty for the platform default, or `ps` for PowerShell). Press `Tab` in the cmd / workdir field to open a two-pane picker window:
 
 - the **left pane** lists the selection lists — `Enter` inserts a `{placeholder}` at the cursor
 - the **right pane** (focus with `→`) shows the selected list's entries — `Enter` inserts the concrete value instead

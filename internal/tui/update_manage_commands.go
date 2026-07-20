@@ -81,7 +81,7 @@ func (m *Model) openCommandForm(editIdx int) (tea.Model, tea.Cmd) {
 		cmd := m.config.Commands[editIdx]
 		cf.mode = 1
 		cf.editIdx = editIdx
-		cf.fields = [4]string{cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group}
+		cf.fields = [5]string{cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell}
 	}
 	m.cf = cf
 	m.screen = ScreenCommandForm
@@ -186,6 +186,23 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
+		// Validate the name as soon as the field is confirmed, so a
+		// duplicate surfaces immediately instead of after the last field.
+		if cf.fieldIdx == 0 {
+			name := cf.fields[0]
+			if name == "" {
+				m.errMsg = "name cannot be empty"
+				return m, gotoField(0)
+			}
+			excludeIdx := -1
+			if cf.mode == 1 {
+				excludeIdx = cf.editIdx
+			}
+			if m.commandNameTaken(name, excludeIdx) {
+				m.errMsg = "name already in use: " + name
+				return m, gotoField(0)
+			}
+		}
 		if cf.fieldIdx < len(cf.fields)-1 {
 			return m, gotoField(cf.fieldIdx + 1)
 		}
@@ -199,6 +216,11 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.errMsg = "cmd cannot be empty"
 			return m, gotoField(1)
 		}
+		shell := strings.ToLower(cf.fields[4])
+		if shell != "" && shell != "ps" {
+			m.errMsg = `shell must be empty or "ps"`
+			return m, gotoField(4)
+		}
 		excludeIdx := -1
 		if cf.mode == 1 {
 			excludeIdx = cf.editIdx
@@ -209,7 +231,7 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if cf.mode == 1 {
 			cmd := m.config.Commands[cf.editIdx]
-			cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group = name, cmdStr, cf.fields[2], cf.fields[3]
+			cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
 			m.config.Commands[cf.editIdx] = cmd
 		} else {
 			m.config.Commands = append(m.config.Commands, mdl.Command{
@@ -217,6 +239,7 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Cmd:   cmdStr,
 				Dir:   cf.fields[2],
 				Group: cf.fields[3],
+				Shell: shell,
 			})
 		}
 		if err := m.saveConfig(); err != nil {

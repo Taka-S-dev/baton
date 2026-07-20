@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -225,7 +226,7 @@ type commandFormState struct {
 	mode     int // 0=create, 1=edit
 	editIdx  int // for edit mode
 	fieldIdx int
-	fields   [4]string // name, cmd, workdir, group
+	fields   [5]string // name, cmd, workdir, group, shell
 
 	// Placeholder picker window: left pane picks a list name to insert
 	// {name}; the right pane picks a concrete value to insert directly.
@@ -235,7 +236,16 @@ type commandFormState struct {
 	slotPickValueCursor int
 }
 
-var commandFormLabels = [4]string{"Name", "Cmd", "Workdir (optional)", "Group (optional)"}
+var commandFormLabels = [5]string{"Name", "Cmd", "Workdir (optional)", "Group (optional)", shellFormLabel()}
+
+// shellFormLabel names the shell the command runs with when the field is
+// left empty, so the form shows the actual platform default.
+func shellFormLabel() string {
+	if runtime.GOOS == "windows" {
+		return "Shell (ps = PowerShell, leave empty for cmd)"
+	}
+	return "Shell (ps = PowerShell, leave empty for sh)"
+}
 
 // Model is the main bubbletea model.
 type Model struct {
@@ -408,6 +418,9 @@ func (m *Model) loadProject(projectDir string) error {
 			warnings = append(warnings, "duplicate command name: "+cmd.Name)
 		}
 		seen[cmd.Name] = true
+		if cmd.Shell != "" && cmd.Shell != "ps" {
+			warnings = append(warnings, "unknown shell \""+cmd.Shell+"\" on "+cmd.Name+" (runs with the platform default)")
+		}
 	}
 	m.loadWarning = strings.Join(warnings, "; ")
 	return nil
