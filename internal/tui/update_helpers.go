@@ -46,9 +46,9 @@ func (m *Model) toggleDeleteSelected(idx int) {
 }
 
 // updateDeleteList implements the shared delete screen: multi-select with
-// Space (Enter with nothing selected deletes the cursor row), a No/Yes
-// confirm dialog (Tab/←/→/h/l to switch), and descending-index deletion so
-// earlier removals don't shift later indices.
+// Tab or Space (Enter with nothing selected deletes the cursor row), a
+// No/Yes confirm dialog (Tab/←/→/h/l to switch), and descending-index
+// deletion so earlier removals don't shift later indices.
 //
 // count is the number of deletable items. onMove (optional) runs after the
 // cursor moves. onDelete receives the selected indices sorted descending.
@@ -81,7 +81,7 @@ func (m *Model) updateDeleteList(msg tea.KeyMsg, count int, onMove func(), onExi
 		if m.moveListCursor(msg.String(), count) && onMove != nil {
 			onMove()
 		}
-	case " ", "　":
+	case "tab", " ", "　":
 		if count > 0 {
 			m.toggleDeleteSelected(m.listCursor)
 		}
