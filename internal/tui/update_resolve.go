@@ -131,6 +131,14 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor = 0
 			return m, nil
 		}
+		if m.screen == ScreenCreateWorkflow {
+			m.gotoWorkflowMgmt()
+			return m, nil
+		}
+		if m.screen == ScreenCreateAlias {
+			m.gotoAliasMgmt()
+			return m, nil
+		}
 		m.gotoMainMenu()
 	default:
 		prevSearch := m.msSearchTI.Value()
@@ -343,7 +351,7 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 			m.errMsg = "failed to save workflows: " + err.Error()
 		}
 		m.resolve = nil
-		m.gotoMainMenu()
+		m.gotoWorkflowMgmt()
 		return m, nil
 	case purposeEditAlias:
 		var steps []string
@@ -356,9 +364,7 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 			m.errMsg = "failed to save aliases: " + err.Error()
 		}
 		m.resolve = nil
-		m.screen = ScreenAliasMgmt
-		m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-		m.listCursor = 0
+		m.gotoAliasMgmt()
 		return m, nil
 	}
 	m.gotoMainMenu()

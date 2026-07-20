@@ -57,34 +57,13 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "Run commands":
 			m.screen = ScreenRunCommands
 			return m, m.setupMultiSelect(true)
-		case "Create workflow":
-			m.screen = ScreenCreateWorkflow
-			return m, m.setupMultiSelectCmdsOnly()
-		case "Edit workflow":
-			m.screen = ScreenEditWorkflow
-			names := make([]string, len(m.workflows))
-			for i, w := range m.workflows {
-				names[i] = w.Name
-			}
-			m.listItems = names
-			m.listCursor = 0
-			m.updateStepsViewport()
-		case "Delete workflow":
-			m.screen = ScreenDeleteWorkflow
-			names := make([]string, len(m.workflows))
-			for i, w := range m.workflows {
-				names[i] = w.Name
-			}
-			m.listItems = names
-			m.listCursor = 0
-			m.updateStepsViewport()
+		case "Manage workflows":
+			m.gotoWorkflowMgmt()
 		case "Manage commands":
 			m.screen = ScreenManageCommands
 			m.listCursor = 0
 		case "Manage aliases":
-			m.screen = ScreenAliasMgmt
-			m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-			m.listCursor = 0
+			m.gotoAliasMgmt()
 		case "Manage lists":
 			m.gotoManageLists()
 		case "Switch config":

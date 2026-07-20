@@ -9,6 +9,13 @@ import (
 
 // ── Alias management ──────────────────────────────────────────────────────────
 
+// gotoAliasMgmt opens the Manage aliases submenu.
+func (m *Model) gotoAliasMgmt() {
+	m.screen = ScreenAliasMgmt
+	m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
+	m.listCursor = 0
+}
+
 func (m Model) updateAliasMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "down":
@@ -53,9 +60,7 @@ func (m Model) updateEditAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor = 0
 		}
 	case "esc":
-		m.screen = ScreenAliasMgmt
-		m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-		m.listCursor = 0
+		m.gotoAliasMgmt()
 	}
 	return m, nil
 }
@@ -91,9 +96,7 @@ func (m Model) updateEditAliasMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateDeleteAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.updateDeleteList(msg, len(m.aliases), nil,
 		func() {
-			m.screen = ScreenAliasMgmt
-			m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-			m.listCursor = 0
+			m.gotoAliasMgmt()
 		},
 		func(indices []int) {
 			for _, i := range indices {
@@ -128,15 +131,13 @@ func (m Model) saveAlias(name string) (tea.Model, tea.Cmd) {
 		m.errMsg = "failed to save aliases: " + err.Error()
 	}
 	m.resolve = nil
-	m.gotoMainMenu()
+	m.gotoAliasMgmt()
 	return m, nil
 }
 
 func (m Model) renameAlias(idx int, name string) (tea.Model, tea.Cmd) {
 	if idx < 0 || idx >= len(m.aliases) {
-		m.screen = ScreenAliasMgmt
-		m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-		m.listCursor = 0
+		m.gotoAliasMgmt()
 		return m, nil
 	}
 	for i, a := range m.aliases {
@@ -149,8 +150,6 @@ func (m Model) renameAlias(idx int, name string) (tea.Model, tea.Cmd) {
 	if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
 		m.errMsg = "failed to save aliases: " + err.Error()
 	}
-	m.screen = ScreenAliasMgmt
-	m.listItems = []string{"Create alias", "Edit alias", "Delete alias"}
-	m.listCursor = 0
+	m.gotoAliasMgmt()
 	return m, nil
 }

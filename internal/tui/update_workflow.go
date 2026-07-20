@@ -7,6 +7,49 @@ import (
 	"github.com/Taka-S-dev/baton/internal/store"
 )
 
+// ── Workflow management ───────────────────────────────────────────────────────
+
+// gotoWorkflowMgmt opens the Manage workflows submenu.
+func (m *Model) gotoWorkflowMgmt() {
+	m.screen = ScreenWorkflowMgmt
+	m.listItems = []string{"Create workflow", "Edit workflow", "Delete workflow"}
+	m.listCursor = 0
+}
+
+func (m Model) updateWorkflowMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
+	case "enter":
+		switch m.listItems[m.listCursor] {
+		case "Create workflow":
+			m.screen = ScreenCreateWorkflow
+			return m, m.setupMultiSelectCmdsOnly()
+		case "Edit workflow":
+			m.screen = ScreenEditWorkflow
+			names := make([]string, len(m.workflows))
+			for i, w := range m.workflows {
+				names[i] = w.Name
+			}
+			m.listItems = names
+			m.listCursor = 0
+			m.updateStepsViewport()
+		case "Delete workflow":
+			m.screen = ScreenDeleteWorkflow
+			names := make([]string, len(m.workflows))
+			for i, w := range m.workflows {
+				names[i] = w.Name
+			}
+			m.listItems = names
+			m.listCursor = 0
+			m.updateStepsViewport()
+		}
+	case "esc":
+		m.gotoMainMenu()
+	}
+	return m, nil
+}
+
 // ── Edit workflow ─────────────────────────────────────────────────────────────
 
 func (m Model) updateEditWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -24,7 +67,7 @@ func (m Model) updateEditWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.listItems = []string{"Rename", "Change commands"}
 		m.listCursor = 0
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoWorkflowMgmt()
 	}
 	return m, nil
 }
@@ -62,7 +105,7 @@ func (m Model) updateEditWorkflowMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateDeleteWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.updateDeleteList(msg, len(m.workflows),
 		m.updateStepsViewport,
-		func() { m.gotoMainMenu() },
+		m.gotoWorkflowMgmt,
 		func(indices []int) {
 			for _, i := range indices {
 				m.workflows = append(m.workflows[:i], m.workflows[i+1:]...)
@@ -96,13 +139,13 @@ func (m Model) saveWorkflow(name string) (tea.Model, tea.Cmd) {
 		m.errMsg = "failed to save workflows: " + err.Error()
 	}
 	m.resolve = nil
-	m.gotoMainMenu()
+	m.gotoWorkflowMgmt()
 	return m, nil
 }
 
 func (m Model) renameWorkflow(idx int, name string) (tea.Model, tea.Cmd) {
 	if idx < 0 || idx >= len(m.workflows) {
-		m.gotoMainMenu()
+		m.gotoWorkflowMgmt()
 		return m, nil
 	}
 	for i, w := range m.workflows {
@@ -115,6 +158,6 @@ func (m Model) renameWorkflow(idx int, name string) (tea.Model, tea.Cmd) {
 	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 		m.errMsg = "failed to save workflows: " + err.Error()
 	}
-	m.gotoMainMenu()
+	m.gotoWorkflowMgmt()
 	return m, nil
 }

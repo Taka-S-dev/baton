@@ -54,6 +54,10 @@ func (m Model) updateNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor = 0
 		case nameInputNewList:
 			m.gotoManageLists()
+		case nameInputWorkflow:
+			m.gotoWorkflowMgmt()
+		case nameInputAlias:
+			m.gotoAliasMgmt()
 		default:
 			m.gotoMainMenu()
 		}

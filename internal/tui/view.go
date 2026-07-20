@@ -30,6 +30,8 @@ func (m Model) View() string {
 	case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
 		ScreenEditWorkflowCommands, ScreenEditAliasCommands:
 		view = m.viewMultiSelect(w)
+	case ScreenWorkflowMgmt:
+		view = m.viewSingleSelect("Manage workflows", w)
 	case ScreenEditWorkflowMode:
 		view = m.viewSingleSelect("Edit workflow", w)
 	case ScreenEditAliasMode:
@@ -136,30 +138,41 @@ type menuItemInfo struct {
 	shortcuts [][2]string
 }
 
+// mainMenuGroups is the single source of truth for the main menu.
+// viewMainMenu renders it and gotoMainMenu flattens it into listItems,
+// so the rendered rows and the Enter dispatch can never drift apart.
+type menuGroup struct {
+	label string
+	items []string
+}
+
+var mainMenuGroups = []menuGroup{
+	{"Run", []string{"Run workflow", "Run commands"}},
+	{"Manage", []string{"Manage workflows", "Manage commands", "Manage aliases", "Manage lists"}},
+	{"", []string{"Switch config", "Exit"}},
+}
+
+func mainMenuItems() []string {
+	var items []string
+	for _, g := range mainMenuGroups {
+		items = append(items, g.items...)
+	}
+	return items
+}
+
 var menuItemInfos = map[string]menuItemInfo{
-	"Run workflow":    {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
-	"Run commands":    {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
-	"Create workflow": {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
-	"Edit workflow":   {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
-	"Delete workflow": {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Tab", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
-	"Manage commands": {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage aliases":  {desc: "Reusable command groups, selectable in Run commands.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage lists":    {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
-	"Switch config":   {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
-	"Exit":            {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
+	"Run workflow":     {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
+	"Run commands":     {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
+	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage aliases":   {desc: "Reusable command groups, selectable in Run commands.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage lists":     {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
+	"Switch config":    {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
+	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
 
 func (m Model) viewMainMenu(w int) string {
-	type group struct {
-		label string
-		items []string
-	}
-	groups := []group{
-		{"Run", []string{"Run workflow", "Run commands"}},
-		{"Workflow", []string{"Create workflow", "Edit workflow", "Delete workflow"}},
-		{"Manage", []string{"Manage commands", "Manage aliases", "Manage lists"}},
-		{"", []string{"Switch config", "Exit"}},
-	}
+	groups := mainMenuGroups
 
 	leftW := 32
 	showRight := w >= leftW+30

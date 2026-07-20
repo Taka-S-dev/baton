@@ -241,9 +241,7 @@ baton [--dry-run]
 
   ▶ Run workflow
     Run commands
-    Create workflow
-    Edit workflow
-    Delete workflow
+    Manage workflows
     Manage commands
     Manage aliases
     Manage lists
@@ -263,7 +261,7 @@ baton [--dry-run]
 
 ### Workflows
 
-Workflows are saved combinations of commands with pre-set placeholder values. Create one via **Create workflow**, then run it instantly from **Run workflow**.
+Workflows are saved combinations of commands with pre-set placeholder values. Create one via **Manage workflows → Create workflow**, then run it instantly from **Run workflow**.
 
 The **Run workflow** list is searchable the same way as the command selector: type to filter, space-separated terms are ANDed, and matches cover the workflow name, the commands it runs, and preset placeholder values.
 

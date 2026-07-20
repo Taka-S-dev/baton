@@ -102,6 +102,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateEditAliasMode(msg)
 		case ScreenDeleteWorkflow:
 			return m.updateDeleteWorkflow(msg)
+		case ScreenWorkflowMgmt:
+			return m.updateWorkflowMgmt(msg)
 		case ScreenAliasMgmt:
 			return m.updateAliasMgmt(msg)
 		case ScreenEditAlias:

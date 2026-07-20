@@ -34,6 +34,7 @@ const (
 	ScreenCreateWorkflow
 	ScreenConfirmVars
 	ScreenNameInput
+	ScreenWorkflowMgmt
 	ScreenEditWorkflow
 	ScreenEditWorkflowMode
 	ScreenEditWorkflowCommands
@@ -443,18 +444,7 @@ func (m *Model) gotoManageLists() {
 
 func (m *Model) gotoMainMenu() {
 	m.screen = ScreenMainMenu
-	m.listItems = []string{
-		"Run workflow",
-		"Run commands",
-		"Create workflow",
-		"Edit workflow",
-		"Delete workflow",
-		"Manage commands",
-		"Manage aliases",
-		"Manage lists",
-		"Switch config",
-		"Exit",
-	}
+	m.listItems = mainMenuItems()
 	m.listCursor = m.mainMenuCursor
 }
 
