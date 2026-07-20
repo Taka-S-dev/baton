@@ -78,7 +78,7 @@ func (m Model) updateDeleteWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) saveWorkflow(name string) (tea.Model, tea.Cmd) {
 	for _, w := range m.workflows {
 		if w.Name == name {
-			m.nameInputErr = "name already exists"
+			m.nameInputErr = "name already in use: " + name
 			return m, nil
 		}
 	}
@@ -107,7 +107,7 @@ func (m Model) renameWorkflow(idx int, name string) (tea.Model, tea.Cmd) {
 	}
 	for i, w := range m.workflows {
 		if i != idx && w.Name == name {
-			m.nameInputErr = "name already exists"
+			m.nameInputErr = "name already in use: " + name
 			return m, nil
 		}
 	}

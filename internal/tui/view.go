@@ -78,10 +78,10 @@ func (m Model) View() string {
 		view = m.viewDeleteList("Delete commands", m.listItems, w)
 	}
 	if m.errMsg != "" {
-		view += "\n" + red("  Error: "+m.errMsg) + "\n"
+		view += "\n" + errorText("  Error: "+m.errMsg) + "\n"
 	}
 	if m.loadWarning != "" && m.screen == ScreenMainMenu {
-		view += "\n" + yellow("  Warning: "+m.loadWarning) + "\n"
+		view += "\n" + warn("  Warning: "+m.loadWarning) + "\n"
 	}
 	return view
 }
@@ -121,7 +121,7 @@ func (m Model) viewProjectSelect(w int) string {
 	for i, p := range m.projects {
 		count := fmt.Sprintf("%d commands", m.projectCmdCounts[p])
 		if i == m.listCursor {
-			b.WriteString("  " + cyanBold("▶") + " " + p + "   " + gray(count) + "\n")
+			b.WriteString("  " + accentBold("▶") + " " + p + "   " + gray(count) + "\n")
 		} else {
 			b.WriteString("    " + p + "   " + gray(count) + "\n")
 		}
@@ -141,7 +141,7 @@ var menuItemInfos = map[string]menuItemInfo{
 	"Run commands":    {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
 	"Create workflow": {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
 	"Edit workflow":   {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
-	"Delete workflow": {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Space", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
+	"Delete workflow": {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Tab", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
 	"Manage commands": {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage aliases":  {desc: "Reusable command groups, selectable in Run commands.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage lists":    {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
@@ -275,7 +275,7 @@ func (m Model) viewSingleSelect(title string, w int) string {
 	} else {
 		for i, item := range m.listItems {
 			if i == m.listCursor {
-				b.WriteString("  " + cyanBold("▶") + " " + item + "\n")
+				b.WriteString("  " + accentBold("▶") + " " + item + "\n")
 			} else {
 				b.WriteString("    " + item + "\n")
 			}
@@ -331,7 +331,7 @@ func (m Model) viewRunWorkflow(w int) string {
 				suffix = "  " + gray("(last)")
 			}
 			if i == cur {
-				b.WriteString("  " + cyanBold("▶") + " " + bold(wf.Name) + suffix + "\n")
+				b.WriteString("  " + accentBold("▶") + " " + bold(wf.Name) + suffix + "\n")
 			} else {
 				b.WriteString("    " + wf.Name + suffix + "\n")
 			}
@@ -411,13 +411,13 @@ func (m Model) viewMultiSelect(w int) string {
 			var label string
 			if item.isAlias() {
 				steps := strings.Join(item.alias.Steps, gray(" > "))
-				label = cyan("@") + " " + item.alias.Name + "  " + sGroup.Render("[alias]") + "  " + gray(steps)
+				label = accent("@") + " " + item.alias.Name + "  " + sGroup.Render("[alias]") + "  " + gray(steps)
 			} else if item.cmd.Template != "" {
 				grp := ""
 				if item.cmd.Group != "" {
 					grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
 				}
-				label = cyan("$") + " " + item.cmd.Name + grp + "  " + gray("("+item.cmd.Template+")")
+				label = accent("$") + " " + item.cmd.Name + grp + "  " + gray("("+item.cmd.Template+")")
 			} else {
 				grp := ""
 				if item.cmd.Group != "" {
@@ -431,7 +431,7 @@ func (m Model) viewMultiSelect(w int) string {
 			}
 
 			if i == cursor {
-				b.WriteString("  " + cyanBold("▶") + " " + check + " " + label + "\n")
+				b.WriteString("  " + accentBold("▶") + " " + check + " " + label + "\n")
 			} else {
 				b.WriteString("    " + check + " " + label + "\n")
 			}
@@ -489,7 +489,7 @@ func (m Model) viewMultiSelect(w int) string {
 	if len(m.msSelected) > 0 {
 		orderHint = "  " + dim("[n] = run order")
 	}
-	b.WriteString("\n  " + green(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + strings.Join(selNames, ", ") + "\n")
+	b.WriteString("\n  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + strings.Join(selNames, ", ") + "\n")
 	b.WriteString(hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Move  Tab Select  Enter Confirm  Esc Back") + "\n")
 
@@ -507,14 +507,14 @@ func (m Model) viewMultiSelect(w int) string {
 func (m Model) viewDiscardWindow(w int, selNames []string) string {
 	names := strings.Join(selNames, ", ")
 	innerW := min(max(lipgloss.Width(names), 40), max(10, w-10))
-	content := yellow(" Discard selection? ") + "\n\n" +
+	content := warn(" Discard selection? ") + "\n\n" +
 		fmt.Sprintf("%d selected:", len(selNames)) + "\n" +
 		dim(lipgloss.NewStyle().Width(innerW).Render(names)) + "\n\n" +
 		gray("Esc: discard   any other key: keep")
 
 	win := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("11")).
+		BorderForeground(lipgloss.Color("220")).
 		Padding(0, 2).
 		Render(content)
 
@@ -530,7 +530,7 @@ func (m Model) viewDiscardWindow(w int, selNames []string) string {
 func (m Model) viewSlotPick(w int) string {
 	sp := m.sp
 	var b strings.Builder
-	b.WriteString("\n" + cyanBold("  [ Select value for {"+sp.slotName+"} ]") + "\n" + hline(w) + "\n\n")
+	b.WriteString("\n" + accentBold("  [ Select value for {"+sp.slotName+"} ]") + "\n" + hline(w) + "\n\n")
 
 	// Context panel — windowed: show up to 3 before current, current, up to 2 after
 	if sp.contextNames != nil {
@@ -545,13 +545,13 @@ func (m Model) viewSlotPick(w int) string {
 		for i := start; i < end; i++ {
 			name := sp.contextNames[i]
 			if i == cur {
-				b.WriteString("  " + cyanBold(fmt.Sprintf("▶ %2d. %s", i+1, name)) + "\n")
+				b.WriteString("  " + accentBold(fmt.Sprintf("▶ %2d. %s", i+1, name)) + "\n")
 			} else {
 				isDone := i < cur && i < len(sp.contextNotes) && sp.contextNotes[i] != ""
 				marker := "  "
 				nameStr := gray(fmt.Sprintf("  %2d. %s", i+1, name))
 				if isDone {
-					marker = green("✓ ")
+					marker = success("✓ ")
 					note := sp.contextNotes[i]
 					maxNote := w - len(name) - 14
 					if maxNote > 10 && len(note) > maxNote {
@@ -568,7 +568,7 @@ func (m Model) viewSlotPick(w int) string {
 
 		// Command preview — separated from the list
 		if sp.currentCmd != nil {
-			b.WriteString("\n" + hlineLabelBright(w, "command preview  "+yellow("{"+sp.slotName+"}")) + "\n\n")
+			b.WriteString("\n" + hlineLabelBright(w, "command preview  "+highlight("{"+sp.slotName+"}")) + "\n\n")
 
 			// Hovered value (from list cursor or custom search input)
 			hoveredVal := ""
@@ -578,13 +578,13 @@ func (m Model) viewSlotPick(w int) string {
 				hoveredVal = sp.search
 			}
 
-			// Substitute resolvedSoFar then current slot with hovered value (yellow) or highlight
+			// Substitute resolvedSoFar then current slot with the hovered value
 			preview := func(s string) string {
 				for k, v := range sp.resolvedSoFar {
 					s = strings.ReplaceAll(s, "{"+k+"}", v)
 				}
 				if hoveredVal != "" {
-					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", yellow(hoveredVal))
+					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", highlight(hoveredVal))
 				} else {
 					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", slotVar("{"+sp.slotName+"}"))
 				}
@@ -609,11 +609,11 @@ func (m Model) viewSlotPick(w int) string {
 	} else {
 		countStr := ""
 		if len(sp.filtered) == 0 {
-			countStr = yellow("no match")
+			countStr = warn("no match")
 		} else {
 			countStr = dim(fmt.Sprintf("%d results", len(sp.filtered)))
 		}
-		b.WriteString("  " + cyan("/") + " " + white(sp.search) + dim("_") +
+		b.WriteString("  " + accent("/") + " " + white(sp.search) + dim("_") +
 			"  " + countStr + "\n\n")
 	}
 
@@ -674,7 +674,7 @@ func (m Model) viewSlotPick(w int) string {
 				line = dim("[ → skip — resolve at run time ]")
 			} else if isCustom {
 				if sp.search != "" {
-					line = cyan("[") + " + " + white(sp.search) + "  " + dim("(custom)") + cyan(" ]")
+					line = accent("[") + " + " + white(sp.search) + "  " + dim("(custom)") + accent(" ]")
 				} else {
 					line = dim("[ + custom value ]")
 				}
@@ -708,7 +708,7 @@ func (m Model) viewConfirmRun(w int) string {
 		if item.IsAlias() {
 			steps := strings.Join(item.Alias.Steps, " > ")
 			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s %s  %s\n",
-				gray(""), i+1, gray(""), cyan("@"), item.Name, gray("("+steps+")")))
+				gray(""), i+1, gray(""), accent("@"), item.Name, gray("("+steps+")")))
 		} else {
 			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
 			if item.Cmd != nil {
@@ -739,7 +739,7 @@ func (m Model) viewRunning(w int) string {
 	}
 	var b strings.Builder
 	n := len(r.items)
-	b.WriteString("\n" + greenBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) + "\n\n")
+	b.WriteString("\n" + successBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) + "\n\n")
 	b.WriteString("  " + gray("Press any key to return to menu...") + "\n")
 	return b.String()
 }
@@ -751,7 +751,7 @@ func (m Model) viewRetry(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Run failed", w) + "\n")
 	if r != nil && r.failErr != nil {
-		b.WriteString("  " + red("Error: "+r.failErr.Error()) + "\n\n")
+		b.WriteString("  " + errorText("Error: "+r.failErr.Error()) + "\n\n")
 	}
 
 	items := []string{
@@ -761,7 +761,7 @@ func (m Model) viewRetry(w int) string {
 	}
 	for i, item := range items {
 		if i == m.listCursor {
-			b.WriteString("  " + cyanBold("▶") + " " + item + "\n")
+			b.WriteString("  " + accentBold("▶") + " " + item + "\n")
 		} else {
 			b.WriteString("    " + item + "\n")
 		}
@@ -819,7 +819,7 @@ func (m Model) viewNameInput(w int) string {
 	b.WriteString("  " + gray("Esc: cancel") + "\n\n")
 	b.WriteString("  " + m.nameInput.View() + "\n")
 	if m.nameInputErr != "" {
-		b.WriteString("\n  " + yellow(m.nameInputErr) + "\n")
+		b.WriteString("\n  " + errorText(m.nameInputErr) + "\n")
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	return b.String()
@@ -845,7 +845,7 @@ func (m Model) viewEditList(w int) string {
 
 	if le.adding {
 		b.WriteString("  " + gray("Esc: cancel") + "\n\n")
-		b.WriteString("  " + cyan("Value > ") + le.addVal)
+		b.WriteString("  " + accent("Value > ") + le.addVal)
 		if le.addFld == 0 {
 			b.WriteString(dim("_"))
 		}
@@ -871,14 +871,14 @@ func (m Model) viewEditList(w int) string {
 		}
 		line := e.Value + lbl
 		if i == le.cursor {
-			b.WriteString("  " + cyanBold("▶") + " " + line + "\n")
+			b.WriteString("  " + accentBold("▶") + " " + line + "\n")
 		} else {
 			b.WriteString("    " + line + "\n")
 		}
 	}
-	addLine := green("+ Add value")
+	addLine := success("+ Add value")
 	if le.cursor == len(le.entries) {
-		b.WriteString("  " + cyanBold("▶") + " " + addLine + "\n")
+		b.WriteString("  " + accentBold("▶") + " " + addLine + "\n")
 	} else {
 		b.WriteString("    " + gray("+ Add value") + "\n")
 	}
@@ -897,7 +897,7 @@ func (m Model) viewManageLists(w int) string {
 	} else {
 		for i, item := range m.listItems {
 			if i == m.listCursor {
-				b.WriteString("  " + cyanBold("▶") + " " + item + "\n")
+				b.WriteString("  " + accentBold("▶") + " " + item + "\n")
 			} else {
 				b.WriteString("    " + item + "\n")
 			}
@@ -926,7 +926,7 @@ func (m Model) viewManageLists(w int) string {
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	if m.deleteConfirm && len(m.listItems) > 0 {
-		b.WriteString("  " + yellow(fmt.Sprintf("Delete %q?", m.listItems[m.listCursor])) + "\n\n")
+		b.WriteString("  " + warn(fmt.Sprintf("Delete %q?", m.listItems[m.listCursor])) + "\n\n")
 		b.WriteString(renderBtns(m.deleteBtn, "  No  ", "  Yes  ") + "\n")
 		b.WriteString("\n  " + gray("Tab: switch   Enter: confirm   Esc: back") + "\n")
 	} else {
@@ -950,10 +950,10 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		for i, item := range items {
 			check := gray("[ ]")
 			if selectedSet[i] {
-				check = yellow("[x]")
+				check = warn("[x]")
 			}
 			if i == m.listCursor {
-				b.WriteString("  " + cyanBold("▶") + " " + check + " " + item + "\n")
+				b.WriteString("  " + accentBold("▶") + " " + check + " " + item + "\n")
 			} else {
 				b.WriteString("    " + check + " " + item + "\n")
 			}
@@ -970,11 +970,11 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		if n > 1 {
 			msg += "s"
 		}
-		b.WriteString("  " + yellow(msg+"?") + "\n\n")
+		b.WriteString("  " + warn(msg+"?") + "\n\n")
 		b.WriteString(renderBtns(m.deleteBtn, "  No  ", "  Yes  ") + "\n")
 		b.WriteString("\n  " + gray("Tab: switch   Enter: confirm   Esc: back") + "\n")
 	} else {
-		b.WriteString("  " + gray("↑↓ Space: toggle   Enter: confirm   Esc: back") + "\n")
+		b.WriteString("  " + gray("↑↓ Tab/Space: toggle   Enter: confirm   Esc: back") + "\n")
 	}
 	return b.String()
 }
@@ -987,7 +987,7 @@ func (m Model) viewManageCommands(w int) string {
 	items := []string{"Create command", "Edit command", "Delete command"}
 	for i, item := range items {
 		if i == m.listCursor {
-			b.WriteString("  " + cyanBold("▶") + " " + item + "\n")
+			b.WriteString("  " + accentBold("▶") + " " + item + "\n")
 		} else {
 			b.WriteString("    " + item + "\n")
 		}
@@ -1017,7 +1017,7 @@ func (m Model) viewTemplatePick(w, cursor int) string {
 	}
 	for i, cmd := range candidates {
 		if i == cursor {
-			b.WriteString("  " + cyanBold("▶") + " " + cmd.Name + "   " + gray("$ "+cmd.Cmd) + "\n")
+			b.WriteString("  " + accentBold("▶") + " " + cmd.Name + "   " + gray("$ "+cmd.Cmd) + "\n")
 		} else {
 			b.WriteString("    " + cmd.Name + "   " + gray("$ "+cmd.Cmd) + "\n")
 		}
@@ -1099,7 +1099,7 @@ func (m Model) viewPlaceholderWindow(w int) string {
 	for i, name := range names {
 		if i == cf.slotPickCursor {
 			if cf.slotPickPane == 0 {
-				left.WriteString(cyanBold("▶ ") + white("{"+name+"}") + "\n")
+				left.WriteString(accentBold("▶ ") + white("{"+name+"}") + "\n")
 			} else {
 				left.WriteString(gray("▶ ") + white("{"+name+"}") + "\n")
 			}
@@ -1168,7 +1168,7 @@ func (m Model) viewPlaceholderWindow(w int) string {
 				}
 			}
 			if cf.slotPickPane == 1 && i == cf.slotPickValueCursor {
-				right.WriteString(cyanBold("▶ ") + line + "\n")
+				right.WriteString(accentBold("▶ ") + line + "\n")
 			} else {
 				right.WriteString("  " + line + "\n")
 			}
@@ -1215,7 +1215,7 @@ func (m Model) viewPlaceholderWindow(w int) string {
 		}
 	}
 
-	content := cyanBold(" Insert placeholder / value ") + "\n\n" +
+	content := accentBold(" Insert placeholder / value ") + "\n\n" +
 		m.nameInput.View() + "\n\n" +
 		panes + "\n\n" +
 		footer +
@@ -1248,9 +1248,9 @@ func (m Model) slotValidationLines(cf *commandFormState) []string {
 	var lines []string
 	for _, s := range slot.GetSlots(probe) {
 		if _, ok := m.lists[s.ListName]; ok {
-			lines = append(lines, green("✓")+" "+gray("{"+s.Name+"} → "+s.ListName))
+			lines = append(lines, success("✓")+" "+gray("{"+s.Name+"} → "+s.ListName))
 		} else {
-			lines = append(lines, yellow("⚠")+" "+gray("{"+s.Name+"} → ")+yellow("no list (free input at run time)"))
+			lines = append(lines, warn("⚠")+" "+gray("{"+s.Name+"} → ")+warn("no list (free input at run time)"))
 		}
 	}
 	return lines

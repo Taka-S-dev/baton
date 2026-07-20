@@ -120,7 +120,7 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) saveNewList(name string) (tea.Model, tea.Cmd) {
 	if _, exists := m.lists[name]; exists {
-		m.nameInputErr = "list already exists"
+		m.nameInputErr = "name already in use: " + name
 		return m, nil
 	}
 	listsDir := filepath.Join(m.projectDir, "lists")

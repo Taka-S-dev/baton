@@ -110,7 +110,7 @@ func (m Model) updateDeleteAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) saveAlias(name string) (tea.Model, tea.Cmd) {
 	for _, a := range m.aliases {
 		if a.Name == name {
-			m.nameInputErr = "name already exists"
+			m.nameInputErr = "name already in use: " + name
 			return m, nil
 		}
 	}
@@ -141,7 +141,7 @@ func (m Model) renameAlias(idx int, name string) (tea.Model, tea.Cmd) {
 	}
 	for i, a := range m.aliases {
 		if i != idx && a.Name == name {
-			m.nameInputErr = "name already exists"
+			m.nameInputErr = "name already in use: " + name
 			return m, nil
 		}
 	}
