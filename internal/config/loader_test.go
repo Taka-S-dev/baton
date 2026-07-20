@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -163,19 +164,55 @@ func TestMissingTemplateFallsBackToBakedCmd(t *testing.T) {
 }
 
 // TestExampleProjectsLoad guards the shipped sample projects against rot:
-// they must load without errors and contain the documented commands.
+// they must load with zero warnings and contain the documented commands.
 func TestExampleProjectsLoad(t *testing.T) {
 	for _, dir := range []string{"example-json", "example-tsv"} {
-		cfg, err := LoadConfig(filepath.Join("..", "..", "projects.example", dir))
+		p, err := LoadProject(filepath.Join("..", "..", "projects.example", dir))
 		if err != nil {
 			t.Fatalf("%s: %v", dir, err)
 		}
-		if len(cfg.Base) < 6 {
-			t.Errorf("%s: only %d commands loaded", dir, len(cfg.Base))
+		if len(p.Warnings) != 0 {
+			t.Errorf("%s: samples must be warning-free, got %v", dir, p.Warnings)
 		}
-		found, ok := cfg.FindCommand("build")
+		if len(p.Config.Base) < 6 {
+			t.Errorf("%s: only %d commands loaded", dir, len(p.Config.Base))
+		}
+		found, ok := p.Config.FindCommand("build")
 		if !ok || found.Slots["projDir"] != "project" {
 			t.Errorf("%s: build command slots not loaded: %+v", dir, found)
+		}
+	}
+}
+
+// TestLoadProject_Warnings checks the diagnostics behind `baton check`:
+// a project wired with known mistakes reports each of them.
+func TestLoadProject_Warnings(t *testing.T) {
+	dir := t.TempDir()
+	tsv := "name\tgroup\tworkdir\tcmd\tshell\tslots\n" +
+		"build\t\t\techo {$root}\tbash\t\n"
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wf := `[{"name":"wf1","commands":["build","ghost"]}]`
+	if err := os.WriteFile(filepath.Join(dir, "workflows.json"), []byte(wf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := LoadProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := ""
+	for _, w := range p.Warnings {
+		joined += w + "; "
+	}
+	for _, want := range []string{
+		`unknown shell "bash"`,
+		"undefined var {$root}",
+		`workflow "wf1" references unknown command "ghost"`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("warnings missing %q, got %q", want, joined)
 		}
 	}
 }

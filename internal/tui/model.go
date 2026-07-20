@@ -2,10 +2,8 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -339,105 +337,18 @@ func New(dryRun bool) (Model, error) {
 }
 
 func (m *Model) loadProject(projectDir string) error {
-	cfg, err := config.LoadConfig(projectDir)
+	p, err := config.LoadProject(projectDir)
 	if err != nil {
 		return err
 	}
 	m.projectDir = projectDir
-	var files []string
-	for _, f := range []string{"commands.json", "templates.json", "template.json", "commands.tsv", "templates.tsv", "config.tsv", "commands.local.json", "config.json"} {
-		if _, err := os.Stat(filepath.Join(projectDir, f)); err == nil {
-			files = append(files, f)
-		}
-	}
-	m.configFile = strings.Join(files, " + ")
-	m.config = cfg
-	workflows, err := store.LoadWorkflows(projectDir)
-	if err != nil {
-		return err
-	}
-	m.workflows = workflows
-	m.lists = slot.LoadLists(filepath.Join(projectDir, "lists"))
+	m.configFile = p.Files
+	m.config = p.Config
+	m.workflows = p.Workflows
+	m.lists = p.Lists
+	m.vars = p.Vars
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
-
-	vars, warnings := slot.LoadVars(projectDir)
-	m.vars = vars
-
-	// Fixed slot values live in vars.tsv ("command.slot" names) and win
-	// over values still stored inside commands.local.json (legacy layout,
-	// migrated on the next save). Re-bake so the merged values apply.
-	for i := range m.config.Commands {
-		c := &m.config.Commands[i]
-		if c.Template == "" {
-			continue
-		}
-		fromVars := slot.CommandValues(m.vars, c.Name)
-		if len(fromVars) == 0 {
-			continue
-		}
-		if c.Values == nil {
-			c.Values = make(map[string]string)
-		}
-		for k, v := range fromVars {
-			c.Values[k] = v
-		}
-		if baked, err := slot.MaterializeCommand(*c, m.config); err == nil {
-			*c = baked
-		}
-	}
-	for _, cmd := range cfg.Commands {
-		if cmd.Template == "" {
-			continue
-		}
-		if _, ok := cfg.FindCommand(cmd.Template); !ok {
-			warnings = append(warnings, "missing template: "+cmd.Name+" → "+cmd.Template)
-		}
-	}
-	seen := make(map[string]bool)
-	undefined := make(map[string]bool)
-	for _, cmd := range cfg.AllCommands() {
-		if seen[cmd.Name] {
-			warnings = append(warnings, "duplicate command name: "+cmd.Name)
-		}
-		seen[cmd.Name] = true
-		if cmd.Shell != "" && cmd.Shell != "ps" {
-			warnings = append(warnings, "unknown shell \""+cmd.Shell+"\" on "+cmd.Name+" (runs with the platform default)")
-		}
-		for _, v := range slot.UndefinedVars(cmd.Cmd+" "+cmd.Dir, m.vars) {
-			if !undefined[v] {
-				undefined[v] = true
-				warnings = append(warnings, "undefined var {$"+v+"} on "+cmd.Name+" (define it in vars.tsv)")
-			}
-		}
-	}
-	for _, entries := range m.lists {
-		for _, e := range entries {
-			for _, v := range slot.UndefinedVars(e.Value, m.vars) {
-				if !undefined[v] {
-					undefined[v] = true
-					warnings = append(warnings, "undefined var {$"+v+"} in a list value (define it in vars.tsv)")
-				}
-			}
-		}
-	}
-	// Orphaned vars.tsv rows (usually a command renamed by hand in
-	// commands.local.json): without a warning the next save would drop
-	// their values silently.
-	var orphans []string
-	orphanSeen := make(map[string]bool)
-	for k := range m.vars {
-		if i := strings.LastIndex(k, "."); i > 0 {
-			if name := k[:i]; !seen[name] && !orphanSeen[name] {
-				orphanSeen[name] = true
-				orphans = append(orphans, name)
-			}
-		}
-	}
-	sort.Strings(orphans)
-	for _, name := range orphans {
-		warnings = append(warnings, "vars.tsv has values for unknown command \""+name+"\" (removed on next save)")
-	}
-	m.loadWarning = strings.Join(warnings, "; ")
+	m.loadWarning = strings.Join(p.Warnings, "; ")
 	return nil
 }
 

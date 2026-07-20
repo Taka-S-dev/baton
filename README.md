@@ -279,9 +279,17 @@ Rules:
 
 ```
 baton [--dry-run]
+baton check [project|path]
 ```
 
 `--dry-run` prints what would be executed without running any commands.
+
+`baton check` validates projects without starting the TUI: it prints every
+warning (undefined variables, missing templates, unknown shells, broken
+workflow references, …) and exits non-zero when anything is wrong. Use it
+in CI, or as the verification loop when generating project files with an
+AI agent — the full file-format spec for that lives in
+[AGENTS.md](AGENTS.md).
 
 ```
   [ baton ]

@@ -12,6 +12,7 @@ projects/
 !go.mod
 !go.sum
 !/README.md
+!/AGENTS.md
 !projects.example/**/*.md
 !*.yml
 !LICENSE

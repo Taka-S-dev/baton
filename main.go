@@ -3,6 +3,7 @@
 // Usage:
 //
 //	baton [--dry-run]
+//	baton check [project|path]
 //
 // Flags:
 //
@@ -31,6 +32,13 @@ const usage = `baton - terminal-based command/workflow runner
 
 Usage:
   baton [--dry-run]
+  baton check [project|path]
+
+Commands:
+  check        Validate projects without starting the TUI and print any
+               warnings. With no argument every project is checked; pass a
+               project name or a directory path to check one. Exits 1 when
+               anything is wrong — usable from scripts, CI, and AI agents.
 
 Flags:
   --dry-run    Print what would be executed without running any commands.
@@ -43,6 +51,10 @@ Environment variables:
 `
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "check" {
+		os.Exit(runCheck(os.Args[2:]))
+	}
+
 	dryRun := false
 	for _, arg := range os.Args[1:] {
 		switch arg {
