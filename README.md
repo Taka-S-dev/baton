@@ -187,13 +187,19 @@ deploy	deploy		echo deploying {env}
 
 ### Template-derived commands
 
-Any command containing `{slots}` can act as a template. **Manage commands → Create command → From template** picks one, fills its slots (each can be skipped to resolve at run time), and saves the result to `commands.local.json`:
+Any command containing `{slots}` can act as a template. **Manage commands → Create command → From template** picks one, fills its slots (each can be skipped to resolve at run time), and saves the result — the identity goes to `commands.local.json`, the chosen values to `vars.tsv` (see Project Variables):
 
 ```json
-{ "name": "build-api", "cmd": "echo building Z:\\api", "workdir": "Z:\\api", "template": "build", "values": { "projDir": "Z:\\api", "projCmd": "Z:\\api" } }
+{ "name": "build-api", "template": "build" }
 ```
 
-The `cmd`/`workdir` are baked for readability and as a fallback if the template is deleted; `template` + `values` remain the source of truth.
+```
+command	name	value
+build-api	projDir	Z:\api
+build-api	projCmd	Z:\api
+```
+
+The actual command line is recomputed from `template` + `vars.tsv` on every load, so editing either propagates immediately. Deleting the template breaks its derived commands, which the startup warning points out.
 
 ## Placeholders and Selection Lists
 
@@ -242,6 +248,35 @@ Hand-typed `{slots}` are validated as you type: `✓` when a matching list exist
 - `Esc` — clear the filter if active, otherwise go back
 - `Enter` — confirm selection
 - On the **Confirm variables** screen: `Confirm` to save, `Edit` to re-pick values
+
+## Project Variables
+
+`vars.tsv` in the project folder is the project's variable table — three columns: which command the entry belongs to (`*` = global), the variable name, and the value:
+
+```
+command	name	value
+*	root	C:\Users\you\work\Phase2
+build-api	workdir	{$root}\api
+```
+
+**Global variables** (`*` rows) are hand-written constants, referenced as `{$name}` — note the `$` — in `cmd`, `workdir`, or list values:
+
+```
+name	group	workdir	cmd
+build	make	{$root}\api	make build
+deploy	deploy		deploy --env {env} --dir {$root}
+```
+
+**Per-command fixed values** (rows with a command name) are written by baton itself: when you save a template-derived command, the slot values you picked land here instead of inside `commands.local.json`. Every fixed value of every saved command is editable in this one file, and baton keeps the table in sync when commands are renamed or deleted.
+
+When the project moves — a new phase folder, another drive, someone else's machine — edit `root` (or find & replace inside this single file) and every command, saved value, and list entry that references it follows.
+
+Rules:
+
+- `{$name}` is substituted silently in previews and at run time; it never prompts. It is invisible to the interactive `{slot}` machinery — a plain `{root}` elsewhere is a normal slot and is never captured by a variable of the same name.
+- Undefined references stay literal and are reported as a startup warning.
+- Substitution is a single pass; values are never expanded recursively.
+- Edits are picked up on the next start or **Switch config**.
 
 ## Usage
 

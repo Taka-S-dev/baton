@@ -235,7 +235,7 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 		if r.currentSlotIdx >= len(r.currentSlots) {
 			resolved := slot.Apply(*item.cmd, r.currentValues)
 			if r.itemNotes[r.currentIdx] == "" {
-				r.itemNotes[r.currentIdx] = cmdNote(resolved)
+				r.itemNotes[r.currentIdx] = m.cmdNote(resolved)
 			}
 			if (r.purpose == purposeCreateWorkflow || r.purpose == purposeCreateAlias) && len(r.currentValues) > 0 {
 				r.workflowVars[item.cmd.Name] = copyMap(r.currentValues)
@@ -276,8 +276,10 @@ func (m Model) lookupStepCommand(name string) (mdl.Command, bool) {
 	return m.config.FindCommand(name)
 }
 
-// cmdNote formats the "$ cmd (workdir: dir)" line shown in list contexts.
-func cmdNote(cmd mdl.Command) string {
+// cmdNote formats the "$ cmd (workdir: dir)" line shown in list contexts,
+// with project variables resolved so notes show real paths.
+func (m Model) cmdNote(cmd mdl.Command) string {
+	cmd = slot.ApplyVarsToCommand(cmd, m.vars)
 	dir := cmd.Dir
 	if dir == "" {
 		dir = "."
@@ -291,7 +293,7 @@ func (m Model) partialNote(item msItem, values map[string]string) string {
 	if item.cmd == nil {
 		return ""
 	}
-	return cmdNote(slot.Apply(*item.cmd, values))
+	return m.cmdNote(slot.Apply(*item.cmd, values))
 }
 
 // itemNeedsSlots reports whether the item still has slots to resolve interactively.

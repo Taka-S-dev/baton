@@ -91,9 +91,10 @@ func (m Model) runNext() tea.Cmd {
 		r.items = newItems
 		return m.runNext()
 	}
+	cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
 	stepHeader := fmt.Sprintf("\n── [%d/%d] %s", r.current+1, len(r.items), item.Name)
-	if item.Cmd.Dir != "" {
-		stepHeader += fmt.Sprintf("   workdir: %s", item.Cmd.Dir)
+	if cmd.Dir != "" {
+		stepHeader += fmt.Sprintf("   workdir: %s", cmd.Dir)
 	}
 	prefix := ""
 	if r.current == r.startIdx {
@@ -108,7 +109,7 @@ func (m Model) runNext() tea.Cmd {
 		}
 		prefix = "\n" + sep + "\n"
 	}
-	return tea.Sequence(tea.Println(prefix+stepHeader), runner.Exec(r.current, *item.Cmd, m.dryRun))
+	return tea.Sequence(tea.Println(prefix+stepHeader), runner.Exec(r.current, cmd, m.dryRun))
 }
 
 func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {

@@ -99,6 +99,154 @@ func TestCommandForm_NameValidatedEarly(t *testing.T) {
 	}
 }
 
+// TestLoadProject_Vars checks vars.tsv is loaded, {$name} references
+// resolve in the workflow step preview, and undefined references surface
+// a load warning naming the variable.
+func TestLoadProject_Vars(t *testing.T) {
+	dir := t.TempDir()
+	cfg := `{"commands": [{"name": "build", "workdir": "{$root}\\api", "cmd": "make {$phase}"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "commands.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vars.tsv"), []byte("command\tname\tvalue\n*\troot\tC:\\work\\Phase2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Model{}
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	if m.vars["root"] != `C:\work\Phase2` {
+		t.Fatalf("vars = %v", m.vars)
+	}
+	if !strings.Contains(m.loadWarning, "undefined var {$phase}") {
+		t.Fatalf("loadWarning = %q, want an undefined-var warning for phase", m.loadWarning)
+	}
+
+	wf := mdl.Workflow{Name: "w", Commands: []string{"build"}}
+	cmd, ok := m.workflowStepCommand(wf, "build")
+	if !ok || cmd.Dir != `C:\work\Phase2\api` {
+		t.Fatalf("workflowStepCommand dir = %q, want the var resolved", cmd.Dir)
+	}
+	if cmd.Cmd != "make {$phase}" {
+		t.Fatalf("undefined var must stay literal, got %q", cmd.Cmd)
+	}
+}
+
+// TestSaveConfig_ValuesLiveInVarsTsv checks the new layout: saving moves
+// a template-derived command's fixed values into vars.tsv (command.slot
+// names), strips them from commands.local.json, prunes entries of
+// deleted commands, and a reload restores the values from vars.tsv.
+func TestSaveConfig_ValuesLiveInVarsTsv(t *testing.T) {
+	dir := t.TempDir()
+	base := `{"commands": [{"name": "build", "workdir": "{workdir}", "cmd": "make build"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "commands.json"), []byte(base), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Model{}
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	m.vars["stale.workdir"] = "./old" // entry of a command that no longer exists
+	m.config.Commands = append(m.config.Commands, mdl.Command{
+		Name: "as", Template: "build", Values: map[string]string{"workdir": "./src"},
+	})
+	if err := m.saveConfig(); err != nil {
+		t.Fatal(err)
+	}
+
+	tsv, err := os.ReadFile(filepath.Join(dir, "vars.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(tsv), "as\tworkdir\t./src") {
+		t.Fatalf("vars.tsv = %q, want the fixed value mirrored as a command/name/value row", tsv)
+	}
+	if strings.Contains(string(tsv), "stale") {
+		t.Fatal("entries of deleted commands must be pruned")
+	}
+	local, err := os.ReadFile(filepath.Join(dir, "commands.local.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"values", "./src", "workdir", "cmd", "slots"} {
+		if strings.Contains(string(local), field) {
+			t.Fatalf("commands.local.json = %q, must not contain %q — template entries persist identity only", local, field)
+		}
+	}
+
+	// Reload: values come back from vars.tsv and the command re-bakes.
+	m2 := &Model{}
+	if err := m2.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	cmd, ok := m2.config.FindCommand("as")
+	if !ok || cmd.Values["workdir"] != "./src" || cmd.Dir != "./src" {
+		t.Fatalf("reloaded command = %+v, want values restored and baked", cmd)
+	}
+}
+
+// TestLoadProject_LegacyValuesStillWork checks values still stored inside
+// commands.local.json (pre-vars.tsv layout) keep working, and vars.tsv
+// wins when both define the same slot.
+func TestLoadProject_LegacyValuesStillWork(t *testing.T) {
+	dir := t.TempDir()
+	base := `{"commands": [{"name": "build", "workdir": "{workdir}", "cmd": "make build"}]}`
+	local := `{"commands": [{"name": "as", "template": "build", "values": {"workdir": "./legacy"}}]}`
+	if err := os.WriteFile(filepath.Join(dir, "commands.json"), []byte(base), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "commands.local.json"), []byte(local), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Model{}
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	if cmd, _ := m.config.FindCommand("as"); cmd.Dir != "./legacy" {
+		t.Fatalf("legacy values must still bake, got %+v", cmd)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "vars.tsv"), []byte("as.workdir\t./from-vars\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m2 := &Model{}
+	if err := m2.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	if cmd, _ := m2.config.FindCommand("as"); cmd.Dir != "./from-vars" {
+		t.Fatalf("vars.tsv must win over legacy values, got %+v", cmd)
+	}
+}
+
+// TestLoadProject_WarnsOrphanedVars checks vars.tsv rows for a command
+// that no longer exists surface a load warning, since the next save
+// would drop them.
+func TestLoadProject_WarnsOrphanedVars(t *testing.T) {
+	dir := t.TempDir()
+	cfg := `{"commands": [{"name": "build", "cmd": "make build"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "commands.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tsv := "command\tname\tvalue\n*\troot\tC:\\x\nghost\tworkdir\t./src\n"
+	if err := os.WriteFile(filepath.Join(dir, "vars.tsv"), []byte(tsv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Model{}
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(m.loadWarning, `unknown command "ghost"`) {
+		t.Fatalf("loadWarning = %q, want an orphaned-vars warning", m.loadWarning)
+	}
+	if strings.Contains(m.loadWarning, "root") {
+		t.Fatalf("globals must not be treated as orphans: %q", m.loadWarning)
+	}
+}
+
 // TestLoadProject_WarnsUnknownShell checks a hand-written config with an
 // unrecognized shell value surfaces a load warning instead of silently
 // falling back to the platform default.

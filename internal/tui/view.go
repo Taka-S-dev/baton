@@ -478,7 +478,7 @@ func (m Model) viewMultiSelect(w int) string {
 			b.WriteString("  " + gray("$ "+hovered.cmd.Cmd) + "\n")
 		} else if hovered.cmd != nil {
 			b.WriteString(hlineLabel(w, "command preview") + "\n")
-			cmdStr := hovered.cmd.Cmd
+			cmdStr := slot.ApplyVars(hovered.cmd.Cmd, m.vars)
 			maxLen := w - 10
 			if maxLen < 10 {
 				maxLen = 10
@@ -604,7 +604,7 @@ func (m Model) viewSlotPick(w int) string {
 				} else {
 					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", slotVar("{"+sp.slotName+"}"))
 				}
-				return s
+				return slot.ApplyVars(s, m.vars)
 			}
 
 			b.WriteString("    " + gray("$") + " " + preview(sp.currentCmd.Cmd) + "\n")

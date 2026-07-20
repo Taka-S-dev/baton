@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -261,6 +262,7 @@ type Model struct {
 	workflows  []mdl.Workflow
 	aliases    []mdl.Alias
 	lists      map[string][]mdl.ListEntry
+	vars       map[string]string // project variables for {$name} references
 
 	screen Screen
 	width  int
@@ -405,7 +407,31 @@ func (m *Model) loadProject(projectDir string) error {
 	m.lists = slot.LoadLists(filepath.Join(projectDir, "lists"))
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
 
-	var warnings []string
+	vars, warnings := slot.LoadVars(projectDir)
+	m.vars = vars
+
+	// Fixed slot values live in vars.tsv ("command.slot" names) and win
+	// over values still stored inside commands.local.json (legacy layout,
+	// migrated on the next save). Re-bake so the merged values apply.
+	for i := range m.config.Commands {
+		c := &m.config.Commands[i]
+		if c.Template == "" {
+			continue
+		}
+		fromVars := slot.CommandValues(m.vars, c.Name)
+		if len(fromVars) == 0 {
+			continue
+		}
+		if c.Values == nil {
+			c.Values = make(map[string]string)
+		}
+		for k, v := range fromVars {
+			c.Values[k] = v
+		}
+		if baked, err := slot.MaterializeCommand(*c, m.config); err == nil {
+			*c = baked
+		}
+	}
 	for _, cmd := range cfg.Commands {
 		if cmd.Template == "" {
 			continue
@@ -415,6 +441,7 @@ func (m *Model) loadProject(projectDir string) error {
 		}
 	}
 	seen := make(map[string]bool)
+	undefined := make(map[string]bool)
 	for _, cmd := range cfg.AllCommands() {
 		if seen[cmd.Name] {
 			warnings = append(warnings, "duplicate command name: "+cmd.Name)
@@ -423,6 +450,39 @@ func (m *Model) loadProject(projectDir string) error {
 		if cmd.Shell != "" && cmd.Shell != "ps" {
 			warnings = append(warnings, "unknown shell \""+cmd.Shell+"\" on "+cmd.Name+" (runs with the platform default)")
 		}
+		for _, v := range slot.UndefinedVars(cmd.Cmd+" "+cmd.Dir, m.vars) {
+			if !undefined[v] {
+				undefined[v] = true
+				warnings = append(warnings, "undefined var {$"+v+"} on "+cmd.Name+" (define it in vars.tsv)")
+			}
+		}
+	}
+	for _, entries := range m.lists {
+		for _, e := range entries {
+			for _, v := range slot.UndefinedVars(e.Value, m.vars) {
+				if !undefined[v] {
+					undefined[v] = true
+					warnings = append(warnings, "undefined var {$"+v+"} in a list value (define it in vars.tsv)")
+				}
+			}
+		}
+	}
+	// Orphaned vars.tsv rows (usually a command renamed by hand in
+	// commands.local.json): without a warning the next save would drop
+	// their values silently.
+	var orphans []string
+	orphanSeen := make(map[string]bool)
+	for k := range m.vars {
+		if i := strings.LastIndex(k, "."); i > 0 {
+			if name := k[:i]; !seen[name] && !orphanSeen[name] {
+				orphanSeen[name] = true
+				orphans = append(orphans, name)
+			}
+		}
+	}
+	sort.Strings(orphans)
+	for _, name := range orphans {
+		warnings = append(warnings, "vars.tsv has values for unknown command \""+name+"\" (removed on next save)")
 	}
 	m.loadWarning = strings.Join(warnings, "; ")
 	return nil
@@ -430,7 +490,37 @@ func (m *Model) loadProject(projectDir string) error {
 
 // saveConfig persists user commands to commands.local.json.
 func (m *Model) saveConfig() error {
-	return store.SaveConfig(m.projectDir, m.config)
+	// Mirror every template-derived command's fixed values into vars.tsv
+	// ("command.slot" names), drop entries for commands that no longer
+	// exist, and persist the local layer without the values — vars.tsv is
+	// their single editable home.
+	for _, c := range m.config.Commands {
+		if c.Template != "" {
+			slot.SetCommandValues(m.vars, c.Name, c.Values)
+		}
+	}
+	slot.PruneCommandValues(m.vars, func(name string) bool {
+		_, ok := m.config.FindCommand(name)
+		return ok
+	})
+	if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+		return err
+	}
+	// Template-derived entries persist only their identity: cmd/workdir/
+	// slots/values are all recomputed from template + vars.tsv on load,
+	// and a baked copy in the file just looks editable without being so.
+	stripped := m.config
+	stripped.Commands = make([]mdl.Command, len(m.config.Commands))
+	copy(stripped.Commands, m.config.Commands)
+	for i := range stripped.Commands {
+		if stripped.Commands[i].Template != "" {
+			stripped.Commands[i].Values = nil
+			stripped.Commands[i].Cmd = ""
+			stripped.Commands[i].Dir = ""
+			stripped.Commands[i].Slots = nil
+		}
+	}
+	return store.SaveConfig(m.projectDir, stripped)
 }
 
 func (m *Model) gotoManageLists() {
@@ -462,7 +552,7 @@ func (m *Model) workflowStepCommand(wf mdl.Workflow, name string) (mdl.Command, 
 	if vars, ok := wf.Vars[name]; ok {
 		cmd = slot.Apply(cmd, vars)
 	}
-	return cmd, true
+	return slot.ApplyVarsToCommand(cmd, m.vars), true
 }
 
 // updateStepsViewport rebuilds the steps viewport content for the currently hovered workflow.
