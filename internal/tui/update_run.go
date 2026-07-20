@@ -160,10 +160,43 @@ func (m Model) updateRetry(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // ── Run workflow ──────────────────────────────────────────────────────────────
 
+// wfSearchText returns the lowercase haystack a workflow is matched
+// against: its name, the commands it runs (name and resolved body, as
+// shown in the steps preview), and preset slot values.
+func (m *Model) wfSearchText(wf mdl.Workflow) string {
+	parts := []string{wf.Name}
+	parts = append(parts, wf.Commands...)
+	for _, name := range wf.Commands {
+		if cmd, ok := m.workflowStepCommand(wf, name); ok {
+			parts = append(parts, cmd.Cmd, cmd.Group)
+		}
+	}
+	for _, vars := range wf.Vars {
+		for _, v := range vars {
+			parts = append(parts, v)
+		}
+	}
+	return strings.ToLower(strings.Join(parts, " "))
+}
+
+func (m *Model) wfFiltered() []int {
+	var out []int
+	terms := strings.Fields(strings.ToLower(m.wfSearchTI.Value()))
+	for i, wf := range m.workflows {
+		if matchesAllTerms(m.wfSearchText(wf), terms) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	filtered := m.wfFiltered()
+	n := len(filtered)
+
 	switch msg.String() {
 	case "tab":
-		if len(m.workflows) > 0 {
+		if n > 0 {
 			m.stepsFocused = !m.stepsFocused
 		}
 	case "up":
@@ -176,15 +209,15 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down":
 		if m.stepsFocused {
 			m.stepsVP.ScrollDown(1)
-		} else if m.listCursor < len(m.listItems)-1 {
+		} else if m.listCursor < n-1 {
 			m.listCursor++
 			m.updateStepsViewport()
 		}
 	case "enter":
-		if len(m.workflows) == 0 {
+		if n == 0 || m.listCursor >= n {
 			break
 		}
-		wf := m.workflows[m.listCursor]
+		wf := m.workflows[filtered[m.listCursor]]
 		store.SaveLastWorkflow(m.projectDir, wf.Name)
 		m.lastWorkflow = wf.Name
 
@@ -213,7 +246,22 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.advanceResolve()
 	case "esc":
+		if m.wfSearchTI.Value() != "" {
+			m.wfSearchTI.SetValue("")
+			m.listCursor = 0
+			m.updateStepsViewport()
+			return m, nil
+		}
 		m.gotoMainMenu()
+	default:
+		prev := m.wfSearchTI.Value()
+		var cmd tea.Cmd
+		m.wfSearchTI, cmd = m.wfSearchTI.Update(msg)
+		if m.wfSearchTI.Value() != prev {
+			m.listCursor = 0
+			m.updateStepsViewport()
+		}
+		return m, cmd
 	}
 	return m, nil
 }

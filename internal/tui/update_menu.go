@@ -43,6 +43,7 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listItems = names
 			m.listCursor = 0
 			m.stepsFocused = false
+			m.wfSearchTI = newMSTI("/ ")
 			if m.lastWorkflow != "" {
 				for i, w := range m.workflows {
 					if w.Name == m.lastWorkflow {
@@ -52,8 +53,9 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.updateStepsViewport()
-		case "Run manually":
-			m.screen = ScreenRunManually
+			return m, m.wfSearchTI.Focus()
+		case "Run commands":
+			m.screen = ScreenRunCommands
 			return m, m.setupMultiSelect(true)
 		case "Create workflow":
 			m.screen = ScreenCreateWorkflow

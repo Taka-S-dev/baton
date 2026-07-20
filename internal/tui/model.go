@@ -25,7 +25,7 @@ const (
 	ScreenProjectSelect Screen = iota
 	ScreenMainMenu
 	ScreenRunWorkflow
-	ScreenRunManually
+	ScreenRunCommands
 	ScreenSlotPick
 	ScreenConfirmRun
 	ScreenRunning
@@ -70,7 +70,7 @@ const (
 type resolveFlowPurpose int
 
 const (
-	purposeRunManually resolveFlowPurpose = iota
+	purposeRunCommands resolveFlowPurpose = iota
 	purposeCreateWorkflow
 	purposeCreateAlias
 	purposeEditWorkflow
@@ -91,14 +91,39 @@ func (i msItem) name() string {
 	return i.cmd.Name
 }
 
-func (i msItem) group() string {
+func (i msItem) isAlias() bool { return i.alias != nil }
+
+// searchText returns the lowercase haystack the search field matches
+// against: name and group, plus the command body, template name and
+// embedded values (for commands) or steps and embedded vars (for aliases).
+func (i msItem) searchText() string {
+	var parts []string
 	if i.alias != nil {
-		return "alias"
+		parts = append(parts, i.alias.Name, "alias")
+		parts = append(parts, i.alias.Steps...)
+		for _, vars := range i.alias.Vars {
+			for _, v := range vars {
+				parts = append(parts, v)
+			}
+		}
+	} else {
+		parts = append(parts, i.cmd.Name, i.cmd.Group, i.cmd.Cmd, i.cmd.Template)
+		for _, v := range i.cmd.Values {
+			parts = append(parts, v)
+		}
 	}
-	return i.cmd.Group
+	return strings.ToLower(strings.Join(parts, " "))
 }
 
-func (i msItem) isAlias() bool { return i.alias != nil }
+// matchesAllTerms reports whether every term occurs in haystack (AND search).
+func matchesAllTerms(haystack string, terms []string) bool {
+	for _, t := range terms {
+		if !strings.Contains(haystack, t) {
+			return false
+		}
+	}
+	return true
+}
 
 // slotPickState holds state for the slot-picking screen.
 type slotPickState struct {
@@ -123,10 +148,10 @@ func (s *slotPickState) applyFilter() {
 		return
 	}
 	s.filtered = nil
-	q := strings.ToLower(s.search)
+	terms := strings.Fields(strings.ToLower(s.search))
 	for _, e := range s.entries {
-		if strings.Contains(strings.ToLower(e.Value), q) ||
-			strings.Contains(strings.ToLower(e.Label), q) {
+		hay := strings.ToLower(e.Value + " " + e.Label)
+		if matchesAllTerms(hay, terms) {
 			s.filtered = append(s.filtered, e)
 		}
 	}
@@ -235,18 +260,17 @@ type Model struct {
 	listItems  []string
 
 	// Multi-select
-	msItems       []msItem
-	msCursor      int
-	msViewStart   int
-	msSelected    []int
-	msActiveField int
-	msSearchTI    textinput.Model
-	msGroupTI     textinput.Model
+	msItems     []msItem
+	msCursor    int
+	msViewStart int
+	msSelected  []int
+	msSearchTI  textinput.Model
+	msEscArmed  bool // first Esc with selections pressed; next Esc discards
 
 	// Slot picking
 	sp *slotPickState
 
-	// Resolve flow (Run manually / Create workflow / Create alias)
+	// Resolve flow (Run commands / Create workflow / Create alias)
 	resolve *resolveFlowState
 
 	// Confirm run
@@ -269,6 +293,7 @@ type Model struct {
 	spinner      spinner.Model
 	stepsVP      viewport.Model
 	stepsFocused bool
+	wfSearchTI   textinput.Model // Run workflow list search
 
 	// List edit
 	le *listEditState
@@ -407,7 +432,7 @@ func (m *Model) gotoMainMenu() {
 	m.screen = ScreenMainMenu
 	m.listItems = []string{
 		"Run workflow",
-		"Run manually",
+		"Run commands",
 		"Create workflow",
 		"Edit workflow",
 		"Delete workflow",
@@ -446,11 +471,12 @@ func (m *Model) updateStepsViewport() {
 	m.stepsVP.Width = w - 4
 	m.stepsVP.Height = h
 
-	if len(m.workflows) == 0 || m.listCursor >= len(m.workflows) {
+	filtered := m.wfFiltered()
+	if len(filtered) == 0 || m.listCursor >= len(filtered) {
 		m.stepsVP.SetContent("")
 		return
 	}
-	wf := m.workflows[m.listCursor]
+	wf := m.workflows[filtered[m.listCursor]]
 	var lines []string
 	for j, cmdName := range wf.Commands {
 		cmdStr := ""

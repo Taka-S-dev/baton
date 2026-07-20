@@ -27,7 +27,6 @@ func TestViewMultiSelect_StableValueOrder(t *testing.T) {
 	m := Model{width: 80, height: 24}
 	m.msItems = []msItem{{cmd: &cmd}}
 	m.msSearchTI = textinput.New()
-	m.msGroupTI = textinput.New()
 
 	first := m.viewMultiSelect(80)
 	for i := 0; i < 50; i++ {
@@ -101,6 +100,30 @@ func TestViewPlaceholderWindow_FullTextFooter(t *testing.T) {
 	view = m.viewPlaceholderWindow(w)
 	if strings.Contains(view, "Development\n") && strings.Count(view, "Development") > 1 {
 		t.Fatal("short entries must not produce a footer")
+	}
+}
+
+// TestViewMultiSelect_DiscardWindow checks the discard guard renders as a
+// floating window listing the selected names while msEscArmed is set.
+func TestViewMultiSelect_DiscardWindow(t *testing.T) {
+	cmd := mdl.Command{Name: "build", Cmd: "make all"}
+	m := Model{width: 80, height: 24}
+	m.msItems = []msItem{{cmd: &cmd}}
+	m.msSearchTI = textinput.New()
+	m.msSelected = []int{0}
+	m.msEscArmed = true
+
+	view := m.viewMultiSelect(80)
+	if !strings.Contains(view, "Discard selection?") {
+		t.Fatal("armed model must render the discard confirmation window")
+	}
+	if !strings.Contains(view, "build") {
+		t.Fatal("the window must list the selected command names")
+	}
+
+	m.msEscArmed = false
+	if strings.Contains(m.viewMultiSelect(80), "Discard selection?") {
+		t.Fatal("disarmed model must not render the discard window")
 	}
 }
 

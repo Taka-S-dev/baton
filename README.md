@@ -208,7 +208,7 @@ Both `{projDir}` and `{projCmd}` will select from the `project` list, each promp
 
 ### Placeholder resolution
 
-- **Run manually** — baton prompts for each placeholder before execution
+- **Run commands** — baton prompts for each placeholder before execution
 - **Workflows and aliases** — baton prompts when creating; values are saved and reused at run time
 - Placeholders can be **skipped** when creating a workflow or a template-derived command — skipped ones are prompted at run time instead
 
@@ -240,7 +240,7 @@ baton [--dry-run]
   [ baton ]
 
   ▶ Run workflow
-    Run manually
+    Run commands
     Create workflow
     Edit workflow
     Delete workflow
@@ -256,15 +256,16 @@ baton [--dry-run]
 | Key | Action |
 |-----|--------|
 | `↑` / `↓` | Move cursor |
-| `Space` | Toggle selection |
+| `Tab` | Toggle selection |
 | `Enter` | Confirm |
-| `Esc` | Cancel / go back |
-| Type | Search by name or group |
-| `Tab` | Switch between name and group search fields |
+| `Esc` | Clear the search if active, otherwise go back (with selections, a second press confirms discarding them) |
+| Type | Search — matches name, group, command body, and embedded values; space-separated terms are ANDed (e.g. `make auth`) |
 
 ### Workflows
 
 Workflows are saved combinations of commands with pre-set placeholder values. Create one via **Create workflow**, then run it instantly from **Run workflow**.
+
+The **Run workflow** list is searchable the same way as the command selector: type to filter, space-separated terms are ANDed, and matches cover the workflow name, the commands it runs, and preset placeholder values.
 
 ### Aliases
 

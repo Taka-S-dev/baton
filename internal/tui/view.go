@@ -27,7 +27,7 @@ func (m Model) View() string {
 		view = m.viewMainMenu(w)
 	case ScreenRunWorkflow:
 		view = m.viewRunWorkflow(w)
-	case ScreenRunManually, ScreenCreateWorkflow, ScreenCreateAlias,
+	case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
 		ScreenEditWorkflowCommands, ScreenEditAliasCommands:
 		view = m.viewMultiSelect(w)
 	case ScreenEditWorkflowMode:
@@ -138,12 +138,12 @@ type menuItemInfo struct {
 
 var menuItemInfos = map[string]menuItemInfo{
 	"Run workflow":    {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
-	"Run manually":    {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
-	"Create workflow": {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Space", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
+	"Run commands":    {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
+	"Create workflow": {desc: "Save a command set as a reusable workflow.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Save"}, {"Esc", "Back"}}},
 	"Edit workflow":   {desc: "Rename or change commands in a workflow.", shortcuts: [][2]string{{"Enter", "Edit"}, {"Esc", "Back"}}},
 	"Delete workflow": {desc: "Delete one or more workflows.", shortcuts: [][2]string{{"Space", "Toggle"}, {"Enter", "Confirm"}, {"Esc", "Back"}}},
 	"Manage commands": {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage aliases":  {desc: "Reusable command groups, selectable in Run Manually.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage aliases":  {desc: "Reusable command groups, selectable in Run commands.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage lists":    {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
 	"Switch config":   {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
 	"Exit":            {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
@@ -155,7 +155,7 @@ func (m Model) viewMainMenu(w int) string {
 		items []string
 	}
 	groups := []group{
-		{"Run", []string{"Run workflow", "Run manually"}},
+		{"Run", []string{"Run workflow", "Run commands"}},
 		{"Workflow", []string{"Create workflow", "Edit workflow", "Delete workflow"}},
 		{"Manage", []string{"Manage commands", "Manage aliases", "Manage lists"}},
 		{"", []string{"Switch config", "Exit"}},
@@ -303,33 +303,42 @@ func (m Model) viewRunWorkflow(w int) string {
 		return b.String()
 	}
 
-	// Reserve lines for preview panel + footer
-	previewH := 2
-	if m.listCursor < len(m.workflows) {
-		previewH = min(len(m.workflows[m.listCursor].Commands), 5) + 2
-	}
-	viewH := max(1, m.height-8-previewH)
-	cur := m.listCursor
-	viewStart := max(0, min(cur-viewH/2, len(m.workflows)-viewH))
-	viewEnd := min(viewStart+viewH, len(m.workflows))
+	b.WriteString("  " + m.wfSearchTI.View() + "\n\n")
 
-	if viewStart > 0 {
-		b.WriteString("  " + gray("...") + "\n")
+	filtered := m.wfFiltered()
+	n := len(filtered)
+	cur := m.listCursor
+	if cur >= n {
+		cur = max(0, n-1)
 	}
-	for i := viewStart; i < viewEnd; i++ {
-		wf := m.workflows[i]
-		suffix := ""
-		if wf.Name == m.lastWorkflow {
-			suffix = "  " + gray("(last)")
+
+	if n == 0 {
+		b.WriteString("  " + gray("No results.") + "\n")
+	} else {
+		// Reserve lines for preview panel + footer
+		previewH := min(len(m.workflows[filtered[cur]].Commands), 5) + 2
+		viewH := max(1, m.height-10-previewH)
+		viewStart := max(0, min(cur-viewH/2, n-viewH))
+		viewEnd := min(viewStart+viewH, n)
+
+		if viewStart > 0 {
+			b.WriteString("  " + gray("...") + "\n")
 		}
-		if i == cur {
-			b.WriteString("  " + cyanBold("▶") + " " + bold(wf.Name) + suffix + "\n")
-		} else {
-			b.WriteString("    " + wf.Name + suffix + "\n")
+		for i := viewStart; i < viewEnd; i++ {
+			wf := m.workflows[filtered[i]]
+			suffix := ""
+			if wf.Name == m.lastWorkflow {
+				suffix = "  " + gray("(last)")
+			}
+			if i == cur {
+				b.WriteString("  " + cyanBold("▶") + " " + bold(wf.Name) + suffix + "\n")
+			} else {
+				b.WriteString("    " + wf.Name + suffix + "\n")
+			}
 		}
-	}
-	if viewEnd < len(m.workflows) {
-		b.WriteString("  " + gray("...") + "\n")
+		if viewEnd < n {
+			b.WriteString("  " + gray("...") + "\n")
+		}
 	}
 
 	// Step preview for hovered workflow (scrollable viewport)
@@ -341,7 +350,7 @@ func (m Model) viewRunWorkflow(w int) string {
 	b.WriteString(m.stepsVP.View() + "\n")
 
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ Enter Esc  Tab: focus steps") + "\n")
+	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab: focus steps") + "\n")
 	return b.String()
 }
 
@@ -374,7 +383,7 @@ func (m Model) viewMultiSelect(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header(title, w) + "\n")
 
-	b.WriteString("  " + m.msSearchTI.View() + "    " + m.msGroupTI.View() + "\n\n")
+	b.WriteString("  " + m.msSearchTI.View() + "\n\n")
 
 	if n == 0 {
 		b.WriteString("  " + gray("No results.") + "\n")
@@ -482,8 +491,38 @@ func (m Model) viewMultiSelect(w int) string {
 	}
 	b.WriteString("\n  " + green(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + strings.Join(selNames, ", ") + "\n")
 	b.WriteString(hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ Move  Space Select  Enter Confirm  Esc Back  Tab Switch") + "\n")
+	b.WriteString("  " + gray("↑↓ Move  Tab Select  Enter Confirm  Esc Back") + "\n")
+
+	// Discard guard: opens as a centered floating window over the list.
+	if m.msEscArmed && len(m.msSelected) > 0 {
+		return m.viewDiscardWindow(w, selNames)
+	}
 	return b.String()
+}
+
+// viewDiscardWindow renders the discard confirmation as a centered floating
+// window (same style as the placeholder picker): shown after Esc is pressed
+// with items still selected. Esc again discards; any other key keeps the
+// selection and returns to the list.
+func (m Model) viewDiscardWindow(w int, selNames []string) string {
+	names := strings.Join(selNames, ", ")
+	innerW := min(max(lipgloss.Width(names), 40), max(10, w-10))
+	content := yellow(" Discard selection? ") + "\n\n" +
+		fmt.Sprintf("%d selected:", len(selNames)) + "\n" +
+		dim(lipgloss.NewStyle().Width(innerW).Render(names)) + "\n\n" +
+		gray("Esc: discard   any other key: keep")
+
+	win := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("11")).
+		Padding(0, 2).
+		Render(content)
+
+	h := m.height
+	if h == 0 {
+		h = 24
+	}
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, win)
 }
 
 // ── Slot pick ────────────────────────────────────────────────────────────────

@@ -39,15 +39,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, c
 		}
 		switch m.screen {
-		case ScreenRunManually, ScreenCreateWorkflow, ScreenCreateAlias,
+		case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
 			ScreenEditWorkflowCommands, ScreenEditAliasCommands:
-			if m.msActiveField == 0 {
-				ti, c := m.msSearchTI.Update(msg)
-				m.msSearchTI = ti
-				return m, c
-			}
-			ti, c := m.msGroupTI.Update(msg)
-			m.msGroupTI = ti
+			ti, c := m.msSearchTI.Update(msg)
+			m.msSearchTI = ti
+			return m, c
+		case ScreenRunWorkflow:
+			ti, c := m.wfSearchTI.Update(msg)
+			m.wfSearchTI = ti
 			return m, c
 		}
 	}
@@ -75,7 +74,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateMainMenu(msg)
 		case ScreenRunWorkflow:
 			return m.updateRunWorkflow(msg)
-		case ScreenRunManually, ScreenCreateWorkflow, ScreenCreateAlias,
+		case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
 			ScreenEditWorkflowCommands, ScreenEditAliasCommands:
 			return m.updateMultiSelect(msg)
 		case ScreenSlotPick:

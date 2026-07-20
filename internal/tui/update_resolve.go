@@ -19,7 +19,6 @@ func (m *Model) setupMultiSelect(includeAliases bool) tea.Cmd {
 	m.msCursor = 0
 	m.msViewStart = 0
 	m.msSelected = nil
-	m.msActiveField = 0
 	for i := range m.config.Base {
 		m.msItems = append(m.msItems, msItem{cmd: &m.config.Base[i]})
 	}
@@ -31,8 +30,7 @@ func (m *Model) setupMultiSelect(includeAliases bool) tea.Cmd {
 			m.msItems = append(m.msItems, msItem{alias: &m.aliases[i]})
 		}
 	}
-	m.msSearchTI = newMSTI("/ ", true)
-	m.msGroupTI = newMSTI("Group / ", false)
+	m.msSearchTI = newMSTI("/ ")
 	return m.msSearchTI.Focus()
 }
 
@@ -56,21 +54,11 @@ func (m *Model) setupMultiSelectWithPreSelected(cmdNames []string) tea.Cmd {
 
 func (m *Model) msFiltered() []int {
 	var out []int
-	qs := strings.ToLower(m.msSearchTI.Value())
-	qg := strings.ToLower(m.msGroupTI.Value())
+	terms := strings.Fields(strings.ToLower(m.msSearchTI.Value()))
 	for i, item := range m.msItems {
-		if qs != "" {
-			if !strings.Contains(strings.ToLower(item.name()), qs) &&
-				!strings.Contains(strings.ToLower(item.group()), qs) {
-				continue
-			}
+		if matchesAllTerms(item.searchText(), terms) {
+			out = append(out, i)
 		}
-		if qg != "" {
-			if !strings.Contains(strings.ToLower(item.group()), qg) {
-				continue
-			}
-		}
-		out = append(out, i)
 	}
 	return out
 }
@@ -78,6 +66,14 @@ func (m *Model) msFiltered() []int {
 func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	filtered := m.msFiltered()
 	n := len(filtered)
+
+	// While the discard window is up, Esc confirms and any other key
+	// just closes it without acting on the list underneath.
+	escArmed := m.msEscArmed
+	m.msEscArmed = false
+	if escArmed && msg.String() != "esc" {
+		return m, nil
+	}
 
 	switch msg.String() {
 	case "up":
@@ -89,20 +85,6 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.msCursor = (m.msCursor + 1) % n
 		}
 	case "tab":
-		m.msActiveField = 1 - m.msActiveField
-		cyan := lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
-		dark := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-		if m.msActiveField == 1 {
-			m.msSearchTI.Blur()
-			m.msSearchTI.PromptStyle = dark
-			m.msGroupTI.PromptStyle = cyan
-			return m, m.msGroupTI.Focus()
-		}
-		m.msGroupTI.Blur()
-		m.msGroupTI.PromptStyle = dark
-		m.msSearchTI.PromptStyle = cyan
-		return m, m.msSearchTI.Focus()
-	case " ", "　":
 		if n > 0 && m.msCursor < n {
 			origIdx := filtered[m.msCursor]
 			found := false
@@ -127,11 +109,14 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.startResolveFlow(selected)
 	case "esc":
-		if m.msSearchTI.Value() != "" || m.msGroupTI.Value() != "" {
+		if m.msSearchTI.Value() != "" {
 			m.msSearchTI.SetValue("")
-			m.msGroupTI.SetValue("")
 			m.msCursor = 0
 			m.msViewStart = 0
+			return m, nil
+		}
+		if len(m.msSelected) > 0 && !escArmed {
+			m.msEscArmed = true
 			return m, nil
 		}
 		if m.screen == ScreenEditWorkflowCommands {
@@ -149,14 +134,9 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.gotoMainMenu()
 	default:
 		prevSearch := m.msSearchTI.Value()
-		prevGroup := m.msGroupTI.Value()
 		var cmd tea.Cmd
-		if m.msActiveField == 0 {
-			m.msSearchTI, cmd = m.msSearchTI.Update(msg)
-		} else {
-			m.msGroupTI, cmd = m.msGroupTI.Update(msg)
-		}
-		if m.msSearchTI.Value() != prevSearch || m.msGroupTI.Value() != prevGroup {
+		m.msSearchTI, cmd = m.msSearchTI.Update(msg)
+		if m.msSearchTI.Value() != prevSearch {
 			m.msCursor = 0
 			m.msViewStart = 0
 		}
@@ -172,7 +152,7 @@ func (m Model) startResolveFlow(items []msItem) (tea.Model, tea.Cmd) {
 	for i, it := range items {
 		names[i] = it.name()
 	}
-	purpose := purposeRunManually
+	purpose := purposeRunCommands
 	if m.screen == ScreenCreateWorkflow {
 		purpose = purposeCreateWorkflow
 	} else if m.screen == ScreenCreateAlias {
@@ -340,7 +320,7 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 	switch r.purpose {
 	case purposeRunWorkflow:
 		return m.startConfirmRun(r.resolved, r.workflowLabel)
-	case purposeRunManually:
+	case purposeRunCommands:
 		return m.startConfirmRun(r.resolved, "manual")
 	case purposeCreateWorkflow:
 		if len(r.workflowVars) > 0 {
@@ -479,7 +459,7 @@ func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 	}
 
 	m.sp = nil
-	m.screen = ScreenRunManually
+	m.screen = ScreenRunCommands
 	if r.purpose == purposeCreateWorkflow {
 		m.screen = ScreenCreateWorkflow
 	} else if r.purpose == purposeCreateAlias {
@@ -509,16 +489,16 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 			m.screen = ScreenRunWorkflow
 			return m, nil
 		default:
-			m.screen = ScreenRunManually
+			m.screen = ScreenRunCommands
 		}
-		return m, m.setupMultiSelect(r.purpose == purposeRunManually)
+		return m, m.setupMultiSelect(r.purpose == purposeRunCommands)
 	}
 
 	r.currentIdx--
 	if len(r.resolved) > 0 {
 		r.resolved = r.resolved[:len(r.resolved)-1]
 	}
-	if r.purpose != purposeRunManually {
+	if r.purpose != purposeRunCommands {
 		prevName := r.rawItems[r.currentIdx].name()
 		delete(r.workflowVars, prevName)
 	}
@@ -548,9 +528,9 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 			m.screen = ScreenRunWorkflow
 			return m, nil
 		default:
-			m.screen = ScreenRunManually
+			m.screen = ScreenRunCommands
 		}
-		return m, m.setupMultiSelect(r.purpose == purposeRunManually)
+		return m, m.setupMultiSelect(r.purpose == purposeRunCommands)
 	}
 
 	m.sp = nil
@@ -603,14 +583,10 @@ func (m Model) updateConfirmVars(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-func newMSTI(prompt string, active bool) textinput.Model {
+func newMSTI(prompt string) textinput.Model {
 	ti := textinput.New()
 	ti.Prompt = prompt
-	if active {
-		ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
-	} else {
-		ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	}
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
 	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("97"))
 	ti.Width = 22
 	ti.CharLimit = 64
