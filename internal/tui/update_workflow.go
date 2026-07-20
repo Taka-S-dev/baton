@@ -26,7 +26,7 @@ func (m Model) updateWorkflowMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch m.listItems[m.listCursor] {
 		case "Create workflow":
 			m.screen = ScreenCreateWorkflow
-			return m, m.setupMultiSelectCmdsOnly()
+			return m, m.setupMultiSelect()
 		case "Edit workflow":
 			m.screen = ScreenEditWorkflow
 			names := make([]string, len(m.workflows))
@@ -129,22 +129,13 @@ func (m Model) saveWorkflow(name string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	r := m.resolve
-	var cmdNames []string
-	for _, item := range r.rawItems {
-		cmdNames = append(cmdNames, item.name())
-	}
-	wf := mdl.Workflow{Name: name, Commands: cmdNames}
-	if len(r.workflowVars) > 0 {
-		wf.Vars = r.workflowVars
-	}
-	m.workflows = append(m.workflows, wf)
+	m.workflows = append(m.workflows, mdl.Workflow{Name: name, Commands: m.pendingWorkflowCmds})
 	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 		m.errMsg = "failed to save workflows: " + err.Error()
 	} else {
 		m.successMsg = "created workflow \"" + name + "\""
 	}
-	m.resolve = nil
+	m.pendingWorkflowCmds = nil
 	m.gotoWorkflowMgmt()
 	return m, nil
 }

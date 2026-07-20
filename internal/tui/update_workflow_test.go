@@ -47,23 +47,35 @@ func TestWorkflowMgmt_Navigation(t *testing.T) {
 	}
 }
 
-// TestSaveFlows_ReturnToSubmenu checks that finishing (or canceling) a
-// create flow lands on the owning submenu, not the main menu.
-func TestSaveFlows_ReturnToSubmenu(t *testing.T) {
+// TestCreateWorkflow_PickAndName checks the simplified creation: Enter on
+// the selector goes straight to the name input (no slot resolution), and
+// saving stores the picked command names and returns to the submenu.
+func TestCreateWorkflow_PickAndName(t *testing.T) {
+	build := mdl.Command{Name: "build", Cmd: "make {target}"}
 	m := Model{}
 	m.projectDir = t.TempDir()
-	m.resolve = &resolveFlowState{}
-	nm, _ := m.saveWorkflow("wf")
-	if got := nm.(Model); got.screen != ScreenWorkflowMgmt {
-		t.Fatalf("saveWorkflow: screen=%v, want Manage workflows", got.screen)
+	m.screen = ScreenCreateWorkflow
+	m.msSearchTI = textinput.New()
+	m.nameInput = textinput.New()
+	m.msItems = []msItem{{cmd: &build}}
+	m.msSelected = []int{0}
+
+	nm, _ := m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEnter})
+	got := nm.(Model)
+	if got.screen != ScreenNameInput {
+		t.Fatalf("Enter must go straight to the name input, screen=%v", got.screen)
+	}
+	if len(got.pendingWorkflowCmds) != 1 || got.pendingWorkflowCmds[0] != "build" {
+		t.Fatalf("pending commands = %v", got.pendingWorkflowCmds)
 	}
 
-	m2 := Model{}
-	m2.projectDir = t.TempDir()
-	m2.resolve = &resolveFlowState{}
-	nm, _ = m2.saveAlias("al")
-	if got := nm.(Model); got.screen != ScreenAliasMgmt {
-		t.Fatalf("saveAlias: screen=%v, want Manage aliases", got.screen)
+	nm, _ = got.saveWorkflow("wf")
+	saved := nm.(Model)
+	if saved.screen != ScreenWorkflowMgmt {
+		t.Fatalf("saveWorkflow: screen=%v, want Manage workflows", saved.screen)
+	}
+	if len(saved.workflows) != 1 || saved.workflows[0].Commands[0] != "build" {
+		t.Fatalf("workflows = %+v", saved.workflows)
 	}
 
 	// Esc out of the Create workflow command selector.
@@ -81,7 +93,6 @@ func TestSaveFlows_ReturnToSubmenu(t *testing.T) {
 func TestSuccessMsg_SetAndCleared(t *testing.T) {
 	m := Model{}
 	m.projectDir = t.TempDir()
-	m.resolve = &resolveFlowState{}
 	nm, _ := m.saveWorkflow("wf")
 	got := nm.(Model)
 	if !strings.Contains(got.successMsg, "wf") {

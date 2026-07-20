@@ -33,19 +33,12 @@ const (
 	ScreenRunning
 	ScreenRetry
 	ScreenCreateWorkflow
-	ScreenConfirmVars
 	ScreenNameInput
 	ScreenWorkflowMgmt
 	ScreenEditWorkflow
 	ScreenEditWorkflowMode
 	ScreenEditWorkflowCommands
 	ScreenDeleteWorkflow
-	ScreenAliasMgmt
-	ScreenCreateAlias
-	ScreenEditAlias
-	ScreenEditAliasMode
-	ScreenEditAliasCommands
-	ScreenDeleteAlias
 	ScreenManageLists
 	ScreenEditList
 	ScreenSwitchConfig
@@ -64,9 +57,7 @@ type nameInputMode int
 
 const (
 	nameInputWorkflow nameInputMode = iota
-	nameInputAlias
 	nameInputEditWorkflow
-	nameInputEditAlias
 	nameInputNewList
 )
 
@@ -74,46 +65,22 @@ type resolveFlowPurpose int
 
 const (
 	purposeRunCommands resolveFlowPurpose = iota
-	purposeCreateWorkflow
-	purposeCreateAlias
-	purposeEditWorkflow
-	purposeEditAlias
 	purposeRunWorkflow
 )
 
-// msItem is an item shown in the multi-select screen.
+// msItem is a command shown in the multi-select screen.
 type msItem struct {
-	cmd   *mdl.Command
-	alias *mdl.Alias
+	cmd *mdl.Command
 }
 
-func (i msItem) name() string {
-	if i.alias != nil {
-		return i.alias.Name
-	}
-	return i.cmd.Name
-}
-
-func (i msItem) isAlias() bool { return i.alias != nil }
+func (i msItem) name() string { return i.cmd.Name }
 
 // searchText returns the lowercase haystack the search field matches
-// against: name and group, plus the command body, template name and
-// embedded values (for commands) or steps and embedded vars (for aliases).
+// against: name, group, command body, template name and embedded values.
 func (i msItem) searchText() string {
-	var parts []string
-	if i.alias != nil {
-		parts = append(parts, i.alias.Name, "alias")
-		parts = append(parts, i.alias.Steps...)
-		for _, vars := range i.alias.Vars {
-			for _, v := range vars {
-				parts = append(parts, v)
-			}
-		}
-	} else {
-		parts = append(parts, i.cmd.Name, i.cmd.Group, i.cmd.Cmd, i.cmd.Template)
-		for _, v := range i.cmd.Values {
-			parts = append(parts, v)
-		}
+	parts := []string{i.cmd.Name, i.cmd.Group, i.cmd.Cmd, i.cmd.Template}
+	for _, v := range i.cmd.Values {
+		parts = append(parts, v)
 	}
 	return strings.ToLower(strings.Join(parts, " "))
 }
@@ -136,7 +103,7 @@ type slotPickState struct {
 	filtered []mdl.ListEntry
 	cursor   int
 	search   string
-	canSkip  bool // true when creating a workflow/alias
+	canSkip  bool // true when creating a template-derived command
 
 	contextNames  []string
 	contextNotes  []string
@@ -173,15 +140,7 @@ type resolveFlowState struct {
 	currentSlotIdx int
 	currentValues  map[string]string
 
-	resolved     []mdl.RunItem
-	workflowVars map[string]map[string]string // for Create flows
-}
-
-// confirmVarsState holds state for the Confirm Variables screen.
-type confirmVarsState struct {
-	cmds []mdl.Command
-	vars map[string]map[string]string
-	btn  int // 0=Confirm, 1=Edit
+	resolved []mdl.RunItem
 }
 
 // runningState tracks command execution.
@@ -260,7 +219,6 @@ type Model struct {
 	configFile string
 	config     mdl.Config
 	workflows  []mdl.Workflow
-	aliases    []mdl.Alias
 	lists      map[string][]mdl.ListEntry
 	vars       map[string]string // project variables for {$name} references
 
@@ -283,16 +241,16 @@ type Model struct {
 	// Slot picking
 	sp *slotPickState
 
-	// Resolve flow (Run commands / Create workflow / Create alias)
+	// Resolve flow (Run commands / Run workflow)
 	resolve *resolveFlowState
+
+	// Create workflow: command names picked, waiting for the name input
+	pendingWorkflowCmds []string
 
 	// Confirm run
 	confirmRunItems []mdl.RunItem
 	confirmRunLabel string
 	confirmRunBtn   int
-
-	// Confirm vars
-	cv *confirmVarsState
 
 	// Running
 	running *runningState
@@ -399,11 +357,6 @@ func (m *Model) loadProject(projectDir string) error {
 		return err
 	}
 	m.workflows = workflows
-	aliases, err := store.LoadAliases(projectDir)
-	if err != nil {
-		return err
-	}
-	m.aliases = aliases
 	m.lists = slot.LoadLists(filepath.Join(projectDir, "lists"))
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
 
@@ -542,15 +495,12 @@ func (m *Model) gotoMainMenu() {
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return nil }
 
-// workflowStepCommand resolves a workflow step name to a displayable command,
-// applying stored workflow vars (template-derived commands are baked at load).
-func (m *Model) workflowStepCommand(wf mdl.Workflow, name string) (mdl.Command, bool) {
+// workflowStepCommand resolves a workflow step name to a displayable
+// command (template-derived commands are baked at load).
+func (m *Model) workflowStepCommand(name string) (mdl.Command, bool) {
 	cmd, ok := m.config.FindCommand(name)
 	if !ok {
 		return mdl.Command{}, false
-	}
-	if vars, ok := wf.Vars[name]; ok {
-		cmd = slot.Apply(cmd, vars)
 	}
 	return slot.ApplyVarsToCommand(cmd, m.vars), true
 }
@@ -575,7 +525,7 @@ func (m *Model) updateStepsViewport() {
 	for j, cmdName := range wf.Commands {
 		cmdStr := ""
 		dirStr := ""
-		if cmd, ok := m.workflowStepCommand(wf, cmdName); ok {
+		if cmd, ok := m.workflowStepCommand(cmdName); ok {
 			cmdStr = cmd.Cmd
 			dirStr = cmd.Dir
 		}

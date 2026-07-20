@@ -476,8 +476,8 @@ func (m *Model) userCommandNames() []string {
 	return names
 }
 
-// commandNameTaken reports whether name collides with another user command,
-// a hand-written command, or an alias. excludeIdx skips one user command
+// commandNameTaken reports whether name collides with another user
+// command or a hand-written command. excludeIdx skips one user command
 // (the one being edited); pass -1 when creating.
 func (m *Model) commandNameTaken(name string, excludeIdx int) bool {
 	for i, cmd := range m.config.Commands {
@@ -487,11 +487,6 @@ func (m *Model) commandNameTaken(name string, excludeIdx int) bool {
 	}
 	for _, cmd := range m.config.Base {
 		if cmd.Name == name {
-			return true
-		}
-	}
-	for _, a := range m.aliases {
-		if a.Name == name {
 			return true
 		}
 	}

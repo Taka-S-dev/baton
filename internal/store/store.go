@@ -33,29 +33,6 @@ func SaveWorkflows(projectDir string, workflows []model.Workflow) error {
 	return writeFileAtomic(filepath.Join(projectDir, "workflows.json"), data)
 }
 
-func LoadAliases(projectDir string) ([]model.Alias, error) {
-	var result []model.Alias
-	data, err := os.ReadFile(filepath.Join(projectDir, "aliases.json"))
-	if os.IsNotExist(err) {
-		return result, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("aliases.json: %w", err)
-	}
-	return result, nil
-}
-
-func SaveAliases(projectDir string, aliases []model.Alias) error {
-	data, err := json.MarshalIndent(aliases, "", "  ")
-	if err != nil {
-		return err
-	}
-	return writeFileAtomic(filepath.Join(projectDir, "aliases.json"), data)
-}
-
 func LoadLastWorkflow(projectDir string) string {
 	data, err := os.ReadFile(filepath.Join(projectDir, ".last_workflow"))
 	if err != nil {

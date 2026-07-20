@@ -18,15 +18,14 @@ func wfModel() Model {
 		{Name: "test", Cmd: "go test ./..."},
 	}}
 	m.workflows = []mdl.Workflow{
-		{Name: "release", Commands: []string{"build", "deploy"},
-			Vars: map[string]map[string]string{"deploy": {"env": "prod"}}},
+		{Name: "release", Commands: []string{"build", "deploy"}},
 		{Name: "ci", Commands: []string{"test"}},
 	}
 	return m
 }
 
 // TestWfFiltered_AndSearch checks the Run workflow list search: AND terms
-// matching the workflow name, its command names, and preset var values.
+// matching the workflow name, its command names, and the command bodies.
 func TestWfFiltered_AndSearch(t *testing.T) {
 	m := wfModel()
 
@@ -35,14 +34,12 @@ func TestWfFiltered_AndSearch(t *testing.T) {
 		want  []int
 	}{
 		{"", []int{0, 1}},
-		{"release", []int{0}},      // name
-		{"test", []int{1}},         // command name
-		{"prod", []int{0}},         // preset var value
-		{"make", []int{0}},         // command body (as shown in the steps preview)
-		{"kubectl prod", []int{0}}, // resolved body: {env} filled from preset vars
-		{"deploy prod", []int{0}},  // AND across fields
-		{"release test", nil},      // AND requires both in one workflow
-		{"RELEASE PROD", []int{0}}, // case-insensitive
+		{"release", []int{0}},         // name
+		{"test", []int{1}},            // command name
+		{"make", []int{0}},            // command body (as shown in the steps preview)
+		{"deploy kubectl", []int{0}},  // AND across fields
+		{"release test", nil},         // AND requires both in one workflow
+		{"RELEASE KUBECTL", []int{0}}, // case-insensitive
 	}
 	for _, c := range cases {
 		m.wfSearchTI.SetValue(c.query)
@@ -60,7 +57,7 @@ func TestUpdateRunWorkflow_SearchKeys(t *testing.T) {
 	m.screen = ScreenRunWorkflow
 	m.wfSearchTI.Focus()
 
-	for _, r := range "deploy prod" {
+	for _, r := range "deploy kubectl" {
 		key := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}
 		if r == ' ' {
 			key.Type = tea.KeySpace
@@ -68,8 +65,8 @@ func TestUpdateRunWorkflow_SearchKeys(t *testing.T) {
 		nm, _ := m.updateRunWorkflow(key)
 		m = nm.(Model)
 	}
-	if got := m.wfSearchTI.Value(); got != "deploy prod" {
-		t.Fatalf("search value = %q, want %q", got, "deploy prod")
+	if got := m.wfSearchTI.Value(); got != "deploy kubectl" {
+		t.Fatalf("search value = %q, want %q", got, "deploy kubectl")
 	}
 	if got := m.wfFiltered(); !equalInts(got, []int{0}) {
 		t.Fatalf("filtered = %v, want [0]", got)

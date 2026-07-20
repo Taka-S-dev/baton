@@ -17,13 +17,11 @@ func msModel(items []msItem) Model {
 }
 
 // TestMsFiltered_MatchesEmbeddedText checks the search hits text beyond
-// name/group: the command body, template values, and alias steps/vars.
+// name/group: the command body and template values.
 func TestMsFiltered_MatchesEmbeddedText(t *testing.T) {
 	build := mdl.Command{Name: "build", Group: "dev", Cmd: "make auth-service"}
 	deploy := mdl.Command{Name: "deploy", Template: "deploy-tpl", Values: map[string]string{"env": "prod"}}
-	al := mdl.Alias{Name: "release", Steps: []string{"build", "deploy"},
-		Vars: map[string]map[string]string{"deploy": {"env": "staging"}}}
-	m := msModel([]msItem{{cmd: &build}, {cmd: &deploy}, {alias: &al}})
+	m := msModel([]msItem{{cmd: &build}, {cmd: &deploy}})
 
 	cases := []struct {
 		query string
@@ -31,12 +29,10 @@ func TestMsFiltered_MatchesEmbeddedText(t *testing.T) {
 	}{
 		{"auth", []int{0}},         // command body
 		{"prod", []int{1}},         // template value
-		{"staging", []int{2}},      // alias var value
-		{"deploy", []int{1, 2}},    // name + alias step
 		{"deploy-tpl", []int{1}},   // template name
 		{"nothing-matches-x", nil}, // no hit
-		{"", []int{0, 1, 2}},       // empty query keeps everything
-		{"  ", []int{0, 1, 2}},     // whitespace-only query keeps everything
+		{"", []int{0, 1}},          // empty query keeps everything
+		{"  ", []int{0, 1}},        // whitespace-only query keeps everything
 		{"MAKE AUTH", []int{0}},    // case-insensitive
 	}
 	for _, c := range cases {

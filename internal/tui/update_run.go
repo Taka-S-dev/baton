@@ -67,30 +67,6 @@ func (m Model) runNext() tea.Cmd {
 		return nil
 	}
 	item := r.items[r.current]
-	if item.IsAlias() {
-		var cmds []mdl.RunItem
-		for _, stepName := range item.Alias.Steps {
-			c, ok := m.lookupStepCommand(stepName)
-			if !ok {
-				continue
-			}
-			if item.VarMap != nil {
-				c = slot.Apply(c, item.VarMap)
-			} else if item.Alias.Vars != nil {
-				if vars, ok := item.Alias.Vars[stepName]; ok {
-					c = slot.Apply(c, vars)
-				}
-			}
-			cCopy := c
-			cmds = append(cmds, mdl.RunItem{Name: stepName, Cmd: &cCopy})
-		}
-		newItems := make([]mdl.RunItem, 0, len(r.items)-1+len(cmds))
-		newItems = append(newItems, r.items[:r.current]...)
-		newItems = append(newItems, cmds...)
-		newItems = append(newItems, r.items[r.current+1:]...)
-		r.items = newItems
-		return m.runNext()
-	}
 	cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
 	stepHeader := fmt.Sprintf("\n── [%d/%d] %s", r.current+1, len(r.items), item.Name)
 	if cmd.Dir != "" {
@@ -162,19 +138,14 @@ func (m Model) updateRetry(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Run workflow ──────────────────────────────────────────────────────────────
 
 // wfSearchText returns the lowercase haystack a workflow is matched
-// against: its name, the commands it runs (name and resolved body, as
-// shown in the steps preview), and preset slot values.
+// against: its name and the commands it runs (name and resolved body,
+// as shown in the steps preview).
 func (m *Model) wfSearchText(wf mdl.Workflow) string {
 	parts := []string{wf.Name}
 	parts = append(parts, wf.Commands...)
 	for _, name := range wf.Commands {
-		if cmd, ok := m.workflowStepCommand(wf, name); ok {
+		if cmd, ok := m.workflowStepCommand(name); ok {
 			parts = append(parts, cmd.Cmd, cmd.Group)
-		}
-	}
-	for _, vars := range wf.Vars {
-		for _, v := range vars {
-			parts = append(parts, v)
 		}
 	}
 	return strings.ToLower(strings.Join(parts, " "))
@@ -222,16 +193,13 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		store.SaveLastWorkflow(m.projectDir, wf.Name)
 		m.lastWorkflow = wf.Name
 
-		// Apply stored vars first; any remaining {slots} are resolved interactively.
+		// Remaining {slots} are resolved interactively per step.
 		var msItems []msItem
 		var names []string
 		for _, name := range wf.Commands {
 			cmd, ok := m.config.FindCommand(name)
 			if !ok {
 				continue
-			}
-			if vars, ok := wf.Vars[name]; ok {
-				cmd = slot.Apply(cmd, vars)
 			}
 			cmdCopy := cmd
 			msItems = append(msItems, msItem{cmd: &cmdCopy})
@@ -242,7 +210,6 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			rawItems:      msItems,
 			itemNames:     names,
 			itemNotes:     make([]string, len(msItems)),
-			workflowVars:  make(map[string]map[string]string),
 			workflowLabel: wf.Name,
 		}
 		return m.advanceResolve()

@@ -17,11 +17,7 @@ func TestSaveAndLoadWorkflows(t *testing.T) {
 	dir := t.TempDir()
 	workflows := []model.Workflow{
 		{Name: "build-all", Commands: []string{"build", "test"}},
-		{
-			Name:     "deploy",
-			Commands: []string{"build", "deploy"},
-			Vars:     map[string]map[string]string{"deploy": {"env": "production"}},
-		},
+		{Name: "deploy", Commands: []string{"build", "deploy"}},
 	}
 	if err := store.SaveWorkflows(dir, workflows); err != nil {
 		t.Fatalf("SaveWorkflows: %v", err)
@@ -36,8 +32,8 @@ func TestSaveAndLoadWorkflows(t *testing.T) {
 	if got[0].Name != "build-all" {
 		t.Errorf("want name=build-all, got %s", got[0].Name)
 	}
-	if got[1].Vars["deploy"]["env"] != "production" {
-		t.Errorf("vars not preserved: %+v", got[1].Vars)
+	if len(got[1].Commands) != 2 || got[1].Commands[1] != "deploy" {
+		t.Errorf("commands not preserved: %+v", got[1].Commands)
 	}
 }
 
@@ -72,56 +68,6 @@ func TestSaveWorkflows_Empty(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("want empty slice, got %+v", got)
-	}
-}
-
-// ── Aliases ───────────────────────────────────────────────────────────────────
-
-func TestSaveAndLoadAliases(t *testing.T) {
-	dir := t.TempDir()
-	aliases := []model.Alias{
-		{Name: "clean-build", Steps: []string{"clean", "build"}},
-		{
-			Name:  "full-deploy",
-			Steps: []string{"build", "test", "deploy"},
-			Vars:  map[string]map[string]string{"deploy": {"env": "staging"}},
-		},
-	}
-	if err := store.SaveAliases(dir, aliases); err != nil {
-		t.Fatalf("SaveAliases: %v", err)
-	}
-	got, err := store.LoadAliases(dir)
-	if err != nil {
-		t.Fatalf("LoadAliases: %v", err)
-	}
-	if len(got) != len(aliases) {
-		t.Fatalf("want %d aliases, got %d", len(aliases), len(got))
-	}
-	if got[0].Name != "clean-build" {
-		t.Errorf("want name=clean-build, got %s", got[0].Name)
-	}
-	if got[1].Vars["deploy"]["env"] != "staging" {
-		t.Errorf("vars not preserved: %+v", got[1].Vars)
-	}
-}
-
-func TestLoadAliases_NoFile(t *testing.T) {
-	dir := t.TempDir()
-	got, err := store.LoadAliases(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(got) != 0 {
-		t.Errorf("want empty slice, got %+v", got)
-	}
-}
-
-func TestLoadAliases_InvalidJSON(t *testing.T) {
-	dir := t.TempDir()
-	_ = os.WriteFile(filepath.Join(dir, "aliases.json"), []byte("not json"), 0644)
-	_, err := store.LoadAliases(dir)
-	if err == nil {
-		t.Error("want error for invalid JSON, got nil")
 	}
 }
 

@@ -68,18 +68,12 @@ func (c Config) FindCommand(name string) (Command, bool) {
 	return Command{}, false
 }
 
-// Workflow is a saved combination of commands with pre-set slot values.
+// Workflow is a saved sequence of command names. It stores no values:
+// fixed values belong to saved commands (vars.tsv), and remaining
+// {slots} are resolved interactively at run time.
 type Workflow struct {
-	Name     string                       `json:"name"`
-	Commands []string                     `json:"commands"`
-	Vars     map[string]map[string]string `json:"vars,omitempty"`
-}
-
-// Alias combines multiple commands into a single runnable item.
-type Alias struct {
-	Name  string                       `json:"name"`
-	Steps []string                     `json:"steps"`
-	Vars  map[string]map[string]string `json:"vars,omitempty"`
+	Name     string   `json:"name"`
+	Commands []string `json:"commands"`
 }
 
 // ListEntry is a single entry in a selection list.
@@ -88,13 +82,8 @@ type ListEntry struct {
 	Label string
 }
 
-// RunItem is a resolved item ready for execution.
+// RunItem is a resolved command ready for execution.
 type RunItem struct {
-	Name   string
-	Cmd    *Command
-	Alias  *Alias
-	VarMap map[string]string
+	Name string
+	Cmd  *Command
 }
-
-// IsAlias returns true if the RunItem wraps an alias.
-func (r RunItem) IsAlias() bool { return r.Alias != nil }

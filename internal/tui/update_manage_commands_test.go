@@ -123,8 +123,7 @@ func TestLoadProject_Vars(t *testing.T) {
 		t.Fatalf("loadWarning = %q, want an undefined-var warning for phase", m.loadWarning)
 	}
 
-	wf := mdl.Workflow{Name: "w", Commands: []string{"build"}}
-	cmd, ok := m.workflowStepCommand(wf, "build")
+	cmd, ok := m.workflowStepCommand("build")
 	if !ok || cmd.Dir != `C:\work\Phase2\api` {
 		t.Fatalf("workflowStepCommand dir = %q, want the var resolved", cmd.Dir)
 	}

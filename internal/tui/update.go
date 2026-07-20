@@ -39,8 +39,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, c
 		}
 		switch m.screen {
-		case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
-			ScreenEditWorkflowCommands, ScreenEditAliasCommands:
+		case ScreenRunCommands, ScreenCreateWorkflow, ScreenEditWorkflowCommands:
 			ti, c := m.msSearchTI.Update(msg)
 			m.msSearchTI = ti
 			return m, c
@@ -75,8 +74,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateMainMenu(msg)
 		case ScreenRunWorkflow:
 			return m.updateRunWorkflow(msg)
-		case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
-			ScreenEditWorkflowCommands, ScreenEditAliasCommands:
+		case ScreenRunCommands, ScreenCreateWorkflow, ScreenEditWorkflowCommands:
 			return m.updateMultiSelect(msg)
 		case ScreenSlotPick:
 			return m.updateSlotPick(msg)
@@ -91,26 +89,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case ScreenRetry:
 			return m.updateRetry(msg)
-		case ScreenConfirmVars:
-			return m.updateConfirmVars(msg)
 		case ScreenNameInput:
 			return m.updateNameInput(msg)
 		case ScreenEditWorkflow:
 			return m.updateEditWorkflow(msg)
 		case ScreenEditWorkflowMode:
 			return m.updateEditWorkflowMode(msg)
-		case ScreenEditAliasMode:
-			return m.updateEditAliasMode(msg)
 		case ScreenDeleteWorkflow:
 			return m.updateDeleteWorkflow(msg)
 		case ScreenWorkflowMgmt:
 			return m.updateWorkflowMgmt(msg)
-		case ScreenAliasMgmt:
-			return m.updateAliasMgmt(msg)
-		case ScreenEditAlias:
-			return m.updateEditAlias(msg)
-		case ScreenDeleteAlias:
-			return m.updateDeleteAlias(msg)
 		case ScreenManageLists:
 			return m.updateManageLists(msg)
 		case ScreenEditList:

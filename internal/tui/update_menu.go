@@ -56,14 +56,12 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.wfSearchTI.Focus()
 		case "Run commands":
 			m.screen = ScreenRunCommands
-			return m, m.setupMultiSelect(true)
+			return m, m.setupMultiSelect()
 		case "Manage workflows":
 			m.gotoWorkflowMgmt()
 		case "Manage commands":
 			m.screen = ScreenManageCommands
 			m.listCursor = 0
-		case "Manage aliases":
-			m.gotoAliasMgmt()
 		case "Manage lists":
 			m.gotoManageLists()
 		case "Switch config":

@@ -31,8 +31,7 @@ Named after the relay baton: each step hands off to the next.
 ## Features
 
 - Interactive TUI with real-time search and multi-select
-- Save and reuse command combinations as workflows
-- Combine multiple commands into a single alias
+- Save and reuse command sequences as workflows
 - `{placeholder}` substitution — pick values from a selection list at runtime
 - Create commands from the TUI: write one directly, or derive one from any
   slotted command (template) with pre-filled values
@@ -47,10 +46,10 @@ Named after the relay baton: each step hands off to the next.
 baton/
 ├── main.go                   # Entry point, CLI flags, bubbletea program setup
 ├── internal/
-│   ├── model/                # Shared data types (Command, Workflow, Alias, RunItem)
+│   ├── model/                # Shared data types (Command, Workflow, RunItem)
 │   ├── config/               # Config loading (JSON/TSV) and projects/ directory discovery
 │   ├── slot/                 # {placeholder} parsing, resolution, and .tsv list loading
-│   ├── store/                # Workflow and alias persistence (JSON files)
+│   ├── store/                # Workflow persistence (JSON files)
 │   ├── runner/               # Command execution via tea.ExecProcess (suspends TUI)
 │   └── tui/                  # Bubbletea Model / Update / View
 │       ├── model.go          # Model struct, screen enum, sub-states, New()
@@ -59,7 +58,6 @@ baton/
 │       ├── update_run.go     # Run, confirm, retry
 │       ├── update_resolve.go # Multi-select, slot resolution, confirm vars
 │       ├── update_workflow.go# Workflow CRUD
-│       ├── update_alias.go   # Alias CRUD
 │       ├── update_manage_commands.go # Command CRUD (direct input / from template)
 │       ├── update_list.go    # List and name-input screens
 │       ├── view.go           # All rendering functions
@@ -67,7 +65,7 @@ baton/
 └── projects.example/         # Sample projects (JSON and TSV) to copy as a starting point
 ```
 
-The TUI follows the standard [Bubble Tea](https://github.com/charmbracelet/bubbletea) architecture (Elm-style Model/Update/View). Each screen has a corresponding `update*` and `view*` function. Slot resolution and workflow/alias creation share a common `resolveFlowState` that drives multi-step placeholder prompting across multiple commands.
+The TUI follows the standard [Bubble Tea](https://github.com/charmbracelet/bubbletea) architecture (Elm-style Model/Update/View). Each screen has a corresponding `update*` and `view*` function. Slot resolution for runs is driven by a common `resolveFlowState` that walks the selected items and prompts for their placeholders.
 
 ## Dependencies
 
@@ -229,9 +227,9 @@ Both `{projDir}` and `{projCmd}` will select from the `project` list, each promp
 
 ### Placeholder resolution
 
-- **Run commands** — baton prompts for each placeholder before execution
-- **Workflows and aliases** — baton prompts when creating; values are saved and reused at run time
-- Placeholders can be **skipped** when creating a workflow or a template-derived command — skipped ones are prompted at run time instead
+- **Run commands / Run workflow** — baton prompts for each placeholder before execution
+- **Fixed values** belong to saved commands: create one from a template with the values filled in (they land in `vars.tsv`), and use that command anywhere — directly, or inside workflows
+- Placeholders can be **skipped** when creating a template-derived command — skipped ones are prompted at run time instead
 
 ### Placeholder picker
 
@@ -247,7 +245,6 @@ Hand-typed `{slots}` are validated as you type: `✓` when a matching list exist
 - Type to filter the list
 - `Esc` — clear the filter if active, otherwise go back
 - `Enter` — confirm selection
-- On the **Confirm variables** screen: `Confirm` to save, `Edit` to re-pick values
 
 ## Project Variables
 
@@ -293,7 +290,6 @@ baton [--dry-run]
     Run commands
     Manage workflows
     Manage commands
-    Manage aliases
     Manage lists
     Switch config
     Exit
@@ -311,21 +307,9 @@ baton [--dry-run]
 
 ### Workflows
 
-Workflows are saved combinations of commands with pre-set placeholder values. Create one via **Manage workflows → Create workflow**, then run it instantly from **Run workflow**.
+Workflows are saved sequences of commands. Creating one is just picking commands and naming them (**Manage workflows → Create workflow**); remaining `{slots}` are prompted at run time, and fixed values belong to the saved commands the workflow contains.
 
-The **Run workflow** list is searchable the same way as the command selector: type to filter, space-separated terms are ANDed, and matches cover the workflow name, the commands it runs, and preset placeholder values.
-
-### Aliases
-
-Aliases combine multiple commands into a single selectable item. Create one via **Manage aliases → Create alias**.
-
-In the command selection screen, aliases appear with an `@` prefix and `[alias]` group tag:
-
-```
-  [ ] @ clean-build  [alias]  clean > build
-```
-
-Selecting an alias expands to its component commands at execution time.
+Run one from **Run workflow** — the list is searchable like the command selector: the workflow name, its step names, and the step command bodies all match.
 
 ### Retry on failure
 

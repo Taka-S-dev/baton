@@ -27,15 +27,12 @@ func (m Model) View() string {
 		view = m.viewMainMenu(w)
 	case ScreenRunWorkflow:
 		view = m.viewRunWorkflow(w)
-	case ScreenRunCommands, ScreenCreateWorkflow, ScreenCreateAlias,
-		ScreenEditWorkflowCommands, ScreenEditAliasCommands:
+	case ScreenRunCommands, ScreenCreateWorkflow, ScreenEditWorkflowCommands:
 		view = m.viewMultiSelect(w)
 	case ScreenWorkflowMgmt:
 		view = m.viewSingleSelect("Manage workflows", w)
 	case ScreenEditWorkflowMode:
 		view = m.viewSingleSelect("Edit workflow", w)
-	case ScreenEditAliasMode:
-		view = m.viewSingleSelect("Edit alias", w)
 	case ScreenSlotPick:
 		view = m.viewSlotPick(w)
 	case ScreenConfirmRun:
@@ -44,20 +41,12 @@ func (m Model) View() string {
 		view = m.viewRunning(w)
 	case ScreenRetry:
 		view = m.viewRetry(w)
-	case ScreenConfirmVars:
-		view = m.viewConfirmVars(w)
 	case ScreenNameInput:
 		view = m.viewNameInput(w)
 	case ScreenEditWorkflow:
 		view = m.viewSingleSelect("Edit workflow", w)
 	case ScreenDeleteWorkflow:
 		view = m.viewDeleteList("Delete workflow", m.listItems, w)
-	case ScreenAliasMgmt:
-		view = m.viewSingleSelect("Manage aliases", w)
-	case ScreenEditAlias:
-		view = m.viewSingleSelect("Edit alias", w)
-	case ScreenDeleteAlias:
-		view = m.viewDeleteList("Delete alias", m.listItems, w)
 	case ScreenManageLists:
 		view = m.viewManageLists(w)
 	case ScreenEditList:
@@ -151,7 +140,7 @@ type menuGroup struct {
 
 var mainMenuGroups = []menuGroup{
 	{"Run", []string{"Run workflow", "Run commands"}},
-	{"Manage", []string{"Manage workflows", "Manage commands", "Manage aliases", "Manage lists"}},
+	{"Manage", []string{"Manage workflows", "Manage commands", "Manage lists"}},
 	{"", []string{"Switch config", "Exit"}},
 }
 
@@ -168,7 +157,6 @@ var menuItemInfos = map[string]menuItemInfo{
 	"Run commands":     {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
 	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage aliases":   {desc: "Reusable command groups, selectable in Run commands.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage lists":     {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
 	"Switch config":    {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
 	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
@@ -254,7 +242,6 @@ func (m Model) viewMainMenu(w int) string {
 		rightLines = append(rightLines, "")
 		rightLines = append(rightLines, gray("Stats"))
 		rightLines = append(rightLines, fmt.Sprintf("  "+gray("workflows: ")+white("%d"), len(m.workflows)))
-		rightLines = append(rightLines, fmt.Sprintf("  "+gray("aliases:   ")+white("%d"), len(m.aliases)))
 		rightLines = append(rightLines, fmt.Sprintf("  "+gray("lists:     ")+white("%d"), len(m.lists)))
 	}
 
@@ -374,7 +361,7 @@ func (m Model) viewRunWorkflow(w int) string {
 
 func (m Model) viewMultiSelect(w int) string {
 	title := "Select commands"
-	if m.screen == ScreenEditWorkflowCommands || m.screen == ScreenEditAliasCommands {
+	if m.screen == ScreenEditWorkflowCommands {
 		title = "Edit commands"
 	}
 	filtered := m.msFiltered()
@@ -425,10 +412,7 @@ func (m Model) viewMultiSelect(w int) string {
 			}
 
 			var label string
-			if item.isAlias() {
-				steps := strings.Join(item.alias.Steps, gray(" > "))
-				label = accent("@") + " " + item.alias.Name + "  " + sGroup.Render("[alias]") + "  " + gray(steps)
-			} else if item.cmd.Template != "" {
+			if item.cmd.Template != "" {
 				grp := ""
 				if item.cmd.Group != "" {
 					grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
@@ -462,11 +446,7 @@ func (m Model) viewMultiSelect(w int) string {
 	if n > 0 && cursor >= 0 && cursor < n {
 		hoveredIdx := filtered[cursor]
 		hovered := m.msItems[hoveredIdx]
-		if hovered.isAlias() {
-			b.WriteString(hlineLabel(w, "alias steps") + "\n")
-			steps := strings.Join(hovered.alias.Steps, gray(" > "))
-			b.WriteString("  " + steps + "\n")
-		} else if hovered.cmd != nil && hovered.cmd.Template != "" {
+		if hovered.cmd != nil && hovered.cmd.Template != "" {
 			b.WriteString(hlineLabel(w, "command") + "\n")
 			b.WriteString("  " + dim("template: ") + hovered.cmd.Template + "\n")
 			if len(hovered.cmd.Values) > 0 {
@@ -721,20 +701,14 @@ func (m Model) viewConfirmRun(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Confirm", w) + "\n")
 	for i, item := range m.confirmRunItems {
-		if item.IsAlias() {
-			steps := strings.Join(item.Alias.Steps, " > ")
-			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s %s  %s\n",
-				gray(""), i+1, gray(""), accent("@"), item.Name, gray("("+steps+")")))
-		} else {
-			b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
-			if item.Cmd != nil {
-				b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
-				workdir := item.Cmd.Dir
-				if workdir == "" {
-					workdir = "."
-				}
-				b.WriteString("         " + dim("workdir: "+workdir) + "\n")
+		b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
+		if item.Cmd != nil {
+			b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
+			workdir := item.Cmd.Dir
+			if workdir == "" {
+				workdir = "."
 			}
+			b.WriteString("         " + dim("workdir: "+workdir) + "\n")
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n\n")
@@ -787,46 +761,13 @@ func (m Model) viewRetry(w int) string {
 	return b.String()
 }
 
-// ── Confirm vars ─────────────────────────────────────────────────────────────
-
-func (m Model) viewConfirmVars(w int) string {
-	cv := m.cv
-	var b strings.Builder
-	b.WriteString("\n" + header("Confirm variables", w) + "\n")
-	b.WriteString("  " + gray("Review the variable values to be saved.") + "\n\n")
-
-	for i, cmd := range cv.cmds {
-		vars, ok := cv.vars[cmd.Name]
-		if !ok {
-			continue
-		}
-		resolved := slot.Apply(cmd, vars)
-		b.WriteString("  " + gray(fmt.Sprintf("  %d. %s", i+1, cmd.Name)) + "\n")
-		b.WriteString("       " + gray("$ "+resolved.Cmd) + "\n")
-		workdir := resolved.Dir
-		if workdir == "" {
-			workdir = "."
-		}
-		b.WriteString("         " + dim("workdir: "+workdir) + "\n")
-	}
-
-	b.WriteString("\n" + hline(w) + "\n\n")
-	b.WriteString("\n" + renderBtns(cv.btn, "  Confirm  ", "  Edit  ") + "\n")
-	b.WriteString("\n  " + gray("Tab: switch   Enter: select   Esc: re-edit") + "\n")
-	return b.String()
-}
-
 // ── Name input ────────────────────────────────────────────────────────────────
 
 func (m Model) viewNameInput(w int) string {
 	title := "Create workflow"
 	switch m.nameInputMode {
-	case nameInputAlias:
-		title = "Create alias"
 	case nameInputEditWorkflow:
 		title = "Rename workflow"
-	case nameInputEditAlias:
-		title = "Rename alias"
 	case nameInputNewList:
 		title = "New list"
 	}
