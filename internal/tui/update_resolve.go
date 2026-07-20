@@ -349,6 +349,8 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 		m.workflows[m.editTargetIdx].Vars = nil
 		if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 			m.errMsg = "failed to save workflows: " + err.Error()
+		} else {
+			m.successMsg = "updated workflow \"" + m.workflows[m.editTargetIdx].Name + "\""
 		}
 		m.resolve = nil
 		m.gotoWorkflowMgmt()
@@ -362,6 +364,8 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 		m.aliases[m.editTargetIdx].Vars = nil
 		if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
 			m.errMsg = "failed to save aliases: " + err.Error()
+		} else {
+			m.successMsg = "updated alias \"" + m.aliases[m.editTargetIdx].Name + "\""
 		}
 		m.resolve = nil
 		m.gotoAliasMgmt()

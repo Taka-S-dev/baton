@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
@@ -104,6 +106,8 @@ func (m Model) updateDeleteAlias(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
 				m.errMsg = "failed to save aliases: " + err.Error()
+			} else {
+				m.successMsg = fmt.Sprintf("deleted %d alias(es)", len(indices))
 			}
 		})
 }
@@ -129,6 +133,8 @@ func (m Model) saveAlias(name string) (tea.Model, tea.Cmd) {
 	m.aliases = append(m.aliases, a)
 	if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
 		m.errMsg = "failed to save aliases: " + err.Error()
+	} else {
+		m.successMsg = "created alias \"" + name + "\""
 	}
 	m.resolve = nil
 	m.gotoAliasMgmt()
@@ -149,6 +155,8 @@ func (m Model) renameAlias(idx int, name string) (tea.Model, tea.Cmd) {
 	m.aliases[idx].Name = name
 	if err := store.SaveAliases(m.projectDir, m.aliases); err != nil {
 		m.errMsg = "failed to save aliases: " + err.Error()
+	} else {
+		m.successMsg = "renamed alias to \"" + name + "\""
 	}
 	m.gotoAliasMgmt()
 	return m, nil

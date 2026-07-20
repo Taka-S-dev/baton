@@ -81,6 +81,8 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				listsDir := filepath.Join(m.projectDir, "lists")
 				if err := os.Remove(filepath.Join(listsDir, name+".tsv")); err != nil {
 					m.errMsg = "failed to delete list: " + err.Error()
+				} else {
+					m.successMsg = "deleted list \"" + name + "\""
 				}
 				delete(m.lists, name)
 				m.listItems = append(m.listItems[:m.listCursor], m.listItems[m.listCursor+1:]...)
@@ -130,6 +132,8 @@ func (m Model) saveNewList(name string) (tea.Model, tea.Cmd) {
 	listsDir := filepath.Join(m.projectDir, "lists")
 	if err := slot.SaveList(listsDir, name, nil); err != nil {
 		m.errMsg = "failed to create list: " + err.Error()
+	} else {
+		m.successMsg = "created list \"" + name + "\""
 	}
 	m.lists[name] = []mdl.ListEntry{}
 	m.le = &listEditState{

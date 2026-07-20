@@ -82,6 +82,9 @@ func (m Model) View() string {
 	if m.errMsg != "" {
 		view += "\n" + errorText("  Error: "+m.errMsg) + "\n"
 	}
+	if m.successMsg != "" {
+		view += "\n" + success("  ✓ "+m.successMsg) + "\n"
+	}
 	if m.loadWarning != "" && m.screen == ScreenMainMenu {
 		view += "\n" + warn("  Warning: "+m.loadWarning) + "\n"
 	}

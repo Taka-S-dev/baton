@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -244,6 +245,10 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if err := m.saveConfig(); err != nil {
 			m.errMsg = "failed to save: " + err.Error()
+		} else if cf.mode == 1 {
+			m.successMsg = "updated command \"" + name + "\""
+		} else {
+			m.successMsg = "created command \"" + name + "\""
 		}
 		m.closeCommandForm()
 		m.listCursor = 0
@@ -352,6 +357,8 @@ func (m *Model) updateCreateCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.config.Commands = append(m.config.Commands, entry)
 		if err := m.saveConfig(); err != nil {
 			m.errMsg = "failed to save: " + err.Error()
+		} else {
+			m.successMsg = "created command \"" + name + "\""
 		}
 		m.screen = ScreenManageCommands
 		m.listCursor = 0
@@ -423,6 +430,8 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.config.Commands[sce.editIdx] = entry
 		if err := m.saveConfig(); err != nil {
 			m.errMsg = "failed to save: " + err.Error()
+		} else {
+			m.successMsg = "updated command \"" + name + "\""
 		}
 		m.screen = ScreenManageCommands
 		m.listCursor = 1
@@ -451,6 +460,8 @@ func (m *Model) updateDeleteCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			if err := m.saveConfig(); err != nil {
 				m.errMsg = "failed to save: " + err.Error()
+			} else {
+				m.successMsg = fmt.Sprintf("deleted %d command(s)", len(indices))
 			}
 		})
 }

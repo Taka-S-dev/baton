@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
@@ -112,6 +114,8 @@ func (m Model) updateDeleteWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 				m.errMsg = "failed to save workflows: " + err.Error()
+			} else {
+				m.successMsg = fmt.Sprintf("deleted %d workflow(s)", len(indices))
 			}
 		})
 }
@@ -137,6 +141,8 @@ func (m Model) saveWorkflow(name string) (tea.Model, tea.Cmd) {
 	m.workflows = append(m.workflows, wf)
 	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 		m.errMsg = "failed to save workflows: " + err.Error()
+	} else {
+		m.successMsg = "created workflow \"" + name + "\""
 	}
 	m.resolve = nil
 	m.gotoWorkflowMgmt()
@@ -157,6 +163,8 @@ func (m Model) renameWorkflow(idx int, name string) (tea.Model, tea.Cmd) {
 	m.workflows[idx].Name = name
 	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 		m.errMsg = "failed to save workflows: " + err.Error()
+	} else {
+		m.successMsg = "renamed workflow to \"" + name + "\""
 	}
 	m.gotoWorkflowMgmt()
 	return m, nil

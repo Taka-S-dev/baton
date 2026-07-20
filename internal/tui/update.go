@@ -67,6 +67,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRunnerDone(msg)
 	case tea.KeyMsg:
 		m.errMsg = ""
+		m.successMsg = ""
 		switch m.screen {
 		case ScreenProjectSelect:
 			return m.updateProjectSelect(msg)

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -72,5 +73,26 @@ func TestSaveFlows_ReturnToSubmenu(t *testing.T) {
 	nm, _ = m3.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEscape})
 	if got := nm.(Model); got.screen != ScreenWorkflowMgmt {
 		t.Fatalf("create selector Esc: screen=%v, want Manage workflows", got.screen)
+	}
+}
+
+// TestSuccessMsg_SetAndCleared checks a successful save leaves a visible
+// confirmation and that the next keypress clears it.
+func TestSuccessMsg_SetAndCleared(t *testing.T) {
+	m := Model{}
+	m.projectDir = t.TempDir()
+	m.resolve = &resolveFlowState{}
+	nm, _ := m.saveWorkflow("wf")
+	got := nm.(Model)
+	if !strings.Contains(got.successMsg, "wf") {
+		t.Fatalf("successMsg = %q, want a created note naming the workflow", got.successMsg)
+	}
+	if !strings.Contains(got.View(), "✓") {
+		t.Fatal("the success note must be rendered in the view")
+	}
+
+	nm2, _ := got.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if s := nm2.(Model).successMsg; s != "" {
+		t.Fatalf("successMsg = %q, want cleared on the next keypress", s)
 	}
 }

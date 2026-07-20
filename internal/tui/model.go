@@ -319,6 +319,7 @@ type Model struct {
 	mainMenuCursor int
 	lastWorkflow   string
 	errMsg         string
+	successMsg     string // transient "it worked" note, cleared on the next keypress
 	loadWarning    string
 	deleteConfirm  bool
 	deleteSelected []int
