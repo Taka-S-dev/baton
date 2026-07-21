@@ -983,6 +983,11 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
 		b.WriteString(m.stepsVP.View() + "\n")
 	}
+	if m.screen == ScreenDeleteCommand && !m.deleteConfirm &&
+		m.listCursor >= 0 && m.listCursor < len(m.editRefs) {
+		b.WriteString("\n")
+		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.listCursor]), w)
+	}
 	b.WriteString("\n" + hline(w) + "\n")
 	if m.deleteConfirm {
 		n := len(m.deleteSelected)

@@ -151,6 +151,20 @@ func TestViewEditCommandPick_ShowsPreview(t *testing.T) {
 	}
 }
 
+// TestViewDeleteCommand_ShowsPreview checks the Delete command list
+// renders the hovered command's preview, like the edit picker.
+func TestViewDeleteCommand_ShowsPreview(t *testing.T) {
+	m := Model{width: 80, height: 24, screen: ScreenDeleteCommand}
+	m.config.Commands = []mdl.Command{{Name: "plain", Cmd: "echo hi", Dir: "./x", Source: "local"}}
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+
+	view := m.viewDeleteList("Delete commands", m.listItems, 80)
+	if !strings.Contains(view, "$ echo hi") || !strings.Contains(view, "workdir: ./x") {
+		t.Fatalf("delete list must preview the hovered command:\n%s", view)
+	}
+}
+
 // TestViewCommandNameInput_StableValueOrder does the same for the
 // create/edit command name screen, which lists the chosen slot values.
 func TestViewCommandNameInput_StableValueOrder(t *testing.T) {
