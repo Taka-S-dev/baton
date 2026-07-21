@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 // TestCommandForm_ShellField walks the create form through all fields and
@@ -96,6 +97,135 @@ func TestCommandForm_NameValidatedEarly(t *testing.T) {
 	m2.updateCommandForm(enter)
 	if m2.errMsg != "" || m2.cf.fieldIdx != 1 {
 		t.Fatalf("edit mode must accept its own name: errMsg=%q fieldIdx=%d", m2.errMsg, m2.cf.fieldIdx)
+	}
+}
+
+// TestEditCommand_RenameOnly checks the Rename shortcut: picking a
+// template-derived command opens a Rename / Change values menu, Rename
+// pre-fills the current name, and saving renames the command and its
+// vars.tsv rows without walking the template or slot steps.
+func TestEditCommand_RenameOnly(t *testing.T) {
+	dir := t.TempDir()
+	m := &Model{}
+	m.projectDir = dir
+	m.nameInput = textinput.New()
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}"}}
+	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./src"}}}
+	m.vars = map[string]string{"as.workdir": "./src"}
+	m.screen = ScreenEditCommandPick
+	m.listItems = m.userCommandNames()
+	m.listCursor = 0
+
+	enter := tea.KeyMsg{Type: tea.KeyEnter}
+	m.updateEditCommandPick(enter)
+	if m.screen != ScreenEditCommandMode {
+		t.Fatalf("picking a template command must open the mode menu, screen=%v", m.screen)
+	}
+	m.updateEditCommandMode(enter) // cursor 0 = Rename
+	if m.screen != ScreenNameInput || m.nameInput.Value() != "as" {
+		t.Fatalf("Rename must open a pre-filled name input: screen=%v value=%q", m.screen, m.nameInput.Value())
+	}
+
+	m.nameInput.SetValue("as2")
+	nm, _ := m.updateNameInput(enter)
+	got := nm.(Model)
+	if got.config.Commands[0].Name != "as2" || got.screen != ScreenManageCommands {
+		t.Fatalf("rename failed: %+v screen=%v", got.config.Commands[0], got.screen)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "vars.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "as2\tworkdir\t./src") {
+		t.Fatalf("vars.tsv must follow the rename, got %q", raw)
+	}
+	if strings.Contains(string(raw), "as\tworkdir") {
+		t.Fatalf("old vars.tsv rows must be pruned, got %q", raw)
+	}
+}
+
+// TestEditCommandMode_ValuesVsTemplate checks the two edit paths:
+// Change values goes straight to the slot picker (skipping the template
+// screen) and Esc from the first slot returns to the menu; Change
+// template opens the template picker with the current one selected.
+func TestEditCommandMode_ValuesVsTemplate(t *testing.T) {
+	newModel := func() *Model {
+		m := &Model{}
+		m.nameInput = textinput.New()
+		m.lists = map[string][]mdl.ListEntry{"workdir": {{Value: "./a"}}}
+		m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}"}}
+		m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./a"}}}
+		m.screen = ScreenEditCommandPick
+		m.listItems = m.userCommandNames()
+		m.listCursor = 0
+		m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
+		return m
+	}
+	enter := tea.KeyMsg{Type: tea.KeyEnter}
+	down := tea.KeyMsg{Type: tea.KeyDown}
+
+	// Change values (cursor 1): straight to the slot picker.
+	m := newModel()
+	m.updateEditCommandMode(down)
+	m.updateEditCommandMode(enter)
+	if m.screen != ScreenSlotPick {
+		t.Fatalf("Change values must skip the template screen, screen=%v", m.screen)
+	}
+	// Esc from the first slot returns to the menu, not the template pick.
+	m.goBackCommandEditSlot()
+	if m.screen != ScreenEditCommandMode {
+		t.Fatalf("Esc from the first slot must return to the menu, screen=%v", m.screen)
+	}
+
+	// Change template (cursor 2): template picker on the current template.
+	m = newModel()
+	m.updateEditCommandMode(down)
+	m.updateEditCommandMode(down)
+	m.updateEditCommandMode(enter)
+	if m.screen != ScreenEditCommandTemplate {
+		t.Fatalf("Change template must open the template picker, screen=%v", m.screen)
+	}
+	if got := m.templateCandidates()[m.sce.templateRefIdx].Name; got != "build" {
+		t.Fatalf("template cursor must be on the current template, got %q", got)
+	}
+}
+
+// TestOpenSlotPick_CursorOnCurrentValue checks that editing a command's
+// values starts each slot picker with the cursor on the current value.
+func TestOpenSlotPick_CursorOnCurrentValue(t *testing.T) {
+	m := &Model{}
+	m.lists = map[string][]mdl.ListEntry{
+		"workdir": {{Value: "./a"}, {Value: "./b"}, {Value: "./c"}},
+	}
+	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./c"}}}
+	m.sce = &commandEditState{
+		mode: 1, editIdx: 0,
+		currentSlots:  []slot.Def{{Name: "workdir", ListName: "workdir"}},
+		currentValues: map[string]string{},
+	}
+	tpl := mdl.Command{Name: "build", Cmd: "make", Dir: "{workdir}"}
+	m.openSlotPickForCommandEdit(&tpl)
+	if m.sp == nil || m.sp.cursor != 2 {
+		t.Fatalf("cursor must start on the current value, sp=%+v", m.sp)
+	}
+}
+
+// TestCommandForm_CtrlSSavesFromAnyField checks Ctrl+S saves the form
+// without walking the remaining fields.
+func TestCommandForm_CtrlSSavesFromAnyField(t *testing.T) {
+	m := &Model{}
+	m.projectDir = t.TempDir()
+	m.nameInput = textinput.New()
+	m.config.Commands = []mdl.Command{{Name: "old", Cmd: "echo hi"}}
+	m.openCommandForm(0)
+
+	m.nameInput.SetValue("new")
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if m.cf != nil {
+		t.Fatalf("Ctrl+S on the first field must save and close the form, errMsg=%q", m.errMsg)
+	}
+	if m.config.Commands[0].Name != "new" || m.config.Commands[0].Cmd != "echo hi" {
+		t.Fatalf("saved command = %+v", m.config.Commands[0])
 	}
 }
 

@@ -35,6 +35,8 @@ func (m Model) updateNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.saveWorkflow(name)
 		case nameInputEditWorkflow:
 			return m.renameWorkflow(m.editTargetIdx, name)
+		case nameInputRenameCommand:
+			return m.renameCommand(name)
 		case nameInputNewList:
 			return m.saveNewList(name)
 		}
@@ -44,6 +46,8 @@ func (m Model) updateNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.screen = ScreenEditWorkflowMode
 			m.listItems = []string{"Rename", "Change commands"}
 			m.listCursor = 0
+		case nameInputRenameCommand:
+			m.gotoEditCommandMode()
 		case nameInputNewList:
 			m.gotoManageLists()
 		case nameInputWorkflow:

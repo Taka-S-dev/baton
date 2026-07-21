@@ -42,6 +42,7 @@ const (
 	ScreenSwitchConfig
 	ScreenManageCommands
 	ScreenEditCommandPick
+	ScreenEditCommandMode
 	ScreenCreateCommandKind
 	ScreenCreateCommandName
 	ScreenCreateCommandTemplate
@@ -56,6 +57,7 @@ type nameInputMode int
 const (
 	nameInputWorkflow nameInputMode = iota
 	nameInputEditWorkflow
+	nameInputRenameCommand
 	nameInputNewList
 )
 
@@ -171,8 +173,9 @@ type listEditState struct {
 
 // commandEditState holds state for creating/editing a template-derived command.
 type commandEditState struct {
-	mode           int // 0=create, 1=edit
-	editIdx        int // for edit mode
+	mode           int  // 0=create, 1=edit
+	editIdx        int  // for edit mode
+	pickedTemplate bool // edit entered via Change template (Esc returns there)
 	name           string
 	templateRefIdx int
 	currentSlots   []slot.Def

@@ -103,20 +103,72 @@ func (cf *commandFormState) slotInsertAvailable(listCount int) bool {
 	return (cf.fieldIdx == 1 || cf.fieldIdx == 2) && listCount > 0
 }
 
+// cfGotoField focuses the given form field, loading its stored text.
+func (m *Model) cfGotoField(idx int) tea.Cmd {
+	m.cf.fieldIdx = idx
+	m.cf.slotPickFocus = false
+	m.nameInput.Prompt = commandFormLabels[idx] + " > "
+	m.nameInput.SetValue(m.cf.fields[idx])
+	m.nameInput.CursorEnd()
+	return m.nameInput.Focus()
+}
+
+// saveCommandForm validates every form field and persists the command.
+// On a validation failure it focuses the offending field instead.
+func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
+	cf := m.cf
+	name, cmdStr := cf.fields[0], cf.fields[1]
+	if name == "" {
+		m.errMsg = "name cannot be empty"
+		return m, m.cfGotoField(0)
+	}
+	if cmdStr == "" {
+		m.errMsg = "cmd cannot be empty"
+		return m, m.cfGotoField(1)
+	}
+	shell := strings.ToLower(cf.fields[4])
+	if shell != "" && shell != "ps" {
+		m.errMsg = `shell must be empty or "ps"`
+		return m, m.cfGotoField(4)
+	}
+	excludeIdx := -1
+	if cf.mode == 1 {
+		excludeIdx = cf.editIdx
+	}
+	if m.commandNameTaken(name, excludeIdx) {
+		m.errMsg = "name already in use: " + name
+		return m, m.cfGotoField(0)
+	}
+	if cf.mode == 1 {
+		cmd := m.config.Commands[cf.editIdx]
+		cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
+		m.config.Commands[cf.editIdx] = cmd
+	} else {
+		m.config.Commands = append(m.config.Commands, mdl.Command{
+			Name:  name,
+			Cmd:   cmdStr,
+			Dir:   cf.fields[2],
+			Group: cf.fields[3],
+			Shell: shell,
+		})
+	}
+	if err := m.saveConfig(); err != nil {
+		m.errMsg = "failed to save: " + err.Error()
+	} else if cf.mode == 1 {
+		m.successMsg = "updated command \"" + name + "\""
+	} else {
+		m.successMsg = "created command \"" + name + "\""
+	}
+	m.closeCommandForm()
+	m.listCursor = 0
+	return m, nil
+}
+
 func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.cf == nil {
 		return m, nil
 	}
 	cf := m.cf
-
-	gotoField := func(idx int) tea.Cmd {
-		cf.fieldIdx = idx
-		cf.slotPickFocus = false
-		m.nameInput.Prompt = commandFormLabels[idx] + " > "
-		m.nameInput.SetValue(cf.fields[idx])
-		m.nameInput.CursorEnd()
-		return m.nameInput.Focus()
-	}
 
 	// Placeholder picker window has key focus. Left pane inserts {name},
 	// right pane inserts the selected concrete value, both at the cursor
@@ -193,7 +245,7 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			name := cf.fields[0]
 			if name == "" {
 				m.errMsg = "name cannot be empty"
-				return m, gotoField(0)
+				return m, m.cfGotoField(0)
 			}
 			excludeIdx := -1
 			if cf.mode == 1 {
@@ -201,61 +253,31 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			if m.commandNameTaken(name, excludeIdx) {
 				m.errMsg = "name already in use: " + name
-				return m, gotoField(0)
+				return m, m.cfGotoField(0)
 			}
 		}
 		if cf.fieldIdx < len(cf.fields)-1 {
-			return m, gotoField(cf.fieldIdx + 1)
+			return m, m.cfGotoField(cf.fieldIdx + 1)
 		}
-		// Last field — validate and save.
-		name, cmdStr := cf.fields[0], cf.fields[1]
-		if name == "" {
-			m.errMsg = "name cannot be empty"
-			return m, gotoField(0)
+		return m.saveCommandForm()
+	case "ctrl+s":
+		// Save from any field — no need to walk the rest of the form.
+		cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
+		return m.saveCommandForm()
+	case "up":
+		if cf.fieldIdx > 0 {
+			cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
+			return m, m.cfGotoField(cf.fieldIdx - 1)
 		}
-		if cmdStr == "" {
-			m.errMsg = "cmd cannot be empty"
-			return m, gotoField(1)
+	case "down":
+		if cf.fieldIdx < len(cf.fields)-1 {
+			cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
+			return m, m.cfGotoField(cf.fieldIdx + 1)
 		}
-		shell := strings.ToLower(cf.fields[4])
-		if shell != "" && shell != "ps" {
-			m.errMsg = `shell must be empty or "ps"`
-			return m, gotoField(4)
-		}
-		excludeIdx := -1
-		if cf.mode == 1 {
-			excludeIdx = cf.editIdx
-		}
-		if m.commandNameTaken(name, excludeIdx) {
-			m.errMsg = "name already in use: " + name
-			return m, gotoField(0)
-		}
-		if cf.mode == 1 {
-			cmd := m.config.Commands[cf.editIdx]
-			cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
-			m.config.Commands[cf.editIdx] = cmd
-		} else {
-			m.config.Commands = append(m.config.Commands, mdl.Command{
-				Name:  name,
-				Cmd:   cmdStr,
-				Dir:   cf.fields[2],
-				Group: cf.fields[3],
-				Shell: shell,
-			})
-		}
-		if err := m.saveConfig(); err != nil {
-			m.errMsg = "failed to save: " + err.Error()
-		} else if cf.mode == 1 {
-			m.successMsg = "updated command \"" + name + "\""
-		} else {
-			m.successMsg = "created command \"" + name + "\""
-		}
-		m.closeCommandForm()
-		m.listCursor = 0
 	case "esc":
 		if cf.fieldIdx > 0 {
 			cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
-			return m, gotoField(cf.fieldIdx - 1)
+			return m, m.cfGotoField(cf.fieldIdx - 1)
 		}
 		m.closeCommandForm()
 		m.listCursor = 0
@@ -293,11 +315,75 @@ func (m *Model) updateEditCommandPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			templateRefIdx: idx,
 			currentValues:  make(map[string]string),
 		}
-		m.screen = ScreenEditCommandTemplate
+		m.gotoEditCommandMode()
 	case "esc":
 		m.screen = ScreenManageCommands
 		m.listCursor = 1
 	}
+	return m, nil
+}
+
+// gotoEditCommandMode opens the edit submenu for the template-derived
+// command held in m.sce.
+func (m *Model) gotoEditCommandMode() {
+	m.screen = ScreenEditCommandMode
+	m.listItems = []string{"Rename", "Change values", "Change template"}
+	m.listCursor = 0
+}
+
+func (m *Model) updateEditCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
+	case "enter":
+		switch m.listItems[m.listCursor] {
+		case "Rename":
+			m.nameInput.SetValue(m.sce.name)
+			m.nameInputMode = nameInputRenameCommand
+			m.nameInputErr = ""
+			m.screen = ScreenNameInput
+			return m, m.nameInput.Focus()
+		case "Change values":
+			// Straight to the slot pickers on the current template.
+			m.sce.pickedTemplate = false
+			return m.startCommandSlots()
+		case "Change template":
+			m.sce.pickedTemplate = true
+			m.screen = ScreenEditCommandTemplate
+		}
+	case "esc":
+		editIdx := m.sce.editIdx
+		m.sce = nil
+		m.screen = ScreenEditCommandPick
+		m.listItems = m.userCommandNames()
+		m.listCursor = editIdx
+	}
+	return m, nil
+}
+
+// renameCommand renames the command being edited without touching its
+// template or values; vars.tsv rows follow the new name on save.
+func (m Model) renameCommand(name string) (tea.Model, tea.Cmd) {
+	sce := m.sce
+	if sce == nil || sce.editIdx < 0 || sce.editIdx >= len(m.config.Commands) {
+		m.sce = nil
+		m.screen = ScreenManageCommands
+		m.listCursor = 1
+		return m, nil
+	}
+	if m.commandNameTaken(name, sce.editIdx) {
+		m.nameInputErr = "name already in use: " + name
+		return m, nil
+	}
+	m.config.Commands[sce.editIdx].Name = name
+	if err := m.saveConfig(); err != nil {
+		m.errMsg = "failed to save: " + err.Error()
+	} else {
+		m.successMsg = "renamed command to \"" + name + "\""
+	}
+	m.sce = nil
+	m.screen = ScreenManageCommands
+	m.listCursor = 1
 	return m, nil
 }
 
@@ -394,11 +480,8 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "enter":
 			return m.startCommandSlots()
 		case "esc":
-			editIdx := sce.editIdx
-			m.sce = nil
-			m.screen = ScreenEditCommandPick
-			m.listItems = m.userCommandNames()
-			m.listCursor = editIdx
+			m.gotoEditCommandMode()
+			m.listCursor = 2 // back onto "Change template"
 		}
 		return m, nil
 	}
@@ -565,6 +648,17 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 		resolvedSoFar: sce.currentValues,
 	}
 	sp.applyFilter()
+	// When editing, start the cursor on the command's current value.
+	if sce.mode == 1 && sce.editIdx >= 0 && sce.editIdx < len(m.config.Commands) {
+		if cur, ok := m.config.Commands[sce.editIdx].Values[s.Name]; ok {
+			for i, e := range sp.filtered {
+				if e.Value == cur {
+					sp.cursor = i
+					break
+				}
+			}
+		}
+	}
 	m.sp = sp
 	m.screen = ScreenSlotPick
 	return *m, nil
@@ -624,9 +718,14 @@ func (m *Model) backFromCommandNameInput() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) backToCommandTemplatePick() (tea.Model, tea.Cmd) {
-	if m.sce.mode == 1 {
+	switch {
+	case m.sce.mode == 1 && !m.sce.pickedTemplate:
+		// Change values skipped the template pick — return to the menu.
+		m.gotoEditCommandMode()
+		m.listCursor = 1 // back onto "Change values"
+	case m.sce.mode == 1:
 		m.screen = ScreenEditCommandTemplate
-	} else {
+	default:
 		m.screen = ScreenCreateCommandTemplate
 	}
 	return m, nil

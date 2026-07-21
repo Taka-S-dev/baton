@@ -111,6 +111,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateCommandForm(msg)
 		case ScreenEditCommandPick:
 			return m.updateEditCommandPick(msg)
+		case ScreenEditCommandMode:
+			return m.updateEditCommandMode(msg)
 		case ScreenCreateCommandName, ScreenCreateCommandTemplate:
 			return m.updateCreateCommand(msg)
 		case ScreenEditCommandName, ScreenEditCommandTemplate:

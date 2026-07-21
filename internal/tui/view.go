@@ -61,6 +61,8 @@ func (m Model) View() string {
 		view = m.viewCommandForm(w)
 	case ScreenEditCommandPick:
 		view = m.viewSingleSelect("Edit command", w)
+	case ScreenEditCommandMode:
+		view = m.viewSingleSelect("Edit command", w)
 	case ScreenCreateCommandName, ScreenCreateCommandTemplate:
 		view = m.viewCreateCommand(w)
 	case ScreenEditCommandName, ScreenEditCommandTemplate:
@@ -768,6 +770,8 @@ func (m Model) viewNameInput(w int) string {
 	switch m.nameInputMode {
 	case nameInputEditWorkflow:
 		title = "Rename workflow"
+	case nameInputRenameCommand:
+		title = "Rename command"
 	case nameInputNewList:
 		title = "New list"
 	}
@@ -1035,7 +1039,7 @@ func (m Model) viewCommandForm(w int) string {
 	}
 
 	b.WriteString("\n" + hline(w) + "\n")
-	guide := "Enter: next / save   Esc: previous / cancel"
+	guide := "↑↓: field   Enter: next / save   Ctrl+S: save   Esc: previous / cancel"
 	if cf.slotInsertAvailable(len(m.lists)) {
 		guide = "Tab: insert placeholder   " + guide
 	}
