@@ -321,8 +321,8 @@ func TestLoadProject_Vars(t *testing.T) {
 	if m.vars["root"] != `C:\work\Phase2` {
 		t.Fatalf("vars = %v", m.vars)
 	}
-	if !strings.Contains(m.loadWarning, "undefined var {$phase}") {
-		t.Fatalf("loadWarning = %q, want an undefined-var warning for phase", m.loadWarning)
+	if !strings.Contains(strings.Join(m.loadWarnings, "; "), "{$phase} is not defined") {
+		t.Fatalf("loadWarnings = %q, want an undefined-var warning for phase", m.loadWarnings)
 	}
 
 	cmd, ok := m.workflowStepCommand("build")
@@ -440,11 +440,11 @@ func TestLoadProject_WarnsOrphanedVars(t *testing.T) {
 	if err := m.loadProject(dir); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(m.loadWarning, `unknown command "ghost"`) {
-		t.Fatalf("loadWarning = %q, want an orphaned-vars warning", m.loadWarning)
+	if !strings.Contains(strings.Join(m.loadWarnings, "; "), `unknown command "ghost"`) {
+		t.Fatalf("loadWarnings = %q, want an orphaned-vars warning", m.loadWarnings)
 	}
-	if strings.Contains(m.loadWarning, "root") {
-		t.Fatalf("globals must not be treated as orphans: %q", m.loadWarning)
+	if strings.Contains(strings.Join(m.loadWarnings, "; "), "root") {
+		t.Fatalf("globals must not be treated as orphans: %q", m.loadWarnings)
 	}
 }
 
@@ -462,7 +462,7 @@ func TestLoadProject_WarnsUnknownShell(t *testing.T) {
 	if err := m.loadProject(dir); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(m.loadWarning, "unknown shell") || !strings.Contains(m.loadWarning, "bash") {
-		t.Fatalf("loadWarning = %q, want an unknown-shell warning naming the value", m.loadWarning)
+	if !strings.Contains(strings.Join(m.loadWarnings, "; "), "unknown shell") || !strings.Contains(strings.Join(m.loadWarnings, "; "), "bash") {
+		t.Fatalf("loadWarnings = %q, want an unknown-shell warning naming the value", m.loadWarnings)
 	}
 }

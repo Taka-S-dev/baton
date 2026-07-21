@@ -76,8 +76,19 @@ func (m Model) View() string {
 	if m.successMsg != "" {
 		view += "\n" + success("  ✓ "+m.successMsg) + "\n"
 	}
-	if m.loadWarning != "" && m.screen == ScreenMainMenu {
-		view += "\n" + warn("  Warning: "+m.loadWarning) + "\n"
+	if len(m.loadWarnings) > 0 && m.screen == ScreenMainMenu {
+		const maxShown = 4
+		shown := m.loadWarnings
+		if len(shown) > maxShown {
+			shown = shown[:maxShown]
+		}
+		view += "\n"
+		for _, wmsg := range shown {
+			view += warn("  Warning: "+wmsg) + "\n"
+		}
+		if rest := len(m.loadWarnings) - maxShown; rest > 0 {
+			view += warn(fmt.Sprintf("  ... and %d more (run: baton check)", rest)) + "\n"
+		}
 	}
 	return view
 }

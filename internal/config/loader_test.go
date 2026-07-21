@@ -298,8 +298,8 @@ func TestLoadProject_Warnings(t *testing.T) {
 	}
 	for _, want := range []string{
 		`unknown shell "bash"`,
-		"undefined var {$root}",
-		`workflow "wf1" references unknown command "ghost"`,
+		"{$root} is not defined",
+		`workflow "wf1": step "ghost" is not a command`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("warnings missing %q, got %q", want, joined)

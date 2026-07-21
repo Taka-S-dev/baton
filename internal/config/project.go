@@ -74,12 +74,21 @@ func LoadProject(projectDir string) (Project, error) {
 	}
 	p.Config = cfg
 
+	p.Warnings = append(warnings, Diagnose(cfg, workflows, p.Lists, vars)...)
+	return p, nil
+}
+
+// Diagnose runs the consistency checks over an in-memory project state.
+// It is re-run whenever the TUI returns to the main menu, so warnings
+// always describe the current state rather than the state at load time.
+func Diagnose(cfg model.Config, workflows []model.Workflow, lists map[string][]model.ListEntry, vars map[string]string) []string {
+	var warnings []string
 	for _, cmd := range cfg.Commands {
 		if cmd.Template == "" {
 			continue
 		}
 		if _, ok := cfg.FindCommand(cmd.Template); !ok {
-			warnings = append(warnings, "missing template: "+cmd.Name+" → "+cmd.Template)
+			warnings = append(warnings, "command \""+cmd.Name+"\": its template \""+cmd.Template+"\" no longer exists")
 		}
 	}
 	seen := make(map[string]bool)
@@ -90,21 +99,26 @@ func LoadProject(projectDir string) (Project, error) {
 		}
 		seen[cmd.Name] = true
 		if cmd.Shell != "" && cmd.Shell != "ps" {
-			warnings = append(warnings, "unknown shell \""+cmd.Shell+"\" on "+cmd.Name+" (runs with the platform default)")
+			warnings = append(warnings, "command \""+cmd.Name+"\": unknown shell \""+cmd.Shell+"\" (runs with the platform default)")
 		}
 		for _, v := range slot.UndefinedVars(cmd.Cmd+" "+cmd.Dir, vars) {
 			if !undefined[v] {
 				undefined[v] = true
-				warnings = append(warnings, "undefined var {$"+v+"} on "+cmd.Name+" (define it in vars.tsv)")
+				warnings = append(warnings, "command \""+cmd.Name+"\": {$"+v+"} is not defined in vars.tsv")
 			}
 		}
 	}
-	for _, entries := range p.Lists {
-		for _, e := range entries {
+	listNames := make([]string, 0, len(lists))
+	for name := range lists {
+		listNames = append(listNames, name)
+	}
+	sort.Strings(listNames)
+	for _, name := range listNames {
+		for _, e := range lists[name] {
 			for _, v := range slot.UndefinedVars(e.Value, vars) {
 				if !undefined[v] {
 					undefined[v] = true
-					warnings = append(warnings, "undefined var {$"+v+"} in a list value (define it in vars.tsv)")
+					warnings = append(warnings, "list \""+name+"\": {$"+v+"} is not defined in vars.tsv")
 				}
 			}
 		}
@@ -112,7 +126,7 @@ func LoadProject(projectDir string) (Project, error) {
 	for _, wf := range workflows {
 		for _, step := range wf.Commands {
 			if _, ok := cfg.FindCommand(step); !ok {
-				warnings = append(warnings, "workflow \""+wf.Name+"\" references unknown command \""+step+"\"")
+				warnings = append(warnings, "workflow \""+wf.Name+"\": step \""+step+"\" is not a command (deleted or renamed?)")
 			}
 		}
 	}
@@ -131,9 +145,7 @@ func LoadProject(projectDir string) (Project, error) {
 	}
 	sort.Strings(orphans)
 	for _, name := range orphans {
-		warnings = append(warnings, "vars.tsv has values for unknown command \""+name+"\" (removed on next save)")
+		warnings = append(warnings, "vars.tsv: values for unknown command \""+name+"\" (removed on next save)")
 	}
-
-	p.Warnings = warnings
-	return p, nil
+	return warnings
 }

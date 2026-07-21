@@ -292,8 +292,8 @@ type Model struct {
 	mainMenuCursor int
 	lastWorkflow   string
 	errMsg         string
-	successMsg     string // transient "it worked" note, cleared on the next keypress
-	loadWarning    string
+	successMsg     string   // transient "it worked" note, cleared on the next keypress
+	loadWarnings   []string // diagnostics; recomputed on every return to the main menu
 	deleteConfirm  bool
 	deleteSelected []int
 	deleteBtn      int // 0=No (default), 1=Yes
@@ -363,7 +363,7 @@ func (m *Model) loadProject(projectDir string) error {
 	m.lists = p.Lists
 	m.vars = p.Vars
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
-	m.loadWarning = strings.Join(p.Warnings, "; ")
+	m.loadWarnings = p.Warnings
 	return nil
 }
 
@@ -415,6 +415,11 @@ func (m *Model) gotoManageLists() {
 func (m *Model) gotoMainMenu() {
 	m.screen = ScreenMainMenu
 	m.listItems = mainMenuItems()
+	// Re-diagnose so the warnings describe the current state — TUI
+	// edits since load (deleted commands, workflows, …) are reflected.
+	if m.projectDir != "" {
+		m.loadWarnings = config.Diagnose(m.config, m.workflows, m.lists, m.vars)
+	}
 	m.listCursor = m.mainMenuCursor
 }
 
