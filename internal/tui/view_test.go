@@ -127,6 +127,29 @@ func TestViewMultiSelect_DiscardWindow(t *testing.T) {
 	}
 }
 
+// TestViewEditCommandPick_ShowsPreview checks the edit picker renders a
+// hover preview for the highlighted command: template and values for
+// derived commands, the command line otherwise.
+func TestViewEditCommandPick_ShowsPreview(t *testing.T) {
+	m := Model{width: 80, height: 24}
+	m.config.Commands = []mdl.Command{
+		{Name: "as", Template: "build", Cmd: "make build", Values: map[string]string{"workdir": "./src"}},
+		{Name: "plain", Cmd: "echo hi", Dir: "./x"},
+	}
+	m.listItems = []string{"as", "plain"}
+
+	view := m.viewEditCommandPick(80)
+	if !strings.Contains(view, "template: build") || !strings.Contains(view, "./src") {
+		t.Fatalf("derived command preview missing template/values:\n%s", view)
+	}
+
+	m.listCursor = 1
+	view = m.viewEditCommandPick(80)
+	if !strings.Contains(view, "$ echo hi") || !strings.Contains(view, "workdir: ./x") {
+		t.Fatalf("plain command preview missing cmd/workdir:\n%s", view)
+	}
+}
+
 // TestViewCommandNameInput_StableValueOrder does the same for the
 // create/edit command name screen, which lists the chosen slot values.
 func TestViewCommandNameInput_StableValueOrder(t *testing.T) {

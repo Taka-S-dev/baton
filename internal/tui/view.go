@@ -60,7 +60,7 @@ func (m Model) View() string {
 	case ScreenCommandForm:
 		view = m.viewCommandForm(w)
 	case ScreenEditCommandPick:
-		view = m.viewSingleSelect("Edit command", w)
+		view = m.viewEditCommandPick(w)
 	case ScreenEditCommandMode:
 		view = m.viewSingleSelect("Edit command", w)
 	case ScreenCreateCommandName, ScreenCreateCommandTemplate:
@@ -446,34 +446,9 @@ func (m Model) viewMultiSelect(w int) string {
 	// Hover preview
 	b.WriteString("\n")
 	if n > 0 && cursor >= 0 && cursor < n {
-		hoveredIdx := filtered[cursor]
-		hovered := m.msItems[hoveredIdx]
-		if hovered.cmd != nil && hovered.cmd.Template != "" {
-			b.WriteString(hlineLabel(w, "command") + "\n")
-			b.WriteString("  " + dim("template: ") + hovered.cmd.Template + "\n")
-			if len(hovered.cmd.Values) > 0 {
-				b.WriteString("  " + dim("values:") + "\n")
-				for _, k := range sortedKeys(hovered.cmd.Values) {
-					b.WriteString("    " + gray(k) + " = " + hovered.cmd.Values[k] + "\n")
-				}
-			}
-			b.WriteString("  " + gray("$ "+hovered.cmd.Cmd) + "\n")
-		} else if hovered.cmd != nil {
-			b.WriteString(hlineLabel(w, "command preview") + "\n")
-			cmdStr := slot.ApplyVars(hovered.cmd.Cmd, m.vars)
-			maxLen := w - 10
-			if maxLen < 10 {
-				maxLen = 10
-			}
-			if len(cmdStr) > maxLen {
-				cmdStr = cmdStr[:maxLen-3] + "..."
-			}
-			b.WriteString("  " + gray("$ "+cmdStr) + "\n")
-			workdir := hovered.cmd.Dir
-			if workdir == "" {
-				workdir = "."
-			}
-			b.WriteString("  " + dim("workdir: "+workdir) + "\n")
+		hovered := m.msItems[filtered[cursor]]
+		if hovered.cmd != nil {
+			m.writeCommandHover(&b, hovered.cmd, w)
 		}
 	} else {
 		b.WriteString(hline(w) + "\n")
@@ -694,6 +669,75 @@ func (m Model) viewSlotPick(w int) string {
 
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter") + "  " + gray("Esc: ") + dim("clear filter / back") + "\n")
+	return b.String()
+}
+
+// writeCommandHover renders the hover panel for a command: template and
+// values for derived commands, the resolved command line otherwise.
+func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
+	if cmd.Template != "" {
+		b.WriteString(hlineLabel(w, "command") + "\n")
+		b.WriteString("  " + dim("template: ") + cmd.Template + "\n")
+		if len(cmd.Values) > 0 {
+			b.WriteString("  " + dim("values:") + "\n")
+			for _, k := range sortedKeys(cmd.Values) {
+				b.WriteString("    " + gray(k) + " = " + cmd.Values[k] + "\n")
+			}
+		}
+		b.WriteString("  " + gray("$ "+cmd.Cmd) + "\n")
+		return
+	}
+	b.WriteString(hlineLabel(w, "command preview") + "\n")
+	cmdStr := slot.ApplyVars(cmd.Cmd, m.vars)
+	maxLen := w - 10
+	if maxLen < 10 {
+		maxLen = 10
+	}
+	if len(cmdStr) > maxLen {
+		cmdStr = cmdStr[:maxLen-3] + "..."
+	}
+	b.WriteString("  " + gray("$ "+cmdStr) + "\n")
+	workdir := cmd.Dir
+	if workdir == "" {
+		workdir = "."
+	}
+	b.WriteString("  " + dim("workdir: "+workdir) + "\n")
+}
+
+// ── Edit command pick ────────────────────────────────────────────────────────
+
+// viewEditCommandPick lists the TUI-created commands with the same hover
+// preview as the command selector, so you can see what a command does
+// before opening it for editing.
+func (m Model) viewEditCommandPick(w int) string {
+	var b strings.Builder
+	b.WriteString("\n" + header("Edit command", w) + "\n")
+	if len(m.config.Commands) == 0 {
+		b.WriteString("  " + gray("(no commands created in the TUI yet)") + "\n")
+		b.WriteString("\n" + hline(w) + "\n")
+		b.WriteString("  " + gray("Esc: back") + "\n")
+		return b.String()
+	}
+	for i, cmd := range m.config.Commands {
+		label := cmd.Name
+		if cmd.Group != "" {
+			label += "  " + sGroup.Render("["+cmd.Group+"]")
+		}
+		if cmd.Template != "" {
+			label = accent("$") + " " + label + "  " + gray("("+cmd.Template+")")
+		}
+		if i == m.listCursor {
+			b.WriteString("  " + accentBold("▶") + " " + label + "\n")
+		} else {
+			b.WriteString("    " + label + "\n")
+		}
+	}
+	b.WriteString("\n")
+	if m.listCursor >= 0 && m.listCursor < len(m.config.Commands) {
+		m.writeCommandHover(&b, &m.config.Commands[m.listCursor], w)
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("↑↓ Enter Esc") + "\n")
 	return b.String()
 }
 
