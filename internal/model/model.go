@@ -15,6 +15,11 @@ type Command struct {
 	Slots    map[string]string `json:"slots,omitempty"`
 	Template string            `json:"template,omitempty"`
 	Values   map[string]string `json:"values,omitempty"`
+
+	// Source records which file the command was loaded from ("tsv",
+	// "json", or "local"). TSV rows are editable from the TUI; the
+	// field is never serialized.
+	Source string `json:"-"`
 }
 
 // UnmarshalJSON accepts the legacy "vars" key as an alias for "slots".

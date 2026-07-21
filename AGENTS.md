@@ -8,7 +8,7 @@ project is on this page, and `baton check` verifies the result.
 
 | File | Generate? |
 |------|-----------|
-| `commands.tsv` | yes — command definitions |
+| `commands.tsv` | yes — command definitions (the baton TUI also appends, edits, or deletes individual rows on user request; untargeted lines are never touched) |
 | `lists/<name>.tsv` | yes — selection lists for `{slot}` placeholders |
 | `vars.tsv` | yes, `*` rows only (see below) |
 | `commands.local.json`, `workflows.json`, `.last_workflow` | **never** — owned and written by the baton TUI |

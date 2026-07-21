@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Taka-S-dev/baton/internal/model"
@@ -85,6 +86,9 @@ func LoadConfig(projectDir string) (model.Config, error) {
 		if err != nil {
 			return cfg, err
 		}
+		for i := range base.Commands {
+			base.Commands[i].Source = "json"
+		}
 		cfg.Base = base.Commands
 	}
 
@@ -95,6 +99,9 @@ func LoadConfig(projectDir string) (model.Config, error) {
 		if err != nil {
 			return cfg, err
 		}
+		for i := range cfgTSV.Commands {
+			cfgTSV.Commands[i].Source = "tsv"
+		}
 		cfg.Base = append(cfg.Base, cfgTSV.Commands...)
 	}
 
@@ -102,6 +109,9 @@ func LoadConfig(projectDir string) (model.Config, error) {
 		cfgJSON, err := loadJSON(path)
 		if err != nil {
 			return cfg, err
+		}
+		for i := range cfgJSON.Commands {
+			cfgJSON.Commands[i].Source = "local"
 		}
 		cfg.Commands = cfgJSON.Commands
 	}
@@ -116,6 +126,126 @@ func LoadConfig(projectDir string) (model.Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// tsvRow serializes a command as a TSV data row.
+func tsvRow(cmd model.Command) string {
+	var slots []string
+	for k, v := range cmd.Slots {
+		slots = append(slots, k+"="+v)
+	}
+	sort.Strings(slots)
+	return strings.Join([]string{cmd.Name, cmd.Group, cmd.Dir, cmd.Cmd, cmd.Shell, strings.Join(slots, ",")}, "\t")
+}
+
+// tsvRowName returns the command name of a TSV data line.
+func tsvRowName(line string) string {
+	name := line
+	if i := strings.IndexByte(line, '\t'); i >= 0 {
+		name = line[:i]
+	}
+	return unquoteTSVField(strings.TrimSpace(name))
+}
+
+// writeTSVLines writes lines back to path atomically, joined with the
+// file's original line ending.
+func writeTSVLines(path, eol string, lines []string) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(strings.Join(lines, eol)+eol), 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// readTSVLines reads path fresh (so edits saved by an editor moments
+// ago are preserved) and returns its logical lines plus the detected
+// line ending. A missing file yields just a header line.
+func readTSVLines(path string) (lines []string, eol string) {
+	eol = "\n"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []string{"name\tgroup\tworkdir\tcmd\tshell\tslots"}, eol
+	}
+	raw := string(data)
+	if strings.Contains(raw, "\r\n") {
+		eol = "\r\n"
+	}
+	lines = strings.Split(strings.ReplaceAll(raw, "\r\n", "\n"), "\n")
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) == 0 {
+		lines = []string{"name\tgroup\tworkdir\tcmd\tshell\tslots"}
+	}
+	return lines, eol
+}
+
+// AppendCommandTSV appends a command as a new row to the project's
+// hand-written TSV — the file the loader actually reads (commands.tsv,
+// or a legacy name if that is what the project uses), created with a
+// header when none exists. Existing rows are never modified. Returns
+// the file name written to.
+func AppendCommandTSV(projectDir string, cmd model.Command) (string, error) {
+	path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv")
+	if !ok {
+		path = filepath.Join(projectDir, "commands.tsv")
+	}
+	lines, eol := readTSVLines(path)
+	lines = append(lines, tsvRow(cmd))
+	if err := writeTSVLines(path, eol, lines); err != nil {
+		return "", err
+	}
+	return filepath.Base(path), nil
+}
+
+// UpdateCommandTSV replaces the row named oldName with cmd. Every other
+// line is left byte-for-byte untouched. Returns the file name, or an
+// error when the row no longer exists (edited by hand since load).
+func UpdateCommandTSV(projectDir, oldName string, cmd model.Command) (string, error) {
+	path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv")
+	if !ok {
+		return "", fmt.Errorf("no TSV command file in this project")
+	}
+	lines, eol := readTSVLines(path)
+	found := false
+	for i := 1; i < len(lines); i++ {
+		if tsvRowName(lines[i]) == oldName {
+			lines[i] = tsvRow(cmd)
+			found = true
+			break
+		}
+	}
+	if !found {
+		return "", fmt.Errorf("command %q not found in %s (changed on disk? re-open the project)", oldName, filepath.Base(path))
+	}
+	if err := writeTSVLines(path, eol, lines); err != nil {
+		return "", err
+	}
+	return filepath.Base(path), nil
+}
+
+// DeleteCommandsTSV removes the rows with the given names. Names whose
+// row is already gone are ignored (deleted by hand is deleted).
+func DeleteCommandsTSV(projectDir string, names []string) (string, error) {
+	path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv")
+	if !ok {
+		return "", fmt.Errorf("no TSV command file in this project")
+	}
+	drop := make(map[string]bool, len(names))
+	for _, n := range names {
+		drop[n] = true
+	}
+	lines, eol := readTSVLines(path)
+	kept := lines[:1]
+	for _, line := range lines[1:] {
+		if !drop[tsvRowName(line)] {
+			kept = append(kept, line)
+		}
+	}
+	if err := writeTSVLines(path, eol, kept); err != nil {
+		return "", err
+	}
+	return filepath.Base(path), nil
 }
 
 // legacySavedCommand is the pre-unification "saved_commands" entry shape.

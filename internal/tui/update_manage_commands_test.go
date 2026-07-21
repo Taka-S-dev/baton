@@ -42,8 +42,17 @@ func TestCommandForm_ShellField(t *testing.T) {
 	if m.cf != nil {
 		t.Fatalf("form must close after a valid save; errMsg=%q", m.errMsg)
 	}
-	if len(m.config.Commands) != 1 || m.config.Commands[0].Shell != "ps" {
-		t.Fatalf("saved commands = %+v, want one command with Shell=ps", m.config.Commands)
+	// Form-created commands are hand-editable definitions: they land in
+	// the TSV (Base layer), not in commands.local.json.
+	if len(m.config.Base) != 1 || m.config.Base[0].Shell != "ps" {
+		t.Fatalf("saved commands = %+v, want one Base command with Shell=ps", m.config.Base)
+	}
+	raw, err := os.ReadFile(filepath.Join(m.projectDir, "commands.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "list-src\t\t\tGet-ChildItem src\tps\t") {
+		t.Fatalf("commands.tsv = %q, want the appended row", raw)
 	}
 }
 
@@ -113,7 +122,8 @@ func TestEditCommand_RenameOnly(t *testing.T) {
 	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./src"}}}
 	m.vars = map[string]string{"as.workdir": "./src"}
 	m.screen = ScreenEditCommandPick
-	m.listItems = m.userCommandNames()
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
 	m.listCursor = 0
 
 	enter := tea.KeyMsg{Type: tea.KeyEnter}
@@ -156,7 +166,8 @@ func TestEditCommandMode_ValuesVsTemplate(t *testing.T) {
 		m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}"}}
 		m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./a"}}}
 		m.screen = ScreenEditCommandPick
-		m.listItems = m.userCommandNames()
+		names, refs := m.editableCommands()
+		m.listItems, m.editRefs = names, refs
 		m.listCursor = 0
 		m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
 		return m
@@ -187,6 +198,67 @@ func TestEditCommandMode_ValuesVsTemplate(t *testing.T) {
 	}
 	if got := m.templateCandidates()[m.sce.templateRefIdx].Name; got != "build" {
 		t.Fatalf("template cursor must be on the current template, got %q", got)
+	}
+}
+
+// TestEditAndDeleteTSVCommands checks TSV rows are editable and
+// deletable from the TUI: the form rewrites exactly the edited row,
+// and deletion removes TSV rows and local commands in one pass.
+func TestEditAndDeleteTSVCommands(t *testing.T) {
+	dir := t.TempDir()
+	tsv := "name\tgroup\tworkdir\tcmd\tshell\tslots\n" +
+		"keep\t\t\techo keep\t\t\n" +
+		"edit-me\tgrp\t\techo old\t\tx=xs\n" +
+		"drop-me\t\t\techo drop\t\t\n"
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := &Model{}
+	m.nameInput = textinput.New()
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	m.config.Commands = []mdl.Command{{Name: "local-cmd", Cmd: "echo local", Source: "local"}}
+
+	// Edit "edit-me" (editRefs: keep=0, edit-me=1, drop-me=2, local-cmd=3).
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+	m.screen = ScreenEditCommandPick
+	m.listCursor = 1
+	m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.cf == nil || !m.cf.tsvEdit {
+		t.Fatalf("picking a TSV row must open the form in TSV mode, cf=%+v", m.cf)
+	}
+	m.nameInput.SetValue("edited")
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
+	raw, _ := os.ReadFile(filepath.Join(dir, "commands.tsv"))
+	if !strings.Contains(string(raw), "edited\tgrp\t\techo old\t\tx=xs") {
+		t.Fatalf("row not rewritten in place (slots must survive): %q", raw)
+	}
+	if !strings.Contains(string(raw), "keep\t") || !strings.Contains(string(raw), "drop-me\t") {
+		t.Fatalf("other rows must be untouched: %q", raw)
+	}
+	if m.config.Base[1].Name != "edited" {
+		t.Fatalf("in-memory Base not updated: %+v", m.config.Base[1])
+	}
+
+	// Delete "drop-me" (tsv) and "local-cmd" (local) together.
+	names, refs = m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+	m.screen = ScreenDeleteCommand
+	m.deleteSelected = []int{2, 3}
+	m.deleteConfirm = true
+	m.deleteBtn = 1
+	m.updateDeleteCommand(tea.KeyMsg{Type: tea.KeyEnter})
+	raw, _ = os.ReadFile(filepath.Join(dir, "commands.tsv"))
+	if strings.Contains(string(raw), "drop-me") {
+		t.Fatalf("TSV row not deleted: %q", raw)
+	}
+	if len(m.config.Commands) != 0 {
+		t.Fatalf("local command not deleted: %+v", m.config.Commands)
+	}
+	if strings.Contains(string(raw), "edited\t") == false || strings.Contains(string(raw), "keep\t") == false {
+		t.Fatalf("unrelated rows must survive deletion: %q", raw)
 	}
 }
 

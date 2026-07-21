@@ -706,25 +706,29 @@ func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
 
 // ── Edit command pick ────────────────────────────────────────────────────────
 
-// viewEditCommandPick lists the TUI-created commands with the same hover
-// preview as the command selector, so you can see what a command does
-// before opening it for editing.
+// viewEditCommandPick lists the editable commands (TSV rows and
+// template-derived ones) with the same hover preview as the command
+// selector, so you can see what a command does before opening it.
 func (m Model) viewEditCommandPick(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Edit command", w) + "\n")
-	if len(m.config.Commands) == 0 {
-		b.WriteString("  " + gray("(no commands created in the TUI yet)") + "\n")
+	if len(m.editRefs) == 0 {
+		b.WriteString("  " + gray("(no commands yet)") + "\n")
 		b.WriteString("\n" + hline(w) + "\n")
 		b.WriteString("  " + gray("Esc: back") + "\n")
 		return b.String()
 	}
-	for i, cmd := range m.config.Commands {
+	for i, ref := range m.editRefs {
+		cmd := m.editRefCommand(ref)
 		label := cmd.Name
 		if cmd.Group != "" {
 			label += "  " + sGroup.Render("["+cmd.Group+"]")
 		}
-		if cmd.Template != "" {
+		switch {
+		case cmd.Template != "":
 			label = accent("$") + " " + label + "  " + gray("("+cmd.Template+")")
+		case slot.HasPlaceholders(*cmd):
+			label += "  " + gray("{...}")
 		}
 		if i == m.listCursor {
 			b.WriteString("  " + accentBold("▶") + " " + label + "\n")
@@ -733,8 +737,8 @@ func (m Model) viewEditCommandPick(w int) string {
 		}
 	}
 	b.WriteString("\n")
-	if m.listCursor >= 0 && m.listCursor < len(m.config.Commands) {
-		m.writeCommandHover(&b, &m.config.Commands[m.listCursor], w)
+	if m.listCursor >= 0 && m.listCursor < len(m.editRefs) {
+		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.listCursor]), w)
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter Esc") + "\n")

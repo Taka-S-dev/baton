@@ -139,8 +139,8 @@ A project has two command layers:
 
 | File | Written by | Contents |
 |------|-----------|----------|
-| `commands.json` / `commands.tsv` | You (hand-written; baton never modifies it) | Command definitions — plain ones, and slotted ones that double as templates |
-| `commands.local.json` | baton (via **Manage commands**) | Commands you created in the TUI |
+| `commands.json` / `commands.tsv` | Shared: you edit freely, and the TUI appends new rows (**Write directly**) or rewrites/deletes **exactly the row you target** via Edit/Delete command. Lines you didn't touch are preserved byte-for-byte, and every write re-reads the file first | Command definitions — plain ones, and slotted ones that double as templates |
+| `commands.local.json` | baton (via **Create command → From template**) | Template-derived commands (identity only; values live in vars.tsv) |
 
 Both layers can coexist; names in `commands.local.json` take priority.
 Legacy file names (`templates.json`, `template.json`, `templates.tsv`, `config.tsv`, `config.json`) are still readable.
@@ -233,7 +233,7 @@ Both `{projDir}` and `{projCmd}` will select from the `project` list, each promp
 
 ### Placeholder picker
 
-When writing a command directly (**Manage commands → Create command → Write directly**), the form asks for name, cmd, workdir, group, and shell (leave empty for the platform default, or `ps` for PowerShell). Press `Tab` in the cmd / workdir field to open a two-pane picker window:
+When writing a command directly (**Manage commands → Create command → Write directly**), the form asks for name, cmd, workdir, group, and shell (leave empty for the platform default, or `ps` for PowerShell). The result is **appended to the project's TSV** — the form is a guided way to author a hand-editable row without remembering the column layout or placeholder syntax. Press `Tab` in the cmd / workdir field to open a two-pane picker window:
 
 - the **left pane** lists the selection lists — `Enter` inserts a `{placeholder}` at the cursor
 - the **right pane** (focus with `→`) shows the selected list's entries — `Enter` inserts the concrete value instead

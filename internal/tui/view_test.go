@@ -136,7 +136,8 @@ func TestViewEditCommandPick_ShowsPreview(t *testing.T) {
 		{Name: "as", Template: "build", Cmd: "make build", Values: map[string]string{"workdir": "./src"}},
 		{Name: "plain", Cmd: "echo hi", Dir: "./x"},
 	}
-	m.listItems = []string{"as", "plain"}
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
 
 	view := m.viewEditCommandPick(80)
 	if !strings.Contains(view, "template: build") || !strings.Contains(view, "./src") {

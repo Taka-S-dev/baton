@@ -183,10 +183,19 @@ type commandEditState struct {
 	currentValues  map[string]string
 }
 
+// editRef points at an editable command: a TSV row in the Base layer
+// or a template-derived command in the local layer.
+type editRef struct {
+	tsv bool
+	idx int
+}
+
 // commandFormState holds state for writing a concrete command directly.
 type commandFormState struct {
-	mode     int // 0=create, 1=edit
-	editIdx  int // for edit mode
+	mode     int  // 0=create, 1=edit
+	editIdx  int  // index into config.Commands, or config.Base when tsvEdit
+	tsvEdit  bool // editing a TSV row (saved via UpdateCommandTSV)
+	origName string
 	fieldIdx int
 	fields   [5]string // name, cmd, workdir, group, shell
 
@@ -230,6 +239,9 @@ type Model struct {
 	// Generic single-select / menu
 	listCursor int
 	listItems  []string
+
+	// Edit/Delete command: what each list row points at
+	editRefs []editRef
 
 	// Multi-select
 	msItems     []msItem

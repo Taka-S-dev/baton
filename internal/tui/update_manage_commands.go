@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/Taka-S-dev/baton/internal/config"
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
 )
@@ -27,20 +28,24 @@ func (m *Model) updateManageCommands(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listItems = []string{"Write directly", "From template"}
 			m.listCursor = 0
 		case 1: // Edit
-			if len(m.config.Commands) == 0 {
-				m.errMsg = "no commands created yet"
+			names, refs := m.editableCommands()
+			if len(refs) == 0 {
+				m.errMsg = "no editable commands (TSV rows and TUI-created commands)"
 				break
 			}
 			m.screen = ScreenEditCommandPick
-			m.listItems = m.userCommandNames()
+			m.listItems = names
+			m.editRefs = refs
 			m.listCursor = 0
 		case 2: // Delete
-			if len(m.config.Commands) == 0 {
-				m.errMsg = "no commands created yet"
+			names, refs := m.editableCommands()
+			if len(refs) == 0 {
+				m.errMsg = "no editable commands (TSV rows and TUI-created commands)"
 				break
 			}
 			m.screen = ScreenDeleteCommand
-			m.listItems = m.userCommandNames()
+			m.listItems = names
+			m.editRefs = refs
 			m.listCursor = 0
 			m.deleteSelected = nil
 		}
@@ -91,6 +96,33 @@ func (m *Model) openCommandForm(editIdx int) (tea.Model, tea.Cmd) {
 	return m, m.nameInput.Focus()
 }
 
+// openCommandFormTSV opens the form on a TSV row (config.Base index).
+// Saving rewrites exactly that row via UpdateCommandTSV.
+func (m *Model) openCommandFormTSV(baseIdx int) (tea.Model, tea.Cmd) {
+	cmd := m.config.Base[baseIdx]
+	cf := &commandFormState{mode: 1, editIdx: baseIdx, tsvEdit: true, origName: cmd.Name}
+	cf.fields = [5]string{cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell}
+	m.cf = cf
+	m.screen = ScreenCommandForm
+	m.nameInput.Prompt = commandFormLabels[0] + " > "
+	m.nameInput.SetValue(cf.fields[0])
+	return m, m.nameInput.Focus()
+}
+
+// formNameTaken applies the duplicate-name check for the form, honoring
+// whichever row is being edited.
+func (m *Model) formNameTaken(name string) bool {
+	cf := m.cf
+	if cf.tsvEdit {
+		return name != cf.origName && m.commandNameTaken(name, -1)
+	}
+	excludeIdx := -1
+	if cf.mode == 1 {
+		excludeIdx = cf.editIdx
+	}
+	return m.commandNameTaken(name, excludeIdx)
+}
+
 func (m *Model) closeCommandForm() {
 	m.cf = nil
 	m.nameInput.Prompt = "Name > "
@@ -131,33 +163,51 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		m.errMsg = `shell must be empty or "ps"`
 		return m, m.cfGotoField(4)
 	}
-	excludeIdx := -1
-	if cf.mode == 1 {
-		excludeIdx = cf.editIdx
-	}
-	if m.commandNameTaken(name, excludeIdx) {
+	if m.formNameTaken(name) {
 		m.errMsg = "name already in use: " + name
 		return m, m.cfGotoField(0)
+	}
+	if cf.tsvEdit {
+		newCmd := m.config.Base[cf.editIdx] // keeps Slots and Source
+		newCmd.Name, newCmd.Cmd, newCmd.Dir, newCmd.Group, newCmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
+		if file, err := config.UpdateCommandTSV(m.projectDir, cf.origName, newCmd); err != nil {
+			m.errMsg = "failed to save: " + err.Error()
+		} else {
+			m.config.Base[cf.editIdx] = newCmd
+			m.successMsg = "updated command \"" + name + "\" in " + file
+		}
+		m.closeCommandForm()
+		m.listCursor = 1
+		return m, nil
 	}
 	if cf.mode == 1 {
 		cmd := m.config.Commands[cf.editIdx]
 		cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
 		m.config.Commands[cf.editIdx] = cmd
-	} else {
-		m.config.Commands = append(m.config.Commands, mdl.Command{
-			Name:  name,
-			Cmd:   cmdStr,
-			Dir:   cf.fields[2],
-			Group: cf.fields[3],
-			Shell: shell,
-		})
+		if err := m.saveConfig(); err != nil {
+			m.errMsg = "failed to save: " + err.Error()
+		} else {
+			m.successMsg = "updated command \"" + name + "\""
+		}
+		m.closeCommandForm()
+		m.listCursor = 0
+		return m, nil
 	}
-	if err := m.saveConfig(); err != nil {
+	// New commands written in the form are hand-editable definitions, so
+	// they go into the project's TSV (append-only; existing rows are
+	// never touched). Template-derived commands stay in the local layer.
+	newCmd := mdl.Command{
+		Name:  name,
+		Cmd:   cmdStr,
+		Dir:   cf.fields[2],
+		Group: cf.fields[3],
+		Shell: shell,
+	}
+	if file, err := config.AppendCommandTSV(m.projectDir, newCmd); err != nil {
 		m.errMsg = "failed to save: " + err.Error()
-	} else if cf.mode == 1 {
-		m.successMsg = "updated command \"" + name + "\""
 	} else {
-		m.successMsg = "created command \"" + name + "\""
+		m.config.Base = append(m.config.Base, newCmd)
+		m.successMsg = "created command \"" + name + "\" in " + file
 	}
 	m.closeCommandForm()
 	m.listCursor = 0
@@ -247,11 +297,7 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.errMsg = "name cannot be empty"
 				return m, m.cfGotoField(0)
 			}
-			excludeIdx := -1
-			if cf.mode == 1 {
-				excludeIdx = cf.editIdx
-			}
-			if m.commandNameTaken(name, excludeIdx) {
+			if m.formNameTaken(name) {
 				m.errMsg = "name already in use: " + name
 				return m, m.cfGotoField(0)
 			}
@@ -291,17 +337,62 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // ── Edit: pick which command to edit ──────────────────────────────────────────
 
+// editableCommands lists the commands the TUI can edit or delete —
+// TSV rows and local template-derived commands — in display order.
+func (m *Model) editableCommands() ([]string, []editRef) {
+	var names []string
+	var refs []editRef
+	for i, c := range m.config.Base {
+		if c.Source == "tsv" {
+			names = append(names, c.Name)
+			refs = append(refs, editRef{tsv: true, idx: i})
+		}
+	}
+	for i, c := range m.config.Commands {
+		names = append(names, c.Name)
+		refs = append(refs, editRef{idx: i})
+	}
+	return names, refs
+}
+
+// editRefCommand resolves an editRef to the command it points at.
+func (m *Model) editRefCommand(ref editRef) *mdl.Command {
+	if ref.tsv {
+		return &m.config.Base[ref.idx]
+	}
+	return &m.config.Commands[ref.idx]
+}
+
+// gotoEditCommandPick opens the edit picker with the cursor on ref.
+func (m *Model) gotoEditCommandPick(at editRef) {
+	names, refs := m.editableCommands()
+	m.screen = ScreenEditCommandPick
+	m.listItems = names
+	m.editRefs = refs
+	m.listCursor = 0
+	for i, r := range refs {
+		if r == at {
+			m.listCursor = i
+			break
+		}
+	}
+}
+
 func (m *Model) updateEditCommandPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "down":
 		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
-		if m.listCursor >= len(m.config.Commands) {
+		if m.listCursor >= len(m.editRefs) {
 			break
 		}
-		cmd := m.config.Commands[m.listCursor]
+		ref := m.editRefs[m.listCursor]
+		if ref.tsv {
+			return m.openCommandFormTSV(ref.idx)
+		}
+		cmd := m.config.Commands[ref.idx]
 		if cmd.Template == "" {
-			return m.openCommandForm(m.listCursor)
+			return m.openCommandForm(ref.idx)
 		}
 		idx := m.getTemplateRefIdx(cmd.Template)
 		if idx < 0 {
@@ -310,7 +401,7 @@ func (m *Model) updateEditCommandPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.sce = &commandEditState{
 			mode:           1,
-			editIdx:        m.listCursor,
+			editIdx:        ref.idx,
 			name:           cmd.Name,
 			templateRefIdx: idx,
 			currentValues:  make(map[string]string),
@@ -354,9 +445,7 @@ func (m *Model) updateEditCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		editIdx := m.sce.editIdx
 		m.sce = nil
-		m.screen = ScreenEditCommandPick
-		m.listItems = m.userCommandNames()
-		m.listCursor = editIdx
+		m.gotoEditCommandPick(editRef{idx: editIdx})
 	}
 	return m, nil
 }
@@ -532,16 +621,28 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Delete flow ───────────────────────────────────────────────────────────────
 
 func (m *Model) updateDeleteCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	return m.updateDeleteList(msg, len(m.config.Commands), nil,
+	return m.updateDeleteList(msg, len(m.editRefs), nil,
 		func() {
 			m.screen = ScreenManageCommands
 			m.listCursor = 2
 		},
 		func(indices []int) {
+			// indices are descending, so both slices shrink safely.
+			var tsvNames []string
 			for _, i := range indices {
-				m.config.Commands = append(m.config.Commands[:i], m.config.Commands[i+1:]...)
+				ref := m.editRefs[i]
+				if ref.tsv {
+					tsvNames = append(tsvNames, m.config.Base[ref.idx].Name)
+					m.config.Base = append(m.config.Base[:ref.idx], m.config.Base[ref.idx+1:]...)
+				} else {
+					m.config.Commands = append(m.config.Commands[:ref.idx], m.config.Commands[ref.idx+1:]...)
+				}
 			}
-			if err := m.saveConfig(); err != nil {
+			err := m.saveConfig()
+			if err == nil && len(tsvNames) > 0 {
+				_, err = config.DeleteCommandsTSV(m.projectDir, tsvNames)
+			}
+			if err != nil {
 				m.errMsg = "failed to save: " + err.Error()
 			} else {
 				m.successMsg = fmt.Sprintf("deleted %d command(s)", len(indices))
@@ -550,14 +651,6 @@ func (m *Model) updateDeleteCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-func (m *Model) userCommandNames() []string {
-	names := make([]string, len(m.config.Commands))
-	for i, cmd := range m.config.Commands {
-		names[i] = cmd.Name
-	}
-	return names
-}
 
 // commandNameTaken reports whether name collides with another user
 // command or a hand-written command. excludeIdx skips one user command

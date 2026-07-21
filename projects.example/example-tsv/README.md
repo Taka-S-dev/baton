@@ -31,7 +31,10 @@ Legacy names (`templates.tsv` / `config.tsv`) are still readable;
 - Rows without slots (`pwd`, `list-files`) run as-is
 - Excel-style quoting is supported: cells like
   `"message=messages,env=environments"` are unquoted on load
-- Write ownership is fixed per file: humans edit commands.tsv, baton
-  writes commands.local.json — hand edits are never overwritten by the app
+- Write ownership: humans edit commands.tsv freely; the TUI can also
+  append rows (**Write directly**) and edit or delete the specific row
+  you target — every other line is preserved byte-for-byte.
+  Template-derived commands live in commands.local.json + vars.tsv,
+  both managed by baton
 - `{$root}` in the `where` command resolves from vars.tsv — edit that
   one line when the project moves to another folder or machine

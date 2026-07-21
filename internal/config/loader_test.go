@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Taka-S-dev/baton/internal/model"
 )
 
 func TestParseVarsStr_SingleVar(t *testing.T) {
@@ -160,6 +162,94 @@ func TestMissingTemplateFallsBackToBakedCmd(t *testing.T) {
 	}
 	if cfg.Commands[0].Cmd != "make src" {
 		t.Errorf("baked cmd fallback lost: got %q", cfg.Commands[0].Cmd)
+	}
+}
+
+// TestAppendCommandTSV checks the append-only TSV writer: it creates the
+// file with a header when absent, appends to whatever TSV the loader
+// reads (legacy names included), and re-reads the file at call time so
+// rows saved by an editor between load and save survive.
+func TestAppendCommandTSV(t *testing.T) {
+	dir := t.TempDir()
+
+	file, err := AppendCommandTSV(dir, model.Command{Name: "a", Cmd: "echo a"})
+	if err != nil || file != "commands.tsv" {
+		t.Fatalf("file=%q err=%v", file, err)
+	}
+
+	// Simulate a hand edit saved after the project was loaded.
+	path := filepath.Join(dir, "commands.tsv")
+	data, _ := os.ReadFile(path)
+	if err := os.WriteFile(path, append(data, []byte("hand\t\t\techo hand\t\t\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := AppendCommandTSV(dir, model.Command{Name: "b", Cmd: "echo {x}", Slots: map[string]string{"x": "xs"}}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Base) != 3 {
+		t.Fatalf("want 3 commands (a, hand, b), got %+v", cfg.Base)
+	}
+	if _, ok := cfg.FindCommand("hand"); !ok {
+		t.Fatal("hand-edited row lost by append")
+	}
+	if b, _ := cfg.FindCommand("b"); b.Slots["x"] != "xs" {
+		t.Fatalf("slots column not written: %+v", b)
+	}
+
+	// Legacy TSV name: append must target the file the loader reads.
+	legacy := t.TempDir()
+	if err := os.WriteFile(filepath.Join(legacy, "config.tsv"), []byte("name\tgroup\tworkdir\tcmd\tshell\tslots\nold\t\t\techo old\t\t\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file, err = AppendCommandTSV(legacy, model.Command{Name: "new", Cmd: "echo new"})
+	if err != nil || file != "config.tsv" {
+		t.Fatalf("file=%q err=%v — must append to the loaded legacy file", file, err)
+	}
+	if _, err := os.Stat(filepath.Join(legacy, "commands.tsv")); err == nil {
+		t.Fatal("must not create commands.tsv beside a loaded legacy TSV")
+	}
+}
+
+// TestUpdateAndDeleteCommandTSV checks the row-targeted writers: update
+// rewrites exactly the named row (preserving CRLF endings and every
+// other line), errors when the row vanished, and delete drops rows
+// while ignoring names already gone.
+func TestUpdateAndDeleteCommandTSV(t *testing.T) {
+	dir := t.TempDir()
+	tsv := "name\tgroup\tworkdir\tcmd\tshell\tslots\r\n" +
+		"a\t\t\techo a\t\t\r\n" +
+		"b\t\t\techo b\t\t\r\n"
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := UpdateCommandTSV(dir, "b", model.Command{Name: "b2", Cmd: "echo b2"}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, "commands.tsv"))
+	got := string(raw)
+	if !strings.Contains(got, "b2\t\t\techo b2\t\t\r\n") {
+		t.Fatalf("row not replaced: %q", got)
+	}
+	if !strings.Contains(got, "a\t\t\techo a\t\t\r\n") {
+		t.Fatalf("other rows must be byte-identical (incl. CRLF): %q", got)
+	}
+
+	if _, err := UpdateCommandTSV(dir, "vanished", model.Command{Name: "x"}); err == nil {
+		t.Fatal("updating a missing row must error")
+	}
+
+	if _, err := DeleteCommandsTSV(dir, []string{"a", "already-gone"}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = os.ReadFile(filepath.Join(dir, "commands.tsv"))
+	if strings.Contains(string(raw), "echo a") || !strings.Contains(string(raw), "b2") {
+		t.Fatalf("delete result wrong: %q", raw)
 	}
 }
 
