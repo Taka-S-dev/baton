@@ -31,12 +31,15 @@ func (m *Model) setupMultiSelect() tea.Cmd {
 
 func (m *Model) setupMultiSelectWithPreSelected(cmdNames []string) tea.Cmd {
 	cmd := m.setupMultiSelect()
-	nameSet := make(map[string]bool, len(cmdNames))
-	for _, n := range cmdNames {
-		nameSet[n] = true
-	}
+	// Pre-select in cmdNames order — msSelected order IS the step order,
+	// so walking msItems here would silently rewrite the workflow to
+	// list order on save.
+	idxByName := make(map[string]int, len(m.msItems))
 	for i, item := range m.msItems {
-		if nameSet[item.name()] {
+		idxByName[item.name()] = i
+	}
+	for _, n := range cmdNames {
+		if i, ok := idxByName[n]; ok {
 			m.msSelected = append(m.msSelected, i)
 		}
 	}

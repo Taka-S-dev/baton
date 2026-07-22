@@ -197,6 +197,27 @@ func TestUpdateMultiSelect_EscDiscardGuard(t *testing.T) {
 	}
 }
 
+// TestSetupMultiSelectWithPreSelected_KeepsStepOrder guards workflow
+// editing against silent reordering: the pre-selection must follow the
+// stored step order, not the command-list order, because msSelected
+// order is what gets saved on Enter.
+func TestSetupMultiSelectWithPreSelected_KeepsStepOrder(t *testing.T) {
+	m := &Model{}
+	m.config.Commands = []mdl.Command{
+		{Name: "auth", Cmd: "make auth"},
+		{Name: "web", Cmd: "make web"},
+	}
+	m.setupMultiSelectWithPreSelected([]string{"web", "auth", "ghost"})
+
+	var names []string
+	for _, idx := range m.msSelected {
+		names = append(names, m.msItems[idx].name())
+	}
+	if len(names) != 2 || names[0] != "web" || names[1] != "auth" {
+		t.Fatalf("pre-selected order = %v, want [web auth] (stored step order)", names)
+	}
+}
+
 // TestUpdateSlotPick_VariadicToggleAndJoin checks a {name...} slot:
 // Tab toggles entries on and off, and Enter joins the picked values
 // with spaces into the resolved command.
