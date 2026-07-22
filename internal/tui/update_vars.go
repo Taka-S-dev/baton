@@ -20,22 +20,47 @@ var varNamePattern = regexp.MustCompile(`^\w+$`)
 // gotoVarsMgmt opens the Manage vars submenu.
 func (m *Model) gotoVarsMgmt() {
 	m.screen = ScreenManageVars
-	m.listItems = []string{"Create variable", "Edit variable", "Delete variable"}
+	m.listItems = []string{"Create variable (global)", "Edit variable", "Delete variable"}
 	m.listCursor = 0
 }
 
-// globalVarNames returns the global ("*" row) variable names, sorted.
-// Scoped "command.slot" values belong to their commands and are managed
-// through Edit command → Change values, not here.
-func (m *Model) globalVarNames() []string {
-	var names []string
-	for k := range m.vars {
-		if !strings.Contains(k, ".") {
-			names = append(names, k)
-		}
+// scopedKey splits a "command.slot" vars key at its LAST dot (command
+// names may contain dots, slot names cannot). ok is false for globals.
+func scopedKey(key string) (cmdName, slotName string, ok bool) {
+	i := strings.LastIndex(key, ".")
+	if i <= 0 {
+		return "", "", false
 	}
-	sort.Strings(names)
-	return names
+	return key[:i], key[i+1:], true
+}
+
+// syncScopedVar mirrors a scoped vars.tsv change into the in-memory
+// command it belongs to and re-bakes it, so previews and runs pick the
+// change up without a reload. remove un-fixes the slot (it will be
+// prompted at run time again).
+func (m *Model) syncScopedVar(key, value string, remove bool) {
+	cmdName, slotName, ok := scopedKey(key)
+	if !ok {
+		return
+	}
+	for ci := range m.config.Commands {
+		c := &m.config.Commands[ci]
+		if c.Name != cmdName {
+			continue
+		}
+		if remove {
+			delete(c.Values, slotName)
+		} else {
+			if c.Values == nil {
+				c.Values = make(map[string]string)
+			}
+			c.Values[slotName] = value
+		}
+		if baked, err := slot.MaterializeCommand(*c, m.config); err == nil {
+			*c = baked
+		}
+		return
+	}
 }
 
 // varRefLocations lists where {$name} is referenced, for previews and
@@ -67,20 +92,37 @@ func (m *Model) varRefLocations(name string) []string {
 	return out
 }
 
-// setVarPickBase fills the pick filter with "name = value" rows.
+// setVarPickBase fills the pick filter with every vars.tsv row: globals
+// first ({$name} = value), then saved commands' fixed values
+// (command.slot = value). The whole file is visible and editable here.
 func (m *Model) setVarPickBase() {
-	names := m.globalVarNames()
+	var globals, scoped []string
+	for k := range m.vars {
+		if strings.Contains(k, ".") {
+			scoped = append(scoped, k)
+		} else {
+			globals = append(globals, k)
+		}
+	}
+	sort.Strings(globals)
+	sort.Strings(scoped)
+	names := append(globals, scoped...)
+
 	labels := make([]string, len(names))
 	texts := make([]string, len(names))
 	for i, n := range names {
-		labels[i] = n + " = " + m.vars[n]
-		if refs := len(m.varRefLocations(n)); refs > 0 {
-			labels[i] += fmt.Sprintf("  (%d refs)", refs)
+		if strings.Contains(n, ".") {
+			labels[i] = n + " = " + m.vars[n]
+		} else {
+			labels[i] = "{$" + n + "} = " + m.vars[n]
+			if refs := len(m.varRefLocations(n)); refs > 0 {
+				labels[i] += fmt.Sprintf("  (%d refs)", refs)
+			}
 		}
 		texts[i] = n + " " + m.vars[n]
 	}
 	m.setPickBase(labels, texts)
-	// pickBase holds display labels; keep the raw names alongside.
+	// pickBase holds display labels; keep the raw keys alongside.
 	m.varPickNames = names
 }
 
@@ -90,7 +132,7 @@ func (m Model) updateVarsMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
 		switch m.listItems[m.listCursor] {
-		case "Create variable":
+		case "Create variable (global)":
 			m.ve = &varEditState{mode: 0}
 			m.nameInput.SetValue("")
 			m.screen = ScreenVarForm
@@ -197,6 +239,15 @@ func (m Model) saveVar(value string) (tea.Model, tea.Cmd) {
 	}
 	m.ve = nil
 
+	if _, _, scoped := scopedKey(ve.name); scoped {
+		// A saved command's fixed value: mirror it into the command and
+		// re-bake. No rebase offer — that is for globals.
+		m.syncScopedVar(ve.name, value, false)
+		m.successMsg = "updated fixed value " + ve.name
+		m.gotoVarsMgmt()
+		return m, nil
+	}
+
 	// A changed value may leave literals behind: offer to rebase values
 	// that start with the OLD value onto the {$name} reference.
 	if ve.mode == 1 && ve.oldValue != "" && ve.oldValue != value {
@@ -225,15 +276,23 @@ func (m Model) updateDeleteVars(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		func(indices []int) {
 			for _, i := range indices {
 				delete(m.vars, names[i])
+				// Deleting a fixed value un-fixes the slot: prompted at
+				// run time again.
+				m.syncScopedVar(names[i], "", true)
 			}
 			if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
 				m.errMsg = "failed to save vars.tsv: " + err.Error()
 				return
 			}
 			if len(indices) == 1 {
-				m.successMsg = "deleted variable {$" + names[indices[0]] + "}"
+				name := names[indices[0]]
+				if _, _, scoped := scopedKey(name); scoped {
+					m.successMsg = "deleted fixed value " + name + " (prompted at run time again)"
+				} else {
+					m.successMsg = "deleted variable {$" + name + "}"
+				}
 			} else {
-				m.successMsg = fmt.Sprintf("deleted %d variables", len(indices))
+				m.successMsg = fmt.Sprintf("deleted %d entries", len(indices))
 			}
 		})
 }
@@ -316,6 +375,7 @@ func (m Model) applyVarRebase() (tea.Model, tea.Cmd) {
 		switch it.kind {
 		case 0:
 			m.vars[it.key] = it.newValue
+			m.syncScopedVar(it.key, it.newValue, false)
 			varsChanged = true
 		case 1:
 			m.lists[it.listName][it.entryIdx].Value = it.newValue

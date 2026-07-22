@@ -283,7 +283,10 @@ When the project moves — a new phase folder, another drive, someone else's mac
 
 ### Manage vars
 
-**Manage vars** in the TUI edits the global rows: create, change a value, delete (with a "referenced by" preview so you see the impact first). Changing a value is not string replacement — everything written as `{$root}` follows automatically because it references the variable, so unrelated values that merely look similar can never be caught.
+**Manage vars** in the TUI shows the whole table — globals first, then every saved command's fixed values — and edits it in place:
+
+- **Globals**: create, change a value (with a "referenced by" preview), delete. Changing a value is not string replacement — everything written as `{$root}` follows automatically because it references the variable, so unrelated values that merely look similar can never be caught.
+- **Fixed values** (`command.slot` rows): edit the value directly — a shortcut past **Edit command → Change values** when you just want to fix a path or a typo. Deleting one **un-fixes the slot**: that placeholder is prompted at run time again. New rows are never created here; they appear when you save a template-derived command.
 
 Values that contain the old value as a **literal** (a hand-typed path in a saved value or a list entry) don't follow by themselves. After a change, baton scans for literals that *start with* the old value and offers to rewrite them into `{$name}` references:
 

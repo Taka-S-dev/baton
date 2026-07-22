@@ -1023,6 +1023,22 @@ func (m Model) viewEditListPick(w int) string {
 
 // ── Manage vars ──────────────────────────────────────────────────────────────
 
+// writeVarHover renders the preview for a vars.tsv row: reference sites
+// for a global, owner and resolved value for a saved fixed value.
+func (m Model) writeVarHover(b *strings.Builder, key string, w int) {
+	cmdName, slotName, scoped := scopedKey(key)
+	if !scoped {
+		m.writeVarRefsPreview(b, key, w)
+		return
+	}
+	b.WriteString("\n" + hlineLabel(w, "fixed value") + "\n")
+	b.WriteString("  " + gray("command:") + " " + cmdName + "   " + gray("slot:") + " " + slotName + "\n")
+	if resolved := slot.ApplyVars(m.vars[key], m.vars); resolved != m.vars[key] {
+		b.WriteString("  " + gray("resolves to:") + " " + resolved + "\n")
+	}
+	b.WriteString("  " + dim("deleting un-fixes the slot (prompted at run time)") + "\n")
+}
+
 // writeVarRefsPreview renders where the hovered variable is referenced.
 func (m Model) writeVarRefsPreview(b *strings.Builder, name string, w int) {
 	b.WriteString("\n" + hlineLabel(w, "referenced by") + "\n")
@@ -1045,7 +1061,7 @@ func (m Model) viewEditVarPick(w int) string {
 	b.WriteString("\n" + header("Edit variable", w) + "\n")
 	m.writePickFilter(&b)
 	if len(m.listItems) == 0 {
-		b.WriteString("  " + gray("(no variables yet)") + "\n")
+		b.WriteString("  " + gray("(vars.tsv is empty — create a global, or save a command with fixed values)") + "\n")
 	} else {
 		for i, item := range m.listItems {
 			if i == m.listCursor {
@@ -1055,7 +1071,7 @@ func (m Model) viewEditVarPick(w int) string {
 			}
 		}
 		if m.listCursor < len(m.listItems) {
-			m.writeVarRefsPreview(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
+			m.writeVarHover(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n")
@@ -1078,8 +1094,12 @@ func (m Model) viewVarForm(w int) string {
 		b.WriteString("  " + gray("name  > ") + white(ve.name) + "\n")
 		b.WriteString("  " + accent("value > ") + m.nameInput.View() + "\n")
 	}
-	b.WriteString("\n  " + dim("referenced as ") + slotVar("{$"+displayOr(ve.name, "name")+"}") +
-		dim(" in cmd / workdir / list values") + "\n")
+	if cmdName, slotName, scoped := scopedKey(ve.name); scoped {
+		b.WriteString("\n  " + dim("fixed value of command \""+cmdName+"\", slot \""+slotName+"\"") + "\n")
+	} else {
+		b.WriteString("\n  " + dim("referenced as ") + slotVar("{$"+displayOr(ve.name, "name")+"}") +
+			dim(" in cmd / workdir / list values") + "\n")
+	}
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("Enter: next / save   Esc: back") + "\n")
 	return b.String()
@@ -1167,7 +1187,7 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 	}
 	if m.screen == ScreenDeleteVar && !m.deleteConfirm &&
 		m.listCursor >= 0 && m.listCursor < len(items) {
-		m.writeVarRefsPreview(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
+		m.writeVarHover(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	if m.deleteConfirm {

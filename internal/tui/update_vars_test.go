@@ -25,7 +25,7 @@ func varsModel(t *testing.T) Model {
 // TestVarsMgmt_Submenu checks Manage vars follows the standard submenu
 // shape and every item responds to Enter.
 func TestVarsMgmt_Submenu(t *testing.T) {
-	want := []string{"Create variable", "Edit variable", "Delete variable"}
+	want := []string{"Create variable (global)", "Edit variable", "Delete variable"}
 	for i, item := range want {
 		m := varsModel(t)
 		if len(m.listItems) != 3 || m.listItems[i] != item {
@@ -227,6 +227,96 @@ func TestDeleteVariable_Flow(t *testing.T) {
 	}
 	if m.screen != ScreenManageVars {
 		t.Fatalf("screen = %v, want back on the submenu", m.screen)
+	}
+}
+
+// TestVarPick_ShowsWholeFile checks the pick list shows every vars.tsv
+// row — globals first, then saved commands' fixed values — so the
+// screen matches what the file actually contains.
+func TestVarPick_ShowsWholeFile(t *testing.T) {
+	m := varsModel(t)
+	m.vars = map[string]string{
+		"root":       `C:\x`,
+		"as.workdir": `{$root}\api`,
+		"b.env":      "staging",
+	}
+	m.setVarPickBase()
+	if len(m.listItems) != 3 {
+		t.Fatalf("listItems = %v, want all 3 rows", m.listItems)
+	}
+	if m.varPickNames[0] != "root" || m.varPickNames[1] != "as.workdir" || m.varPickNames[2] != "b.env" {
+		t.Fatalf("order = %v, want globals first then scoped, sorted", m.varPickNames)
+	}
+	if !strings.Contains(m.listItems[0], "{$root}") || !strings.Contains(m.listItems[1], "as.workdir") {
+		t.Fatalf("labels = %v", m.listItems)
+	}
+}
+
+// TestEditScopedValue checks editing a saved fixed value from Manage
+// vars: vars.tsv is written and the owning command re-bakes so the
+// change is live without a reload.
+func TestEditScopedValue(t *testing.T) {
+	m := varsModel(t)
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./old"}, Dir: "./old", Cmd: "make", Source: "local"}}
+	m.vars = map[string]string{"as.workdir": "./old"}
+
+	m.screen = ScreenEditVarPick
+	m.setVarPickBase()
+	nm, _ := m.updateEditVarPick(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.screen != ScreenVarForm || m.nameInput.Value() != "./old" {
+		t.Fatalf("form must open pre-filled, screen=%v value=%q", m.screen, m.nameInput.Value())
+	}
+
+	m.nameInput.SetValue("./new")
+	nm, _ = m.updateVarForm(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.screen != ScreenManageVars {
+		t.Fatalf("scoped edit must return straight to the submenu (no rebase offer), screen=%v", m.screen)
+	}
+	if m.vars["as.workdir"] != "./new" {
+		t.Fatalf("vars = %v", m.vars)
+	}
+	cmd, _ := m.config.FindCommand("as")
+	if cmd.Values["workdir"] != "./new" || cmd.Dir != "./new" {
+		t.Fatalf("command must be synced and re-baked, got %+v", cmd)
+	}
+	raw, _ := os.ReadFile(filepath.Join(m.projectDir, "vars.tsv"))
+	if !strings.Contains(string(raw), "as\tworkdir\t./new") {
+		t.Fatalf("vars.tsv = %q", raw)
+	}
+}
+
+// TestDeleteScopedValue checks deleting a fixed value un-fixes the
+// slot: the command re-bakes with the {placeholder} restored.
+func TestDeleteScopedValue(t *testing.T) {
+	m := varsModel(t)
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./old"}, Dir: "./old", Cmd: "make", Source: "local"}}
+	m.vars = map[string]string{"as.workdir": "./old"}
+
+	m.screen = ScreenDeleteVar
+	m.setVarPickBase()
+	nm, _ := m.updateDeleteVars(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	nm, _ = m.updateDeleteVars(tea.KeyMsg{Type: tea.KeyTab}) // → Yes
+	m = nm.(Model)
+	nm, _ = m.updateDeleteVars(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+
+	if _, ok := m.vars["as.workdir"]; ok {
+		t.Fatal("row must be deleted")
+	}
+	cmd, _ := m.config.FindCommand("as")
+	if _, ok := cmd.Values["workdir"]; ok {
+		t.Fatalf("fixed value must be removed from the command, got %+v", cmd.Values)
+	}
+	if cmd.Dir != "{workdir}" {
+		t.Fatalf("slot must be un-fixed (re-baked to the placeholder), got %q", cmd.Dir)
+	}
+	if !strings.Contains(m.successMsg, "prompted at run time") {
+		t.Fatalf("notice must explain the un-fix, got %q", m.successMsg)
 	}
 }
 
