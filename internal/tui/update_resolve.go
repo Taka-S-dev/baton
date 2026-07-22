@@ -91,12 +91,18 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "enter":
-		if len(m.msSelected) == 0 {
-			break
+		sel := m.msSelected
+		if len(sel) == 0 {
+			// Nothing toggled: Enter acts on the hovered row (fzf-style),
+			// same as the slot picker's variadic fallback.
+			if n == 0 || m.msCursor >= n {
+				break
+			}
+			sel = []int{filtered[m.msCursor]}
 		}
-		selected := make([]msItem, len(m.msSelected))
-		names := make([]string, len(m.msSelected))
-		for i, idx := range m.msSelected {
+		selected := make([]msItem, len(sel))
+		names := make([]string, len(sel))
+		for i, idx := range sel {
 			selected[i] = m.msItems[idx]
 			names[i] = m.msItems[idx].name()
 		}

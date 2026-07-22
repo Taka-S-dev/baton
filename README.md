@@ -323,7 +323,7 @@ AI agent — the full file-format spec for that lives in
 |-----|--------|
 | `↑` / `↓` | Move cursor |
 | `Tab` | Toggle selection |
-| `Enter` | Confirm |
+| `Enter` | Confirm — with nothing toggled, acts on the hovered row alone |
 | `Esc` | Clear the search if active, otherwise go back (with selections, a second press confirms discarding them) |
 | Type | Search — matches name, group, command body, and embedded values; space-separated terms are ANDed (e.g. `make auth`) |
 

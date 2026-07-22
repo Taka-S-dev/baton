@@ -288,6 +288,57 @@ func TestUpdateSlotPick_VariadicEnterFallsBackToSingle(t *testing.T) {
 	}
 }
 
+// TestUpdateMultiSelect_EnterActsOnHoveredRow checks the fzf-style
+// fallback: with nothing toggled, Enter runs the hovered row alone —
+// respecting the active filter — and with no matches it does nothing.
+func TestUpdateMultiSelect_EnterActsOnHoveredRow(t *testing.T) {
+	a := mdl.Command{Name: "auth", Cmd: "make auth"}
+	b := mdl.Command{Name: "web", Cmd: "make web"}
+	m := msModel([]msItem{{cmd: &a}, {cmd: &b}})
+	m.screen = ScreenRunCommands
+	m.msSearchTI.Focus()
+
+	nm, _ := m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyDown})
+	m = nm.(Model)
+	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.screen != ScreenConfirmRun {
+		t.Fatalf("screen = %v, want confirm run", m.screen)
+	}
+	if len(m.confirmRunItems) != 1 || m.confirmRunItems[0].Name != "web" {
+		t.Fatalf("confirm items = %v, want just the hovered command", m.confirmRunItems)
+	}
+
+	// No matches: Enter must stay put.
+	m2 := msModel([]msItem{{cmd: &a}})
+	m2.screen = ScreenRunCommands
+	m2.msSearchTI.SetValue("zzz")
+	nm, _ = m2.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEnter})
+	m2 = nm.(Model)
+	if m2.screen != ScreenRunCommands {
+		t.Fatalf("screen = %v — Enter on an empty result list must do nothing", m2.screen)
+	}
+}
+
+// TestUpdateMultiSelect_CreateWorkflowHoveredRow checks the same fallback
+// applies to workflow creation: Enter with nothing toggled proceeds to the
+// name input with the hovered command as the single step.
+func TestUpdateMultiSelect_CreateWorkflowHoveredRow(t *testing.T) {
+	a := mdl.Command{Name: "auth", Cmd: "make auth"}
+	m := msModel([]msItem{{cmd: &a}})
+	m.nameInput = textinput.New()
+	m.screen = ScreenCreateWorkflow
+
+	nm, _ := m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.screen != ScreenNameInput {
+		t.Fatalf("screen = %v, want the name input", m.screen)
+	}
+	if len(m.pendingWorkflowCmds) != 1 || m.pendingWorkflowCmds[0] != "auth" {
+		t.Fatalf("pending commands = %v, want the hovered command", m.pendingWorkflowCmds)
+	}
+}
+
 func equalInts(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
