@@ -290,6 +290,9 @@ func (m Model) viewMainMenu(w int) string {
 func (m Model) viewSingleSelect(title string, w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header(title, w) + "\n")
+	if m.screen == ScreenEditWorkflow {
+		m.writePickFilter(&b)
+	}
 	if len(m.listItems) == 0 {
 		b.WriteString("  " + gray("(empty)") + "\n")
 	} else {
@@ -720,6 +723,20 @@ func (m Model) viewSlotPick(w int) string {
 	return b.String()
 }
 
+// writePickFilter renders the type-to-filter line for the management
+// pick screens (Edit/Delete of commands, workflows and lists).
+func (m Model) writePickFilter(b *strings.Builder) {
+	if m.pickSearch == "" {
+		b.WriteString("  " + dim("/ type to filter...") + "\n\n")
+		return
+	}
+	count := dim(fmt.Sprintf("%d results", len(m.listItems)))
+	if len(m.listItems) == 0 {
+		count = warn("no match")
+	}
+	b.WriteString("  " + accent("/") + " " + white(m.pickSearch) + dim("_") + "  " + count + "\n\n")
+}
+
 // writeCommandHover renders the hover panel for a command: template and
 // values for derived commands, the resolved command line otherwise.
 func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
@@ -766,8 +783,9 @@ func (m Model) viewEditCommandPick(w int) string {
 		b.WriteString("  " + gray("Esc: back") + "\n")
 		return b.String()
 	}
-	for i, ref := range m.editRefs {
-		cmd := m.editRefCommand(ref)
+	m.writePickFilter(&b)
+	for i := range m.listItems {
+		cmd := m.editRefCommand(m.editRefs[m.pickOrig(i)])
 		label := cmd.Name
 		if cmd.Group != "" {
 			label += "  " + sGroup.Render("["+cmd.Group+"]")
@@ -785,8 +803,8 @@ func (m Model) viewEditCommandPick(w int) string {
 		}
 	}
 	b.WriteString("\n")
-	if m.listCursor >= 0 && m.listCursor < len(m.editRefs) {
-		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.listCursor]), w)
+	if m.listCursor >= 0 && m.listCursor < len(m.listItems) {
+		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter Esc") + "\n")
@@ -972,6 +990,7 @@ func (m Model) writeListEntriesPreview(b *strings.Builder, listName string, w in
 func (m Model) viewEditListPick(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Edit list", w) + "\n")
+	m.writePickFilter(&b)
 	if len(m.listItems) == 0 {
 		b.WriteString("  " + gray("(no lists)") + "\n")
 	} else {
@@ -996,6 +1015,9 @@ func (m Model) viewEditListPick(w int) string {
 func (m Model) viewDeleteList(title string, items []string, w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header(title, w) + "\n")
+	if !m.deleteConfirm {
+		m.writePickFilter(&b)
+	}
 	if len(items) == 0 {
 		b.WriteString("  " + gray("(empty)") + "\n")
 	} else {
@@ -1005,7 +1027,7 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		}
 		for i, item := range items {
 			check := gray("[ ]")
-			if selectedSet[i] {
+			if selectedSet[m.pickOrig(i)] {
 				check = warn("[x]")
 			}
 			if i == m.listCursor {
@@ -1020,9 +1042,9 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		b.WriteString(m.stepsVP.View() + "\n")
 	}
 	if m.screen == ScreenDeleteCommand && !m.deleteConfirm &&
-		m.listCursor >= 0 && m.listCursor < len(m.editRefs) {
+		m.listCursor >= 0 && m.listCursor < len(items) {
 		b.WriteString("\n")
-		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.listCursor]), w)
+		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
 	}
 	if m.screen == ScreenDeleteList && !m.deleteConfirm &&
 		m.listCursor >= 0 && m.listCursor < len(items) {
@@ -1039,7 +1061,7 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		b.WriteString(renderBtns(m.deleteBtn, "  No  ", "  Yes  ") + "\n")
 		b.WriteString("\n  " + gray("Tab: switch   Enter: confirm   Esc: back") + "\n")
 	} else {
-		b.WriteString("  " + gray("↑↓ Tab/Space: toggle   Enter: confirm   Esc: back") + "\n")
+		b.WriteString("  " + gray("↑↓ Tab: toggle   Enter: confirm   Esc: back") + "\n")
 	}
 	return b.String()
 }

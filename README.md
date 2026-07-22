@@ -333,6 +333,8 @@ Workflows are saved sequences of commands. Creating one is just picking commands
 
 Run one from **Run workflow** — the list is searchable like the command selector: the workflow name, its step names, and the step command bodies all match.
 
+The management pick screens (Edit/Delete of commands, workflows, and lists) are searchable the same way — just start typing to filter; `Esc` clears the filter first, then goes back.
+
 ### Retry on failure
 
 When a command fails, baton offers a recovery menu:

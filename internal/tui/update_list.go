@@ -75,11 +75,11 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.openNameInput(nameInputNewList)
 		case "Edit list":
 			m.screen = ScreenEditListPick
-			m.listItems = m.sortedListNames()
+			m.setListPickBase()
 			m.listCursor = 0
 		case "Delete list":
 			m.screen = ScreenDeleteList
-			m.listItems = m.sortedListNames()
+			m.setListPickBase()
 			m.listCursor = 0
 		}
 	case "esc":
@@ -89,6 +89,21 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // ── Edit list: pick which one ─────────────────────────────────────────────────
+
+// setListPickBase fills the pick filter with the list names, searchable
+// by name and by the entry values/labels they contain.
+func (m *Model) setListPickBase() {
+	names := m.sortedListNames()
+	texts := make([]string, len(names))
+	for i, n := range names {
+		parts := []string{n}
+		for _, e := range m.lists[n] {
+			parts = append(parts, e.Value, e.Label)
+		}
+		texts[i] = strings.Join(parts, " ")
+	}
+	m.setPickBase(names, texts)
+}
 
 func (m Model) updateEditListPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -106,7 +121,13 @@ func (m Model) updateEditListPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.screen = ScreenEditList
 	case "esc":
+		if m.pickSearch != "" {
+			m.clearPickFilter()
+			break
+		}
 		m.gotoManageLists()
+	default:
+		m.handlePickTyping(msg, nil)
 	}
 	return m, nil
 }
@@ -114,8 +135,8 @@ func (m Model) updateEditListPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Delete list ───────────────────────────────────────────────────────────────
 
 func (m Model) updateDeleteLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	names := m.listItems
-	return m.updateDeleteList(msg, len(names), nil,
+	names := m.pickBase // onDelete receives original indices
+	return m.updateDeleteList(msg, len(m.listItems), nil,
 		m.gotoManageLists,
 		func(indices []int) {
 			listsDir := filepath.Join(m.projectDir, "lists")
@@ -277,7 +298,7 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if le.fromPick {
 			// Return to the pick screen, cursor on the list just edited.
 			m.screen = ScreenEditListPick
-			m.listItems = m.sortedListNames()
+			m.setListPickBase()
 			m.listCursor = 0
 			for i, n := range m.listItems {
 				if n == le.name {

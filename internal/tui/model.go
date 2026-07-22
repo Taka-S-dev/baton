@@ -279,6 +279,15 @@ type Model struct {
 	// Edit/Delete command: what each list row points at
 	editRefs []editRef
 
+	// Type-to-filter for the management pick screens (Edit/Delete of
+	// commands, workflows and lists): pickBase/pickTexts hold the full
+	// item set, listItems the visible subset, and pickMap maps a visible
+	// row to its original index (nil = identity).
+	pickSearch string
+	pickBase   []string
+	pickTexts  []string
+	pickMap    []int
+
 	// Multi-select
 	msItems     []msItem
 	msCursor    int
@@ -479,12 +488,24 @@ func (m *Model) updateStepsViewport() {
 	m.stepsVP.Width = w - 4
 	m.stepsVP.Height = h
 
-	filtered := m.wfFiltered()
-	if len(filtered) == 0 || m.listCursor >= len(filtered) {
-		m.stepsVP.SetContent("")
-		return
+	var wf mdl.Workflow
+	switch m.screen {
+	case ScreenEditWorkflow, ScreenDeleteWorkflow:
+		// These pick screens filter via the pick filter, not the Run
+		// workflow search field.
+		if len(m.listItems) == 0 || m.listCursor >= len(m.listItems) {
+			m.stepsVP.SetContent("")
+			return
+		}
+		wf = m.workflows[m.pickOrig(m.listCursor)]
+	default:
+		filtered := m.wfFiltered()
+		if len(filtered) == 0 || m.listCursor >= len(filtered) {
+			m.stepsVP.SetContent("")
+			return
+		}
+		wf = m.workflows[filtered[m.listCursor]]
 	}
-	wf := m.workflows[filtered[m.listCursor]]
 	var lines []string
 	for j, cmdName := range wf.Commands {
 		cmdStr := ""

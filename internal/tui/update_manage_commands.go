@@ -34,8 +34,8 @@ func (m *Model) updateManageCommands(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				break
 			}
 			m.screen = ScreenEditCommandPick
-			m.listItems = names
 			m.editRefs = refs
+			m.setPickBase(names, m.commandPickTexts(refs))
 			m.listCursor = 0
 		case 2: // Delete
 			names, refs := m.editableCommands()
@@ -44,8 +44,8 @@ func (m *Model) updateManageCommands(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				break
 			}
 			m.screen = ScreenDeleteCommand
-			m.listItems = names
 			m.editRefs = refs
+			m.setPickBase(names, m.commandPickTexts(refs))
 			m.listCursor = 0
 			m.deleteSelected = nil
 		}
@@ -364,11 +364,21 @@ func (m *Model) editRefCommand(ref editRef) *mdl.Command {
 }
 
 // gotoEditCommandPick opens the edit picker with the cursor on ref.
+// commandPickTexts builds the search haystacks for a set of editRefs,
+// matching the same fields as the Run commands search.
+func (m *Model) commandPickTexts(refs []editRef) []string {
+	texts := make([]string, len(refs))
+	for i, r := range refs {
+		texts[i] = msItem{cmd: m.editRefCommand(r)}.searchText()
+	}
+	return texts
+}
+
 func (m *Model) gotoEditCommandPick(at editRef) {
 	names, refs := m.editableCommands()
 	m.screen = ScreenEditCommandPick
-	m.listItems = names
 	m.editRefs = refs
+	m.setPickBase(names, m.commandPickTexts(refs))
 	m.listCursor = 0
 	for i, r := range refs {
 		if r == at {
@@ -383,10 +393,10 @@ func (m *Model) updateEditCommandPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "down":
 		m.moveListCursor(msg.String(), len(m.listItems))
 	case "enter":
-		if m.listCursor >= len(m.editRefs) {
+		if m.listCursor >= len(m.listItems) {
 			break
 		}
-		ref := m.editRefs[m.listCursor]
+		ref := m.editRefs[m.pickOrig(m.listCursor)]
 		if ref.tsv {
 			return m.openCommandFormTSV(ref.idx)
 		}
@@ -408,8 +418,14 @@ func (m *Model) updateEditCommandPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.gotoEditCommandMode()
 	case "esc":
+		if m.pickSearch != "" {
+			m.clearPickFilter()
+			break
+		}
 		m.screen = ScreenManageCommands
 		m.listCursor = 1
+	default:
+		m.handlePickTyping(msg, nil)
 	}
 	return m, nil
 }
@@ -621,7 +637,7 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Delete flow ───────────────────────────────────────────────────────────────
 
 func (m *Model) updateDeleteCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	return m.updateDeleteList(msg, len(m.editRefs), nil,
+	return m.updateDeleteList(msg, len(m.listItems), nil,
 		func() {
 			m.screen = ScreenManageCommands
 			m.listCursor = 2

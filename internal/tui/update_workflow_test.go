@@ -107,3 +107,34 @@ func TestSuccessMsg_SetAndCleared(t *testing.T) {
 		t.Fatalf("successMsg = %q, want cleared on the next keypress", s)
 	}
 }
+
+// TestEditWorkflowPick_FilterMapsTarget checks the workflow edit picker
+// filters on name and step text, and Enter targets the original index.
+func TestEditWorkflowPick_FilterMapsTarget(t *testing.T) {
+	m := Model{}
+	m.workflows = []mdl.Workflow{
+		{Name: "build-all", Commands: []string{"build"}},
+		{Name: "ship", Commands: []string{"deploy"}},
+	}
+	m.screen = ScreenEditWorkflow
+	m.setWorkflowPickBase()
+
+	// "deploy" only appears in ship's steps — name search alone wouldn't hit.
+	var nm tea.Model = m
+	for _, r := range "deploy" {
+		nm, _ = nm.(Model).updateEditWorkflow(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	got := nm.(Model)
+	if len(got.listItems) != 1 || got.listItems[0] != "ship" {
+		t.Fatalf("filtered items = %v, want [ship]", got.listItems)
+	}
+
+	nm, _ = got.updateEditWorkflow(tea.KeyMsg{Type: tea.KeyEnter})
+	got = nm.(Model)
+	if got.editTargetIdx != 1 {
+		t.Fatalf("editTargetIdx = %d, want the ORIGINAL index 1", got.editTargetIdx)
+	}
+	if got.screen != ScreenEditWorkflowMode {
+		t.Fatalf("screen = %v, want the mode menu", got.screen)
+	}
+}

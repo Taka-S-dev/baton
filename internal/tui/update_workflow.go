@@ -29,20 +29,12 @@ func (m Model) updateWorkflowMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.setupMultiSelect()
 		case "Edit workflow":
 			m.screen = ScreenEditWorkflow
-			names := make([]string, len(m.workflows))
-			for i, w := range m.workflows {
-				names[i] = w.Name
-			}
-			m.listItems = names
+			m.setWorkflowPickBase()
 			m.listCursor = 0
 			m.updateStepsViewport()
 		case "Delete workflow":
 			m.screen = ScreenDeleteWorkflow
-			names := make([]string, len(m.workflows))
-			for i, w := range m.workflows {
-				names[i] = w.Name
-			}
-			m.listItems = names
+			m.setWorkflowPickBase()
 			m.listCursor = 0
 			m.updateStepsViewport()
 		}
@@ -54,6 +46,18 @@ func (m Model) updateWorkflowMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // ── Edit workflow ─────────────────────────────────────────────────────────────
 
+// setWorkflowPickBase fills the pick filter with the workflow names,
+// searchable like Run workflow: name, step names and step bodies.
+func (m *Model) setWorkflowPickBase() {
+	names := make([]string, len(m.workflows))
+	texts := make([]string, len(m.workflows))
+	for i, wf := range m.workflows {
+		names[i] = wf.Name
+		texts[i] = m.wfSearchText(wf)
+	}
+	m.setPickBase(names, texts)
+}
+
 func (m Model) updateEditWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "down":
@@ -61,15 +65,22 @@ func (m Model) updateEditWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateStepsViewport()
 		}
 	case "enter":
-		if len(m.workflows) == 0 {
+		if len(m.listItems) == 0 {
 			break
 		}
-		m.editTargetIdx = m.listCursor
+		m.editTargetIdx = m.pickOrig(m.listCursor)
 		m.screen = ScreenEditWorkflowMode
 		m.listItems = []string{"Rename", "Change commands"}
 		m.listCursor = 0
 	case "esc":
+		if m.pickSearch != "" {
+			m.clearPickFilter()
+			m.updateStepsViewport()
+			break
+		}
 		m.gotoWorkflowMgmt()
+	default:
+		m.handlePickTyping(msg, m.updateStepsViewport)
 	}
 	return m, nil
 }
@@ -92,12 +103,9 @@ func (m Model) updateEditWorkflowMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "esc":
 		m.screen = ScreenEditWorkflow
-		names := make([]string, len(m.workflows))
-		for i, w := range m.workflows {
-			names[i] = w.Name
-		}
-		m.listItems = names
+		m.setWorkflowPickBase()
 		m.listCursor = m.editTargetIdx
+		m.updateStepsViewport()
 	}
 	return m, nil
 }
@@ -105,7 +113,7 @@ func (m Model) updateEditWorkflowMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Delete workflow ───────────────────────────────────────────────────────────
 
 func (m Model) updateDeleteWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	return m.updateDeleteList(msg, len(m.workflows),
+	return m.updateDeleteList(msg, len(m.listItems),
 		m.updateStepsViewport,
 		m.gotoWorkflowMgmt,
 		func(indices []int) {

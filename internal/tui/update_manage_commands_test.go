@@ -501,3 +501,46 @@ func TestOpenSlotPickForCommandEdit_VariadicPrepopulatesPicked(t *testing.T) {
 		t.Fatalf("stored value = %q, want the joined picks", v)
 	}
 }
+
+// TestEditCommandPick_FilterMapsSelection checks typing filters the edit
+// picker and Enter targets the command under the filtered cursor, not the
+// row number.
+func TestEditCommandPick_FilterMapsSelection(t *testing.T) {
+	m := &Model{}
+	m.config.Base = []mdl.Command{{Name: "tpl", Cmd: "make {x}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{
+		{Name: "alpha", Template: "tpl", Source: "local"},
+		{Name: "beta", Template: "tpl", Source: "local"},
+	}
+	names, refs := m.editableCommands()
+	m.screen = ScreenEditCommandPick
+	m.editRefs = refs
+	m.setPickBase(names, m.commandPickTexts(refs))
+
+	for _, r := range "beta" {
+		m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if len(m.listItems) != 1 || m.listItems[0] != "beta" {
+		t.Fatalf("filtered items = %v, want [beta]", m.listItems)
+	}
+
+	nm, _ := m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
+	got := nm.(*Model)
+	if got.screen != ScreenEditCommandMode || got.sce == nil || got.sce.name != "beta" {
+		t.Fatalf("Enter must open the mode menu for beta, got screen=%v", got.screen)
+	}
+
+	// Esc with a filter active must clear it, not leave the screen.
+	m2 := &Model{}
+	m2.config.Commands = []mdl.Command{{Name: "alpha", Cmd: "echo", Source: "local"}}
+	n2, r2 := m2.editableCommands()
+	m2.screen = ScreenEditCommandPick
+	m2.editRefs = r2
+	m2.setPickBase(n2, m2.commandPickTexts(r2))
+	m2.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
+	nm, _ = m2.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEscape})
+	got = nm.(*Model)
+	if got.screen != ScreenEditCommandPick || got.pickSearch != "" {
+		t.Fatalf("first Esc must only clear the filter, screen=%v search=%q", got.screen, got.pickSearch)
+	}
+}
