@@ -165,6 +165,44 @@ func TestViewDeleteCommand_ShowsPreview(t *testing.T) {
 	}
 }
 
+// TestViewSlotPick_Variadic checks the multi-pick rendering: checkbox
+// markers on entries, the joined picks in the command preview, and the
+// Tab hint in the key guide.
+func TestViewSlotPick_Variadic(t *testing.T) {
+	cmd := mdl.Command{Name: "up", Cmd: "docker compose up {services...}"}
+	m := Model{width: 80, height: 24}
+	m.sp = &slotPickState{
+		slotName: "services", listName: "services", variadic: true,
+		entries:       []mdl.ListEntry{{Value: "api"}, {Value: "web"}, {Value: "worker"}},
+		picked:        []string{"api", "web"},
+		contextNames:  []string{"up"},
+		contextNotes:  []string{""},
+		currentCmd:    &cmd,
+		resolvedSoFar: map[string]string{},
+	}
+	m.sp.applyFilter()
+
+	view := m.viewSlotPick(80)
+	if !strings.Contains(view, "[x]") || !strings.Contains(view, "[ ]") {
+		t.Fatal("variadic picker must render checkbox markers")
+	}
+	if !strings.Contains(view, "{services...}") {
+		t.Fatal("title and preview must show the variadic placeholder")
+	}
+	if !strings.Contains(view, "api web") {
+		t.Fatal("preview must show the picked values joined with spaces")
+	}
+	if !strings.Contains(view, "Tab") {
+		t.Fatal("key guide must mention Tab")
+	}
+
+	m.sp.variadic = false
+	m.sp.picked = nil
+	if strings.Contains(m.viewSlotPick(80), "[ ]") {
+		t.Fatal("single-value picker must not render checkboxes")
+	}
+}
+
 // TestViewCommandNameInput_StableValueOrder does the same for the
 // create/edit command name screen, which lists the chosen slot values.
 func TestViewCommandNameInput_StableValueOrder(t *testing.T) {

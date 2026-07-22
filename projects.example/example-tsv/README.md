@@ -36,5 +36,7 @@ Legacy names (`templates.tsv` / `config.tsv`) are still readable;
   you target — every other line is preserved byte-for-byte.
   Template-derived commands live in commands.local.json + vars.tsv,
   both managed by baton
+- `{env...}` in `deploy-all` is a variadic slot: Tab toggles
+  multiple entries and the values are joined with spaces
 - `{$root}` in the `where` command resolves from vars.tsv — edit that
   one line when the project moves to another folder or machine

@@ -11,8 +11,10 @@ import (
 	"github.com/Taka-S-dev/baton/internal/model"
 )
 
-// Pattern matches {slotName} placeholders.
-var Pattern = regexp.MustCompile(`\{(\w+)\}`)
+// Pattern matches {slotName} placeholders — the single-value {name} form
+// and the variadic {name...} form, which accepts multiple values at run
+// time, joined with spaces.
+var Pattern = regexp.MustCompile(`\{(\w+)(\.\.\.)?\}`)
 
 // VarPattern matches {$name} project-variable references. The $ prefix
 // keeps them invisible to Pattern, so vars never capture interactive slots.
@@ -22,6 +24,15 @@ var VarPattern = regexp.MustCompile(`\{\$(\w+)\}`)
 type Def struct {
 	Name     string
 	ListName string
+	Variadic bool // written as {name...}: multiple values, space-joined
+}
+
+// Placeholder returns the literal placeholder text for the slot.
+func (d Def) Placeholder() string {
+	if d.Variadic {
+		return "{" + d.Name + "...}"
+	}
+	return "{" + d.Name + "}"
 }
 
 // HasPlaceholders returns true if the command contains any {slot} placeholders.
@@ -32,36 +43,47 @@ func HasPlaceholders(cmd model.Command) bool {
 // GetSlots returns all unique slots to resolve for a command, in order.
 // List name comes from cmd.Slots if defined, otherwise defaults to the slot name.
 func GetSlots(cmd model.Command) []Def {
-	seen := make(map[string]bool)
+	idx := make(map[string]int)
 	var slots []Def
-	add := func(name string) {
-		if seen[name] {
+	add := func(m []string) {
+		name, variadic := m[1], m[2] != ""
+		if i, ok := idx[name]; ok {
+			// A name used both as {x} and {x...} resolves once, as variadic.
+			if variadic {
+				slots[i].Variadic = true
+			}
 			return
 		}
-		seen[name] = true
 		listName := name
 		if cmd.Slots != nil {
 			if ln, ok := cmd.Slots[name]; ok {
 				listName = ln
 			}
 		}
-		slots = append(slots, Def{Name: name, ListName: listName})
+		idx[name] = len(slots)
+		slots = append(slots, Def{Name: name, ListName: listName, Variadic: variadic})
 	}
 	for _, m := range Pattern.FindAllStringSubmatch(cmd.Cmd, -1) {
-		add(m[1])
+		add(m)
 	}
 	for _, m := range Pattern.FindAllStringSubmatch(cmd.Dir, -1) {
-		add(m[1])
+		add(m)
 	}
 	return slots
+}
+
+// Replace substitutes every {name} and {name...} occurrence in s.
+func Replace(s, name, value string) string {
+	s = strings.ReplaceAll(s, "{"+name+"}", value)
+	return strings.ReplaceAll(s, "{"+name+"...}", value)
 }
 
 // Apply replaces all {slotName} occurrences in cmd with values from the map.
 func Apply(cmd model.Command, values map[string]string) model.Command {
 	result := cmd
 	for k, v := range values {
-		result.Cmd = strings.ReplaceAll(result.Cmd, "{"+k+"}", v)
-		result.Dir = strings.ReplaceAll(result.Dir, "{"+k+"}", v)
+		result.Cmd = Replace(result.Cmd, k, v)
+		result.Dir = Replace(result.Dir, k, v)
 	}
 	return result
 }
@@ -227,7 +249,7 @@ func PruneCommandValues(vars map[string]string, keep func(cmdName string) bool) 
 // current slot with cyan markers, for display in the context panel.
 func HighlightSlot(text, currentSlot string, resolved map[string]string) string {
 	return Pattern.ReplaceAllStringFunc(text, func(m string) string {
-		name := m[1 : len(m)-1]
+		name := strings.TrimSuffix(m[1:len(m)-1], "...")
 		if v, ok := resolved[name]; ok {
 			return v
 		}

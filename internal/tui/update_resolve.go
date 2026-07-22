@@ -229,6 +229,7 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 		listName:      s.ListName,
 		entries:       entries,
 		cursor:        0,
+		variadic:      s.Variadic,
 		contextNames:  r.itemNames,
 		contextNotes:  r.itemNotes,
 		contextIdx:    r.currentIdx,
@@ -262,17 +263,33 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up":
 		sp.cursor = (sp.cursor - 1 + total) % total
-	case "down", "tab":
+	case "down":
 		sp.cursor = (sp.cursor + 1) % total
-	case "backspace":
-		if len(sp.search) > 0 {
-			sp.search = sp.search[:len(sp.search)-1]
+	case "tab":
+		if !sp.variadic {
+			sp.cursor = (sp.cursor + 1) % total
+			break
+		}
+		// Variadic slot: Tab toggles the hovered entry, or adds the typed
+		// custom value and clears the input for the next one.
+		if sp.cursor < len(sp.filtered) {
+			sp.togglePicked(sp.filtered[sp.cursor].Value)
+		} else if sp.cursor == len(sp.filtered) && sp.search != "" {
+			sp.togglePicked(sp.search)
+			sp.search = ""
 			sp.applyFilter()
 			sp.cursor = 0
 		}
 	case "enter":
 		if sp.canSkip && sp.cursor == skipRow && m.sce != nil {
 			return m.skipCommandEditSlot()
+		}
+		if sp.variadic && len(sp.picked) > 0 {
+			joined := strings.Join(sp.picked, " ")
+			if m.sce != nil {
+				return m.acceptCommandEditSlotValue(joined)
+			}
+			return m.acceptSlotValue(joined)
 		}
 		if sp.cursor == len(sp.filtered) {
 			if sp.search != "" {

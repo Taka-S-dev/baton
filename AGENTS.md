@@ -61,6 +61,12 @@ Two placeholder kinds — do not mix them up:
   vars.tsv. Never prompts. Use for paths and other constants that
   change per machine or per project phase.
 
+A slot written as `{name...}` is **variadic**: the picker allows
+multiple selections and joins them with single spaces
+(`docker compose up {services...}` → `docker compose up api web`).
+Use it only where the command accepts space-separated arguments.
+There is no `{$name...}` — variables are single fixed values.
+
 Rows containing `{slot}` also serve as templates for the TUI's
 **Create command → From template**.
 

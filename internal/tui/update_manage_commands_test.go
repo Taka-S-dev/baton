@@ -466,3 +466,38 @@ func TestLoadProject_WarnsUnknownShell(t *testing.T) {
 		t.Fatalf("loadWarnings = %q, want an unknown-shell warning naming the value", m.loadWarnings)
 	}
 }
+
+// TestOpenSlotPickForCommandEdit_VariadicPrepopulatesPicked checks that
+// editing a saved command's variadic slot restores the stored values as
+// toggles, and confirming writes the joined string back.
+func TestOpenSlotPickForCommandEdit_VariadicPrepopulatesPicked(t *testing.T) {
+	m := &Model{}
+	m.nameInput = textinput.New()
+	m.lists = map[string][]mdl.ListEntry{"services": {
+		{Value: "api"}, {Value: "web"}, {Value: "worker"},
+	}}
+	m.config.Commands = []mdl.Command{{
+		Name: "up-all", Template: "up",
+		Values: map[string]string{"services": "api worker"},
+	}}
+	m.sce = &commandEditState{
+		mode: 1, editIdx: 0, name: "up-all",
+		currentSlots:  []slot.Def{{Name: "services", ListName: "services", Variadic: true}},
+		currentValues: map[string]string{},
+	}
+	tpl := mdl.Command{Name: "up", Cmd: "docker compose up {services...}"}
+	m.openSlotPickForCommandEdit(&tpl)
+
+	if m.sp == nil || !m.sp.variadic {
+		t.Fatal("expected a variadic slot pick")
+	}
+	if got := m.sp.picked; len(got) != 2 || got[0] != "api" || got[1] != "worker" {
+		t.Fatalf("picked = %v, want the stored values pre-toggled", got)
+	}
+
+	nm, _ := (*m).updateSlotPick(tea.KeyMsg{Type: tea.KeyEnter})
+	got := nm.(*Model)
+	if v := got.sce.currentValues["services"]; v != "api worker" {
+		t.Fatalf("stored value = %q, want the joined picks", v)
+	}
+}

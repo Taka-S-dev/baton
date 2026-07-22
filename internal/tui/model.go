@@ -105,11 +105,44 @@ type slotPickState struct {
 	search   string
 	canSkip  bool // true when creating a template-derived command
 
+	// {name...} slots: Tab toggles values into picked (in toggle order)
+	// and Enter joins them with spaces. With nothing picked, Enter falls
+	// back to the single-value behavior.
+	variadic bool
+	picked   []string
+
 	contextNames  []string
 	contextNotes  []string
 	contextIdx    int
 	currentCmd    *mdl.Command
 	resolvedSoFar map[string]string
+}
+
+// placeholder returns the literal placeholder text being resolved.
+func (s *slotPickState) placeholder() string {
+	if s.variadic {
+		return "{" + s.slotName + "...}"
+	}
+	return "{" + s.slotName + "}"
+}
+
+func (s *slotPickState) togglePicked(v string) {
+	for i, p := range s.picked {
+		if p == v {
+			s.picked = append(s.picked[:i], s.picked[i+1:]...)
+			return
+		}
+	}
+	s.picked = append(s.picked, v)
+}
+
+func (s *slotPickState) isPicked(v string) bool {
+	for _, p := range s.picked {
+		if p == v {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *slotPickState) applyFilter() {

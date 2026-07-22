@@ -225,6 +225,20 @@ Use `slots` to map different slot names to the same list:
 
 Both `{projDir}` and `{projCmd}` will select from the `project` list, each prompted separately.
 
+### Variadic placeholders — `{name...}`
+
+Write `{name...}` when a placeholder should accept **multiple values** from its list:
+
+```
+compose-up	docker	docker compose up {services...}
+```
+
+At run time the picker switches to multi-select — `Tab` toggles entries (typed custom values can be toggled in too), `Enter` confirms, and the values are joined with single spaces: `docker compose up api web worker`. With nothing toggled, `Enter` picks the hovered entry alone, exactly like a normal slot.
+
+Saved commands can fix a variadic slot the same way as any other — the stored value is simply the joined string.
+
+> Note: values containing spaces are not quoted when joined, so variadic slots work best with space-free values (service names, package paths, flags).
+
 ### Placeholder resolution
 
 - **Run commands / Run workflow** — baton prompts for each placeholder before execution

@@ -514,7 +514,11 @@ func (m Model) viewDiscardWindow(w int, selNames []string) string {
 func (m Model) viewSlotPick(w int) string {
 	sp := m.sp
 	var b strings.Builder
-	b.WriteString("\n" + accentBold("  [ Select value for {"+sp.slotName+"} ]") + "\n" + hline(w) + "\n\n")
+	title := "  [ Select value for " + sp.placeholder() + " ]"
+	if sp.variadic {
+		title = "  [ Select values for " + sp.placeholder() + " ]"
+	}
+	b.WriteString("\n" + accentBold(title) + "\n" + hline(w) + "\n\n")
 
 	// Context panel — windowed: show up to 3 before current, current, up to 2 after
 	if sp.contextNames != nil {
@@ -552,7 +556,7 @@ func (m Model) viewSlotPick(w int) string {
 
 		// Command preview — separated from the list
 		if sp.currentCmd != nil {
-			b.WriteString("\n" + hlineLabelBright(w, "command preview  "+highlight("{"+sp.slotName+"}")) + "\n\n")
+			b.WriteString("\n" + hlineLabelBright(w, "command preview  "+highlight(sp.placeholder())) + "\n\n")
 
 			// Hovered value (from list cursor or custom search input)
 			hoveredVal := ""
@@ -562,15 +566,20 @@ func (m Model) viewSlotPick(w int) string {
 				hoveredVal = sp.search
 			}
 
-			// Substitute resolvedSoFar then current slot with the hovered value
+			// Substitute resolvedSoFar, then the current slot: the joined
+			// picks for a variadic slot (they win on Enter), the hovered
+			// value otherwise.
 			preview := func(s string) string {
 				for k, v := range sp.resolvedSoFar {
-					s = strings.ReplaceAll(s, "{"+k+"}", v)
+					s = slot.Replace(s, k, v)
 				}
-				if hoveredVal != "" {
-					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", highlight(hoveredVal))
-				} else {
-					s = strings.ReplaceAll(s, "{"+sp.slotName+"}", slotVar("{"+sp.slotName+"}"))
+				switch {
+				case sp.variadic && len(sp.picked) > 0:
+					s = slot.Replace(s, sp.slotName, highlight(strings.Join(sp.picked, " ")))
+				case hoveredVal != "":
+					s = slot.Replace(s, sp.slotName, highlight(hoveredVal))
+				default:
+					s = slot.Replace(s, sp.slotName, slotVar(sp.placeholder()))
 				}
 				return slot.ApplyVars(s, m.vars)
 			}
@@ -650,6 +659,13 @@ func (m Model) viewSlotPick(w int) string {
 				} else {
 					rawLine = e.Value
 				}
+				if sp.variadic {
+					if sp.isPicked(e.Value) {
+						rawLine = "[x] " + rawLine
+					} else {
+						rawLine = "[ ] " + rawLine
+					}
+				}
 			}
 			b.WriteString(sCursor.Width(w-2).Render("    "+rawLine) + "\n")
 		} else {
@@ -670,6 +686,13 @@ func (m Model) viewSlotPick(w int) string {
 				} else {
 					line = white(e.Value)
 				}
+				if sp.variadic {
+					if sp.isPicked(e.Value) {
+						line = success("[x] ") + line
+					} else {
+						line = dim("[ ] ") + line
+					}
+				}
 			}
 			b.WriteString("    " + line + "\n")
 		}
@@ -679,7 +702,17 @@ func (m Model) viewSlotPick(w int) string {
 	}
 
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ Enter") + "  " + gray("Esc: ") + dim("clear filter / back") + "\n")
+	if sp.variadic {
+		picked := ""
+		if len(sp.picked) > 0 {
+			picked = "  " + dim(fmt.Sprintf("%d picked", len(sp.picked)))
+		}
+		b.WriteString("  " + gray("↑↓") + "  " + gray("Tab: ") + dim("toggle") +
+			"  " + gray("Enter: ") + dim("confirm") +
+			"  " + gray("Esc: ") + dim("clear filter / back") + picked + "\n")
+	} else {
+		b.WriteString("  " + gray("↑↓ Enter") + "  " + gray("Esc: ") + dim("clear filter / back") + "\n")
+	}
 	return b.String()
 }
 
@@ -1273,9 +1306,9 @@ func (m Model) slotValidationLines(cf *commandFormState) []string {
 	var lines []string
 	for _, s := range slot.GetSlots(probe) {
 		if _, ok := m.lists[s.ListName]; ok {
-			lines = append(lines, success("✓")+" "+gray("{"+s.Name+"} → "+s.ListName))
+			lines = append(lines, success("✓")+" "+gray(s.Placeholder()+" → "+s.ListName))
 		} else {
-			lines = append(lines, warn("⚠")+" "+gray("{"+s.Name+"} → ")+warn("no list (free input at run time)"))
+			lines = append(lines, warn("⚠")+" "+gray(s.Placeholder()+" → ")+warn("no list (free input at run time)"))
 		}
 	}
 	return lines

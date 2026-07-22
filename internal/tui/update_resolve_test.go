@@ -197,6 +197,97 @@ func TestUpdateMultiSelect_EscDiscardGuard(t *testing.T) {
 	}
 }
 
+// TestUpdateSlotPick_VariadicToggleAndJoin checks a {name...} slot:
+// Tab toggles entries on and off, and Enter joins the picked values
+// with spaces into the resolved command.
+func TestUpdateSlotPick_VariadicToggleAndJoin(t *testing.T) {
+	cmd := mdl.Command{Name: "up", Cmd: "docker compose up {services...}"}
+	m := Model{}
+	m.lists = map[string][]mdl.ListEntry{"services": {
+		{Value: "api"}, {Value: "web"}, {Value: "worker"},
+	}}
+	nm, _ := m.startResolveFlow([]msItem{{cmd: &cmd}})
+	m = nm.(Model)
+	if m.screen != ScreenSlotPick || m.sp == nil || !m.sp.variadic {
+		t.Fatalf("expected a variadic slot pick, got screen=%v", m.screen)
+	}
+
+	key := func(k tea.KeyMsg) {
+		nm, _ = m.updateSlotPick(k)
+		m = nm.(Model)
+	}
+	tab := tea.KeyMsg{Type: tea.KeyTab}
+	key(tab)                           // toggle api
+	key(tea.KeyMsg{Type: tea.KeyDown}) // → web
+	key(tab)                           // toggle web
+	if got := m.sp.picked; len(got) != 2 || got[0] != "api" || got[1] != "web" {
+		t.Fatalf("picked = %v, want [api web]", got)
+	}
+	key(tab) // toggle web off again
+	if got := m.sp.picked; len(got) != 1 || got[0] != "api" {
+		t.Fatalf("picked = %v after un-toggle, want [api]", got)
+	}
+	key(tab) // and back on
+
+	key(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.screen != ScreenConfirmRun {
+		t.Fatalf("screen = %v, want confirm run", m.screen)
+	}
+	if got := m.confirmRunItems[0].Cmd.Cmd; got != "docker compose up api web" {
+		t.Fatalf("resolved cmd = %q", got)
+	}
+}
+
+// TestUpdateSlotPick_VariadicCustomToggle checks Tab on the custom row:
+// the typed value joins the picks and the input clears for the next one.
+func TestUpdateSlotPick_VariadicCustomToggle(t *testing.T) {
+	cmd := mdl.Command{Name: "up", Cmd: "up {services...}"}
+	m := Model{}
+	m.lists = map[string][]mdl.ListEntry{"services": {{Value: "api"}}}
+	nm, _ := m.startResolveFlow([]msItem{{cmd: &cmd}})
+	m = nm.(Model)
+
+	key := func(k tea.KeyMsg) {
+		nm, _ = m.updateSlotPick(k)
+		m = nm.(Model)
+	}
+	for _, r := range "db" {
+		key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	// "db" matches nothing, so the cursor sits on the custom row.
+	key(tea.KeyMsg{Type: tea.KeyTab})
+	if got := m.sp.picked; len(got) != 1 || got[0] != "db" {
+		t.Fatalf("picked = %v, want [db]", got)
+	}
+	if m.sp.search != "" {
+		t.Fatalf("search = %q — must clear after toggling a custom value", m.sp.search)
+	}
+
+	key(tea.KeyMsg{Type: tea.KeyTab}) // cursor is back on "api"
+	key(tea.KeyMsg{Type: tea.KeyEnter})
+	if got := m.confirmRunItems[0].Cmd.Cmd; got != "up db api" {
+		t.Fatalf("resolved cmd = %q, want picks in toggle order", got)
+	}
+}
+
+// TestUpdateSlotPick_VariadicEnterFallsBackToSingle checks that Enter with
+// nothing toggled behaves exactly like a normal slot: the hovered entry wins.
+func TestUpdateSlotPick_VariadicEnterFallsBackToSingle(t *testing.T) {
+	cmd := mdl.Command{Name: "up", Cmd: "up {services...}"}
+	m := Model{}
+	m.lists = map[string][]mdl.ListEntry{"services": {{Value: "api"}, {Value: "web"}}}
+	nm, _ := m.startResolveFlow([]msItem{{cmd: &cmd}})
+	m = nm.(Model)
+
+	nm, _ = m.updateSlotPick(tea.KeyMsg{Type: tea.KeyDown})
+	m = nm.(Model)
+	nm, _ = m.updateSlotPick(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if got := m.confirmRunItems[0].Cmd.Cmd; got != "up web" {
+		t.Fatalf("resolved cmd = %q, want the hovered entry alone", got)
+	}
+}
+
 func equalInts(a, b []int) bool {
 	if len(a) != len(b) {
 		return false

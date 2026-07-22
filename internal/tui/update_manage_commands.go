@@ -734,6 +734,7 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 		entries:       m.lists[s.ListName],
 		cursor:        0,
 		canSkip:       true,
+		variadic:      s.Variadic,
 		contextNames:  []string{sce.name},
 		contextNotes:  []string{},
 		contextIdx:    0,
@@ -741,13 +742,18 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 		resolvedSoFar: sce.currentValues,
 	}
 	sp.applyFilter()
-	// When editing, start the cursor on the command's current value.
+	// When editing, start from the command's current value: pre-toggle a
+	// variadic slot's stored values, or park the cursor on a single one.
 	if sce.mode == 1 && sce.editIdx >= 0 && sce.editIdx < len(m.config.Commands) {
 		if cur, ok := m.config.Commands[sce.editIdx].Values[s.Name]; ok {
-			for i, e := range sp.filtered {
-				if e.Value == cur {
-					sp.cursor = i
-					break
+			if s.Variadic {
+				sp.picked = strings.Fields(cur)
+			} else {
+				for i, e := range sp.filtered {
+					if e.Value == cur {
+						sp.cursor = i
+						break
+					}
 				}
 			}
 		}
