@@ -38,7 +38,9 @@ const (
 	ScreenEditWorkflowCommands
 	ScreenDeleteWorkflow
 	ScreenManageLists
+	ScreenEditListPick
 	ScreenEditList
+	ScreenDeleteList
 	ScreenSwitchConfig
 	ScreenManageCommands
 	ScreenEditCommandPick
@@ -193,6 +195,7 @@ type runningState struct {
 type listEditState struct {
 	name      string
 	entries   []mdl.ListEntry
+	fromPick  bool // entered via Edit list (Esc returns to the pick screen)
 	cursor    int
 	adding    bool
 	addVal    string
@@ -435,13 +438,10 @@ func (m *Model) saveConfig() error {
 	return store.SaveConfig(m.projectDir, stripped)
 }
 
+// gotoManageLists opens the Manage lists submenu.
 func (m *Model) gotoManageLists() {
 	m.screen = ScreenManageLists
-	var names []string
-	for k := range m.lists {
-		names = append(names, k)
-	}
-	m.listItems = names
+	m.listItems = []string{"Create list", "Edit list", "Delete list"}
 	m.listCursor = 0
 }
 

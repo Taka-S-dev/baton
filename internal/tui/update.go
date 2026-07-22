@@ -101,8 +101,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateWorkflowMgmt(msg)
 		case ScreenManageLists:
 			return m.updateManageLists(msg)
+		case ScreenEditListPick:
+			return m.updateEditListPick(msg)
 		case ScreenEditList:
 			return m.updateEditList(msg)
+		case ScreenDeleteList:
+			return m.updateDeleteLists(msg)
 		case ScreenManageCommands:
 			return m.updateManageCommands(msg)
 		case ScreenCreateCommandKind:

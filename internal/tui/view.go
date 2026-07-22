@@ -48,9 +48,13 @@ func (m Model) View() string {
 	case ScreenDeleteWorkflow:
 		view = m.viewDeleteList("Delete workflow", m.listItems, w)
 	case ScreenManageLists:
-		view = m.viewManageLists(w)
+		view = m.viewSingleSelect("Manage lists", w)
+	case ScreenEditListPick:
+		view = m.viewEditListPick(w)
 	case ScreenEditList:
 		view = m.viewEditList(w)
+	case ScreenDeleteList:
+		view = m.viewDeleteList("Delete list", m.listItems, w)
 	case ScreenSwitchConfig:
 		view = m.viewSingleSelect("Switch config", w)
 	case ScreenManageCommands:
@@ -170,7 +174,7 @@ var menuItemInfos = map[string]menuItemInfo{
 	"Run commands":     {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
 	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage lists":     {desc: "Edit selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Edit"}, {"n", "New"}, {"d", "Delete"}, {"Esc", "Back"}}},
+	"Manage lists":     {desc: "Create, edit or delete selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Switch config":    {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
 	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
@@ -942,11 +946,34 @@ func (m Model) viewEditList(w int) string {
 
 // ── Manage lists ─────────────────────────────────────────────────────────────
 
-func (m Model) viewManageLists(w int) string {
-	var b strings.Builder
-	b.WriteString("\n" + header("Manage lists", w) + "\n")
-	if len(m.listItems) == 0 {
+// writeListEntriesPreview renders the hovered list's entries (up to 5),
+// shared by the Edit list pick and Delete list screens.
+func (m Model) writeListEntriesPreview(b *strings.Builder, listName string, w int) {
+	entries := m.lists[listName]
+	b.WriteString("\n" + hlineLabel(w, "entries") + "\n")
+	if len(entries) == 0 {
 		b.WriteString("  " + gray("(empty)") + "\n")
+		return
+	}
+	maxShow := min(5, len(entries))
+	for i := 0; i < maxShow; i++ {
+		e := entries[i]
+		lbl := ""
+		if e.Label != "" {
+			lbl = "  " + dim(e.Label)
+		}
+		b.WriteString("  " + gray("·") + " " + e.Value + lbl + "\n")
+	}
+	if len(entries) > maxShow {
+		b.WriteString("  " + dim(fmt.Sprintf("... +%d more", len(entries)-maxShow)) + "\n")
+	}
+}
+
+func (m Model) viewEditListPick(w int) string {
+	var b strings.Builder
+	b.WriteString("\n" + header("Edit list", w) + "\n")
+	if len(m.listItems) == 0 {
+		b.WriteString("  " + gray("(no lists)") + "\n")
 	} else {
 		for i, item := range m.listItems {
 			if i == m.listCursor {
@@ -955,36 +982,12 @@ func (m Model) viewManageLists(w int) string {
 				b.WriteString("    " + item + "\n")
 			}
 		}
-	}
-	if !m.deleteConfirm && len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
-		listName := m.listItems[m.listCursor]
-		entries := m.lists[listName]
-		b.WriteString("\n" + hlineLabel(w, "entries") + "\n")
-		if len(entries) == 0 {
-			b.WriteString("  " + gray("(empty)") + "\n")
-		} else {
-			maxShow := min(5, len(entries))
-			for i := 0; i < maxShow; i++ {
-				e := entries[i]
-				lbl := ""
-				if e.Label != "" {
-					lbl = "  " + dim(e.Label)
-				}
-				b.WriteString("  " + gray("·") + " " + e.Value + lbl + "\n")
-			}
-			if len(entries) > maxShow {
-				b.WriteString("  " + dim(fmt.Sprintf("... +%d more", len(entries)-maxShow)) + "\n")
-			}
+		if m.listCursor < len(m.listItems) {
+			m.writeListEntriesPreview(&b, m.listItems[m.listCursor], w)
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n")
-	if m.deleteConfirm && len(m.listItems) > 0 {
-		b.WriteString("  " + warn(fmt.Sprintf("Delete %q?", m.listItems[m.listCursor])) + "\n\n")
-		b.WriteString(renderBtns(m.deleteBtn, "  No  ", "  Yes  ") + "\n")
-		b.WriteString("\n  " + gray("Tab: switch   Enter: confirm   Esc: back") + "\n")
-	} else {
-		b.WriteString("  " + gray("↑↓ Enter: edit   n: new   d: delete   Esc: back") + "\n")
-	}
+	b.WriteString("  " + gray("↑↓ Enter: edit   Esc: back") + "\n")
 	return b.String()
 }
 
@@ -1020,6 +1023,10 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		m.listCursor >= 0 && m.listCursor < len(m.editRefs) {
 		b.WriteString("\n")
 		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.listCursor]), w)
+	}
+	if m.screen == ScreenDeleteList && !m.deleteConfirm &&
+		m.listCursor >= 0 && m.listCursor < len(items) {
+		m.writeListEntriesPreview(&b, items[m.listCursor], w)
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	if m.deleteConfirm {

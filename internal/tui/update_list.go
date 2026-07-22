@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,33 +66,31 @@ func (m Model) updateNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Manage lists ──────────────────────────────────────────────────────────────
 
 func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.deleteConfirm {
-		switch msg.String() {
-		case "tab", "left", "right", "h", "l":
-			m.deleteBtn = 1 - m.deleteBtn
-		case "enter":
-			if m.deleteBtn == 1 && len(m.listItems) > 0 {
-				name := m.listItems[m.listCursor]
-				listsDir := filepath.Join(m.projectDir, "lists")
-				if err := os.Remove(filepath.Join(listsDir, name+".tsv")); err != nil {
-					m.errMsg = "failed to delete list: " + err.Error()
-				} else {
-					m.successMsg = "deleted list \"" + name + "\""
-				}
-				delete(m.lists, name)
-				m.listItems = append(m.listItems[:m.listCursor], m.listItems[m.listCursor+1:]...)
-				if m.listCursor >= len(m.listItems) && m.listCursor > 0 {
-					m.listCursor--
-				}
-			}
-			m.deleteConfirm = false
-			m.deleteBtn = 0
-		case "esc":
-			m.deleteConfirm = false
-			m.deleteBtn = 0
+	switch msg.String() {
+	case "up", "down":
+		m.moveListCursor(msg.String(), len(m.listItems))
+	case "enter":
+		switch m.listItems[m.listCursor] {
+		case "Create list":
+			return m.openNameInput(nameInputNewList)
+		case "Edit list":
+			m.screen = ScreenEditListPick
+			m.listItems = m.sortedListNames()
+			m.listCursor = 0
+		case "Delete list":
+			m.screen = ScreenDeleteList
+			m.listItems = m.sortedListNames()
+			m.listCursor = 0
 		}
-		return m, nil
+	case "esc":
+		m.gotoMainMenu()
 	}
+	return m, nil
+}
+
+// ── Edit list: pick which one ─────────────────────────────────────────────────
+
+func (m Model) updateEditListPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "down":
 		m.moveListCursor(msg.String(), len(m.listItems))
@@ -101,21 +100,42 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		name := m.listItems[m.listCursor]
 		m.le = &listEditState{
-			name:    name,
-			entries: append([]mdl.ListEntry{}, m.lists[name]...),
+			name:     name,
+			entries:  append([]mdl.ListEntry{}, m.lists[name]...),
+			fromPick: true,
 		}
 		m.screen = ScreenEditList
-	case "n", "a":
-		return m.openNameInput(nameInputNewList)
-	case "d", "delete":
-		if len(m.listItems) > 0 {
-			m.deleteConfirm = true
-			m.deleteBtn = 0
-		}
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoManageLists()
 	}
 	return m, nil
+}
+
+// ── Delete list ───────────────────────────────────────────────────────────────
+
+func (m Model) updateDeleteLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	names := m.listItems
+	return m.updateDeleteList(msg, len(names), nil,
+		m.gotoManageLists,
+		func(indices []int) {
+			listsDir := filepath.Join(m.projectDir, "lists")
+			failed := false
+			for _, i := range indices {
+				name := names[i]
+				if err := os.Remove(filepath.Join(listsDir, name+".tsv")); err != nil {
+					m.errMsg = "failed to delete list: " + err.Error()
+					failed = true
+				}
+				delete(m.lists, name)
+			}
+			if !failed {
+				if len(indices) == 1 {
+					m.successMsg = "deleted list \"" + names[indices[0]] + "\""
+				} else {
+					m.successMsg = fmt.Sprintf("deleted %d lists", len(indices))
+				}
+			}
+		})
 }
 
 func (m Model) saveNewList(name string) (tea.Model, tea.Cmd) {
@@ -254,7 +274,20 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.lists[le.name] = append([]mdl.ListEntry{}, le.entries...)
 		}
 	case "esc":
-		m.gotoManageLists()
+		if le.fromPick {
+			// Return to the pick screen, cursor on the list just edited.
+			m.screen = ScreenEditListPick
+			m.listItems = m.sortedListNames()
+			m.listCursor = 0
+			for i, n := range m.listItems {
+				if n == le.name {
+					m.listCursor = i
+					break
+				}
+			}
+		} else {
+			m.gotoManageLists()
+		}
 	}
 	return m, nil
 }
