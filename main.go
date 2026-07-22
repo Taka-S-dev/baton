@@ -22,11 +22,27 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Taka-S-dev/baton/internal/tui"
 )
+
+// version is stamped by the release build via
+// -ldflags "-X main.version=v1.2.3". Plain `go build` falls back to the
+// VCS-derived module version when Go recorded one.
+var version = ""
+
+func versionString() string {
+	if version != "" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return "dev"
+}
 
 const usage = `baton - terminal-based command/workflow runner
 
@@ -42,6 +58,7 @@ Commands:
 
 Flags:
   --dry-run    Print what would be executed without running any commands.
+  --version    Print the version and exit.
   -h, --help   Show this help.
 
 Environment variables:
@@ -62,6 +79,9 @@ func main() {
 			dryRun = true
 		case "-h", "--help":
 			fmt.Print(usage)
+			return
+		case "--version":
+			fmt.Println("baton " + versionString())
 			return
 		}
 	}
