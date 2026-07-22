@@ -33,7 +33,7 @@ func LoadProject(projectDir string) (Project, error) {
 		return p, err
 	}
 	var files []string
-	for _, f := range []string{"commands.json", "templates.json", "template.json", "commands.tsv", "templates.tsv", "config.tsv", "commands.local.json", "config.json"} {
+	for _, f := range []string{"commands.json", "commands.tsv", "commands.local.json"} {
 		if _, err := os.Stat(filepath.Join(projectDir, f)); err == nil {
 			files = append(files, f)
 		}
@@ -50,9 +50,9 @@ func LoadProject(projectDir string) (Project, error) {
 	vars, warnings := slot.LoadVars(projectDir)
 	p.Vars = vars
 
-	// Fixed slot values live in vars.tsv and win over values still stored
-	// inside commands.local.json (legacy layout, migrated on the next
-	// save). Re-bake so the merged values apply.
+	// Fixed slot values live in vars.tsv; merge them into the derived
+	// commands and re-bake so they apply. vars.tsv wins over any values
+	// present in commands.local.json.
 	for i := range cfg.Commands {
 		c := &cfg.Commands[i]
 		if c.Template == "" {

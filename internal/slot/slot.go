@@ -155,11 +155,6 @@ func LoadVars(projectDir string) (map[string]string, []string) {
 			} else {
 				set(cmd+"."+name, value, i+1)
 			}
-		case len(parts) == 2 && strings.TrimSpace(parts[1]) != "":
-			// Legacy two-column rows: "command.slot<TAB>value" or a
-			// global "name<TAB>value". Rewritten in the current format
-			// on the next save.
-			set(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), i+1)
 		default:
 			warnings = append(warnings, fmt.Sprintf("vars.tsv line %d: missing value", i+1))
 		}

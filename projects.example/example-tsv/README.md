@@ -11,9 +11,6 @@ example-tsv/
 └── commands.local.json  <- commands created via Manage commands (generated)
 ```
 
-Legacy names (`templates.tsv` / `config.tsv`) are still readable;
-`commands.tsv` wins when both exist.
-
 ## commands.tsv columns
 
 | Column | Description |

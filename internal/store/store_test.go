@@ -107,7 +107,7 @@ func TestSaveLastWorkflow_Overwrite(t *testing.T) {
 func TestSaveConfigRoundtrip(t *testing.T) {
 	dir := t.TempDir()
 
-	writeJSON(t, filepath.Join(dir, "templates.json"), model.Config{
+	writeJSON(t, filepath.Join(dir, "commands.json"), model.Config{
 		Commands: []model.Command{
 			{Name: "build", Cmd: "make {target}", Slots: map[string]string{"target": "targets"}},
 		},
@@ -130,7 +130,7 @@ func TestSaveConfigRoundtrip(t *testing.T) {
 	}
 
 	if len(loaded.Base) != 1 || loaded.Base[0].Name != "build" {
-		t.Errorf("templates not loaded from templates.json: %+v", loaded.Base)
+		t.Errorf("templates not loaded from commands.json: %+v", loaded.Base)
 	}
 	if len(loaded.Commands) != 2 {
 		t.Fatalf("commands lost on save: got %d, want 2", len(loaded.Commands))
@@ -155,72 +155,6 @@ func TestSaveConfigRoundtrip(t *testing.T) {
 		if c.Name == "should-not-be-written" {
 			t.Error("hand-written command leaked into commands.local.json")
 		}
-	}
-}
-
-// TestLegacySavedCommandsMigrate ensures the old "saved_commands" section is
-// converted to unified commands on load, and disappears after the next save.
-func TestLegacySavedCommandsMigrate(t *testing.T) {
-	dir := t.TempDir()
-	legacy := `{
-  "commands": [{"name": "pwd", "cmd": "pwd"}],
-  "saved_commands": [{"name": "build-src", "template_ref": "build", "values": {"workdir": "src"}}]
-}`
-	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(legacy), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := config.LoadConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-	if len(cfg.Commands) != 2 {
-		t.Fatalf("want 2 commands (pwd + migrated build-src), got %d", len(cfg.Commands))
-	}
-	migrated := cfg.Commands[1]
-	if migrated.Name != "build-src" || migrated.Template != "build" || migrated.Values["workdir"] != "src" {
-		t.Fatalf("legacy saved_command not converted: %+v", migrated)
-	}
-
-	// Resave and confirm the file migrated to commands.local.json in the
-	// unified format, with the legacy config.json removed.
-	if err := store.SaveConfig(dir, cfg); err != nil {
-		t.Fatalf("SaveConfig: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "config.json")); !os.IsNotExist(err) {
-		t.Error("legacy config.json still present after migration save")
-	}
-	raw, _ := os.ReadFile(filepath.Join(dir, "commands.local.json"))
-	var onDisk map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &onDisk); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := onDisk["saved_commands"]; ok {
-		t.Error("saved_commands section still present after migration save")
-	}
-
-	reloaded, err := config.LoadConfig(dir)
-	if err != nil {
-		t.Fatalf("reload: %v", err)
-	}
-	if len(reloaded.Commands) != 2 {
-		t.Fatalf("commands lost after migration save: %+v", reloaded.Commands)
-	}
-}
-
-// TestLegacyVarsKeyReadable ensures the old "vars" key is read as Slots.
-func TestLegacyVarsKeyReadable(t *testing.T) {
-	dir := t.TempDir()
-	legacy := `{"commands": [{"name": "build", "cmd": "make {target}", "vars": {"target": "targets"}}]}`
-	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(legacy), 0644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := config.LoadConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-	if len(cfg.Commands) != 1 || cfg.Commands[0].Slots["target"] != "targets" {
-		t.Fatalf("legacy vars key not read as slots: %+v", cfg.Commands)
 	}
 }
 

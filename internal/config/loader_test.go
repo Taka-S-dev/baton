@@ -30,14 +30,13 @@ func TestLoadTSV_UnusedVarDoesNotAffectListName(t *testing.T) {
 	dir := t.TempDir()
 	tsv := "name\tgroup\tworkdir\tcmd\tshell\tvars\n" +
 		"build\tmake\t{projDir}\techo building\t\tprojDir=project,projCmd=project\n"
-	if err := os.WriteFile(filepath.Join(dir, "config.tsv"), []byte(tsv), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Legacy TSV commands are treated as templates.
 	if len(cfg.Base) != 1 {
 		t.Fatalf("want 1 template, got %d", len(cfg.Base))
 	}
@@ -74,16 +73,16 @@ func TestLoadTSV_ExcelQuotedVars(t *testing.T) {
 }
 
 // TestLoadConfig_TSVAndJSONCoexist guards the TSV-main workflow: creating
-// config.json via the TUI (saved commands) must not hide TSV commands.
+// commands via the TUI (commands.local.json) must not hide TSV commands.
 func TestLoadConfig_TSVAndJSONCoexist(t *testing.T) {
 	dir := t.TempDir()
-	tsv := "name\tgroup\tworkdir\tcmd\tshell\tvars\n" +
+	tsv := "name\tgroup\tworkdir\tcmd\tshell\tslots\n" +
 		"build\tmake\t{projDir}\techo building\t\tprojDir=project\n"
-	if err := os.WriteFile(filepath.Join(dir, "config.tsv"), []byte(tsv), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0644); err != nil {
 		t.Fatal(err)
 	}
-	cfgJSON := `{"saved_commands":[{"name":"build-proj","template_ref":"build","values":{"projDir":"proj"}}]}`
-	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfgJSON), 0644); err != nil {
+	local := `{"commands":[{"name":"build-proj","template":"build","values":{"projDir":"proj"}}]}`
+	if err := os.WriteFile(filepath.Join(dir, "commands.local.json"), []byte(local), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,49 +91,28 @@ func TestLoadConfig_TSVAndJSONCoexist(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(cfg.Base) != 1 || cfg.Base[0].Name != "build" {
-		t.Fatalf("TSV commands hidden by config.json: %+v", cfg.Base)
+		t.Fatalf("TSV commands hidden by commands.local.json: %+v", cfg.Base)
 	}
 	if len(cfg.Commands) != 1 || cfg.Commands[0].Template != "build" {
-		t.Fatalf("legacy saved command not migrated: %+v", cfg.Commands)
+		t.Fatalf("derived command not loaded: %+v", cfg.Commands)
 	}
 	if _, ok := cfg.FindCommand("build"); !ok {
 		t.Error("template target from TSV not resolvable")
 	}
 }
 
-// TestTemplatesTSVPreferred ensures templates.tsv is read, and wins over
-// legacy config.tsv when both exist.
-func TestTemplatesTSVPreferred(t *testing.T) {
-	dir := t.TempDir()
-	newTSV := "name\tgroup\tworkdir\tcmd\tshell\tvars\nnew-cmd\t\t\techo new\t\t\n"
-	oldTSV := "name\tgroup\tworkdir\tcmd\tshell\tvars\nold-cmd\t\t\techo old\t\t\n"
-	if err := os.WriteFile(filepath.Join(dir, "templates.tsv"), []byte(newTSV), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "config.tsv"), []byte(oldTSV), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadConfig(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(cfg.Base) != 1 || cfg.Base[0].Name != "new-cmd" {
-		t.Fatalf("templates.tsv not preferred: %+v", cfg.Base)
-	}
-}
-
 // TestTemplateEditPropagates ensures editing a template updates derived
-// commands on the next load (the baked cmd in config.json is a cache).
+// commands on the next load (the baked cmd in commands.local.json is a
+// cache).
 func TestTemplateEditPropagates(t *testing.T) {
 	dir := t.TempDir()
 	templates := `{"commands": [{"name": "build", "cmd": "gmake {target}"}]}`
-	if err := os.WriteFile(filepath.Join(dir, "templates.json"), []byte(templates), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "commands.json"), []byte(templates), 0644); err != nil {
 		t.Fatal(err)
 	}
 	// Baked cmd is stale (from before the template was edited).
 	cfgJSON := `{"commands": [{"name": "build-src", "cmd": "make src", "template": "build", "values": {"target": "src"}}]}`
-	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfgJSON), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "commands.local.json"), []byte(cfgJSON), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,7 +130,7 @@ func TestTemplateEditPropagates(t *testing.T) {
 func TestMissingTemplateFallsBackToBakedCmd(t *testing.T) {
 	dir := t.TempDir()
 	cfgJSON := `{"commands": [{"name": "build-src", "cmd": "make src", "template": "gone", "values": {"target": "src"}}]}`
-	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfgJSON), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "commands.local.json"), []byte(cfgJSON), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -166,8 +144,7 @@ func TestMissingTemplateFallsBackToBakedCmd(t *testing.T) {
 }
 
 // TestAppendCommandTSV checks the append-only TSV writer: it creates the
-// file with a header when absent, appends to whatever TSV the loader
-// reads (legacy names included), and re-reads the file at call time so
+// file with a header when absent, and re-reads the file at call time so
 // rows saved by an editor between load and save survive.
 func TestAppendCommandTSV(t *testing.T) {
 	dir := t.TempDir()
@@ -199,19 +176,6 @@ func TestAppendCommandTSV(t *testing.T) {
 	}
 	if b, _ := cfg.FindCommand("b"); b.Slots["x"] != "xs" {
 		t.Fatalf("slots column not written: %+v", b)
-	}
-
-	// Legacy TSV name: append must target the file the loader reads.
-	legacy := t.TempDir()
-	if err := os.WriteFile(filepath.Join(legacy, "config.tsv"), []byte("name\tgroup\tworkdir\tcmd\tshell\tslots\nold\t\t\techo old\t\t\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	file, err = AppendCommandTSV(legacy, model.Command{Name: "new", Cmd: "echo new"})
-	if err != nil || file != "config.tsv" {
-		t.Fatalf("file=%q err=%v — must append to the loaded legacy file", file, err)
-	}
-	if _, err := os.Stat(filepath.Join(legacy, "commands.tsv")); err == nil {
-		t.Fatal("must not create commands.tsv beside a loaded legacy TSV")
 	}
 }
 

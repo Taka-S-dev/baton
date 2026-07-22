@@ -21,5 +21,3 @@ example-json/
   multiple entries and the values are joined with spaces
 - `{$root}` in the `where` command resolves from vars.tsv — edit that
   one line when the project moves to another folder or machine
-- Legacy file names (`templates.json`, `template.json`, `config.json`)
-  are still readable

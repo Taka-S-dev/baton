@@ -410,7 +410,7 @@ func TestLoadProject_LegacyValuesStillWork(t *testing.T) {
 		t.Fatalf("legacy values must still bake, got %+v", cmd)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, "vars.tsv"), []byte("as.workdir\t./from-vars\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "vars.tsv"), []byte("command\tname\tvalue\nas\tworkdir\t./from-vars\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	m2 := &Model{}

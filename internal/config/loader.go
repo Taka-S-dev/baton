@@ -74,14 +74,12 @@ func ListProjects(projectsDir string) []string {
 }
 
 // LoadConfig loads the hand-written layer (commands.json and/or
-// commands.tsv, never written back) and commands.local.json (app-managed
-// user commands). Legacy names are still readable: templates.json,
-// template.json, templates.tsv, config.tsv, config.json, and the old
-// "saved_commands" section (converted to template-derived commands).
+// commands.tsv, never written back as a whole) and commands.local.json
+// (app-managed user commands).
 func LoadConfig(projectDir string) (model.Config, error) {
 	cfg := model.Config{}
 
-	if path, ok := firstExisting(projectDir, "commands.json", "templates.json", "template.json"); ok {
+	if path, ok := firstExisting(projectDir, "commands.json"); ok {
 		base, err := loadJSON(path)
 		if err != nil {
 			return cfg, err
@@ -94,7 +92,7 @@ func LoadConfig(projectDir string) (model.Config, error) {
 
 	// Loaded unconditionally so that creating commands via the TUI
 	// never hides TSV-defined commands.
-	if path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv"); ok {
+	if path, ok := firstExisting(projectDir, "commands.tsv"); ok {
 		cfgTSV, err := loadTSV(path)
 		if err != nil {
 			return cfg, err
@@ -105,7 +103,7 @@ func LoadConfig(projectDir string) (model.Config, error) {
 		cfg.Base = append(cfg.Base, cfgTSV.Commands...)
 	}
 
-	if path, ok := firstExisting(projectDir, "commands.local.json", "config.json"); ok {
+	if path, ok := firstExisting(projectDir, "commands.local.json"); ok {
 		cfgJSON, err := loadJSON(path)
 		if err != nil {
 			return cfg, err
@@ -181,15 +179,10 @@ func readTSVLines(path string) (lines []string, eol string) {
 }
 
 // AppendCommandTSV appends a command as a new row to the project's
-// hand-written TSV — the file the loader actually reads (commands.tsv,
-// or a legacy name if that is what the project uses), created with a
-// header when none exists. Existing rows are never modified. Returns
-// the file name written to.
+// commands.tsv, created with a header when none exists. Existing rows
+// are never modified. Returns the file name written to.
 func AppendCommandTSV(projectDir string, cmd model.Command) (string, error) {
-	path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv")
-	if !ok {
-		path = filepath.Join(projectDir, "commands.tsv")
-	}
+	path := filepath.Join(projectDir, "commands.tsv")
 	lines, eol := readTSVLines(path)
 	lines = append(lines, tsvRow(cmd))
 	if err := writeTSVLines(path, eol, lines); err != nil {
@@ -202,7 +195,7 @@ func AppendCommandTSV(projectDir string, cmd model.Command) (string, error) {
 // line is left byte-for-byte untouched. Returns the file name, or an
 // error when the row no longer exists (edited by hand since load).
 func UpdateCommandTSV(projectDir, oldName string, cmd model.Command) (string, error) {
-	path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv")
+	path, ok := firstExisting(projectDir, "commands.tsv")
 	if !ok {
 		return "", fmt.Errorf("no TSV command file in this project")
 	}
@@ -227,7 +220,7 @@ func UpdateCommandTSV(projectDir, oldName string, cmd model.Command) (string, er
 // DeleteCommandsTSV removes the rows with the given names. Names whose
 // row is already gone are ignored (deleted by hand is deleted).
 func DeleteCommandsTSV(projectDir string, names []string) (string, error) {
-	path, ok := firstExisting(projectDir, "commands.tsv", "templates.tsv", "config.tsv")
+	path, ok := firstExisting(projectDir, "commands.tsv")
 	if !ok {
 		return "", fmt.Errorf("no TSV command file in this project")
 	}
@@ -248,13 +241,6 @@ func DeleteCommandsTSV(projectDir string, names []string) (string, error) {
 	return filepath.Base(path), nil
 }
 
-// legacySavedCommand is the pre-unification "saved_commands" entry shape.
-type legacySavedCommand struct {
-	Name        string            `json:"name"`
-	TemplateRef string            `json:"template_ref"`
-	Values      map[string]string `json:"values"`
-}
-
 func loadJSON(path string) (model.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -263,21 +249,6 @@ func loadJSON(path string) (model.Config, error) {
 	var cfg model.Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return model.Config{}, fmt.Errorf("%s: %w", filepath.Base(path), err)
-	}
-
-	// Convert the legacy "saved_commands" section into template-derived
-	// commands. They are migrated to the unified format on next save.
-	var legacy struct {
-		SavedCommands []legacySavedCommand `json:"saved_commands"`
-	}
-	if err := json.Unmarshal(data, &legacy); err == nil {
-		for _, sc := range legacy.SavedCommands {
-			cfg.Commands = append(cfg.Commands, model.Command{
-				Name:     sc.Name,
-				Template: sc.TemplateRef,
-				Values:   sc.Values,
-			})
-		}
 	}
 	return cfg, nil
 }

@@ -1,7 +1,5 @@
 package model
 
-import "encoding/json"
-
 // Command represents a single executable command definition.
 // A command is either concrete (Cmd is set) or template-derived
 // (Template names a template whose slots are filled from Values;
@@ -20,22 +18,6 @@ type Command struct {
 	// "json", or "local"). TSV rows are editable from the TUI; the
 	// field is never serialized.
 	Source string `json:"-"`
-}
-
-// UnmarshalJSON accepts the legacy "vars" key as an alias for "slots".
-func (c *Command) UnmarshalJSON(data []byte) error {
-	type plain Command
-	aux := struct {
-		*plain
-		LegacyVars map[string]string `json:"vars"`
-	}{plain: (*plain)(c)}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	if c.Slots == nil {
-		c.Slots = aux.LegacyVars
-	}
-	return nil
 }
 
 // Config holds all commands for a project.

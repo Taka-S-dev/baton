@@ -64,16 +64,22 @@ func TestLoadVars(t *testing.T) {
 	}
 }
 
-func TestLoadVars_LegacyTwoColumnRows(t *testing.T) {
+// TestLoadVars_TwoColumnRowsWarn checks a row without the command column
+// is reported as broken instead of being guessed at: the format is
+// strictly three columns (command / name / value).
+func TestLoadVars_TwoColumnRowsWarn(t *testing.T) {
 	dir := t.TempDir()
-	tsv := "name\tvalue\nroot\tC:\\x\nas.workdir\t./src\n"
+	tsv := "command\tname\tvalue\nroot\tC:\\x\n"
 	if err := os.WriteFile(filepath.Join(dir, "vars.tsv"), []byte(tsv), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	vars, warnings := LoadVars(dir)
-	if vars["root"] != `C:\x` || vars["as.workdir"] != "./src" || len(warnings) != 0 {
-		t.Fatalf("legacy rows must load: vars=%v warnings=%v", vars, warnings)
+	if len(vars) != 0 {
+		t.Fatalf("two-column rows must not load, got %v", vars)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "missing value") {
+		t.Fatalf("warnings = %v, want a missing-value warning", warnings)
 	}
 }
 

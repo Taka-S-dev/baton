@@ -47,18 +47,12 @@ func SaveLastWorkflow(projectDir, name string) {
 
 // SaveConfig writes app-managed user commands to commands.local.json.
 // The hand-written layer (Base) is excluded via the json:"-" tag.
-// A legacy config.json is removed after a successful write so the
-// project migrates to the new name.
 func SaveConfig(projectDir string, cfg model.Config) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := writeFileAtomic(filepath.Join(projectDir, "commands.local.json"), data); err != nil {
-		return err
-	}
-	_ = os.Remove(filepath.Join(projectDir, "config.json"))
-	return nil
+	return writeFileAtomic(filepath.Join(projectDir, "commands.local.json"), data)
 }
 
 // writeFileAtomic writes to a temp file then renames it over the target,

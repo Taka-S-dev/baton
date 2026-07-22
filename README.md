@@ -143,7 +143,6 @@ A project has two command layers:
 | `commands.local.json` | baton (via **Create command → From template**) | Template-derived commands (identity only; values live in vars.tsv) |
 
 Both layers can coexist; names in `commands.local.json` take priority.
-Legacy file names (`templates.json`, `template.json`, `templates.tsv`, `config.tsv`, `config.json`) are still readable.
 
 ### commands.json
 
@@ -177,7 +176,7 @@ deploy	deploy		echo deploying {env}
 | `workdir`   | No       | Working directory (leave empty to use current). Supports `{placeholders}` |
 | `cmd`   | Yes*     | Command to execute. Supports `{placeholders}` |
 | `shell` | No       | `"ps"` for PowerShell (`powershell` on Windows, `pwsh` on Linux/macOS), omit to use the platform default (`cmd /C` on Windows, `sh -c` elsewhere) |
-| `slots` | No       | Maps slot names to list names (see Placeholders). `vars` is accepted as a legacy alias |
+| `slots` | No       | Maps slot names to list names (see Placeholders) |
 | `template` | No    | Name of a slotted command this entry derives from (used by TUI-created commands) |
 | `values` | No      | Slot values applied to the template. The baked `cmd` is recomputed from `template` + `values` on every load, so template edits propagate |
 
