@@ -55,6 +55,16 @@ func (m Model) View() string {
 		view = m.viewEditList(w)
 	case ScreenDeleteList:
 		view = m.viewDeleteList("Delete list", m.listItems, w)
+	case ScreenManageVars:
+		view = m.viewSingleSelect("Manage vars", w)
+	case ScreenEditVarPick:
+		view = m.viewEditVarPick(w)
+	case ScreenVarForm:
+		view = m.viewVarForm(w)
+	case ScreenDeleteVar:
+		view = m.viewDeleteList("Delete variable", m.listItems, w)
+	case ScreenVarRebase:
+		view = m.viewVarRebase(w)
 	case ScreenSwitchConfig:
 		view = m.viewSingleSelect("Switch config", w)
 	case ScreenManageCommands:
@@ -157,7 +167,7 @@ type menuGroup struct {
 
 var mainMenuGroups = []menuGroup{
 	{"Run", []string{"Run workflow", "Run commands"}},
-	{"Manage", []string{"Manage workflows", "Manage commands", "Manage lists"}},
+	{"Manage", []string{"Manage workflows", "Manage commands", "Manage lists", "Manage vars"}},
 	{"", []string{"Switch config", "Exit"}},
 }
 
@@ -175,6 +185,7 @@ var menuItemInfos = map[string]menuItemInfo{
 	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage lists":     {desc: "Create, edit or delete selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Manage vars":      {desc: "Project variables ({$name}): change one value to move every reference at once.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Switch config":    {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
 	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
@@ -1010,6 +1021,110 @@ func (m Model) viewEditListPick(w int) string {
 	return b.String()
 }
 
+// ── Manage vars ──────────────────────────────────────────────────────────────
+
+// writeVarRefsPreview renders where the hovered variable is referenced.
+func (m Model) writeVarRefsPreview(b *strings.Builder, name string, w int) {
+	b.WriteString("\n" + hlineLabel(w, "referenced by") + "\n")
+	refs := m.varRefLocations(name)
+	if len(refs) == 0 {
+		b.WriteString("  " + gray("(nothing — safe to delete)") + "\n")
+		return
+	}
+	maxShow := min(5, len(refs))
+	for i := 0; i < maxShow; i++ {
+		b.WriteString("  " + gray("·") + " " + refs[i] + "\n")
+	}
+	if len(refs) > maxShow {
+		b.WriteString("  " + dim(fmt.Sprintf("... +%d more", len(refs)-maxShow)) + "\n")
+	}
+}
+
+func (m Model) viewEditVarPick(w int) string {
+	var b strings.Builder
+	b.WriteString("\n" + header("Edit variable", w) + "\n")
+	m.writePickFilter(&b)
+	if len(m.listItems) == 0 {
+		b.WriteString("  " + gray("(no variables yet)") + "\n")
+	} else {
+		for i, item := range m.listItems {
+			if i == m.listCursor {
+				b.WriteString("  " + accentBold("▶") + " " + item + "\n")
+			} else {
+				b.WriteString("    " + item + "\n")
+			}
+		}
+		if m.listCursor < len(m.listItems) {
+			m.writeVarRefsPreview(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
+		}
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("↑↓ Enter: edit   Esc: back") + "\n")
+	return b.String()
+}
+
+func (m Model) viewVarForm(w int) string {
+	ve := m.ve
+	var b strings.Builder
+	title := "Create variable"
+	if ve.mode == 1 {
+		title = "Edit variable"
+	}
+	b.WriteString("\n" + header(title, w) + "\n\n")
+	if ve.mode == 0 && ve.fieldIdx == 0 {
+		b.WriteString("  " + accent("name  > ") + m.nameInput.View() + "\n")
+		b.WriteString("  " + gray("value >") + "\n")
+	} else {
+		b.WriteString("  " + gray("name  > ") + white(ve.name) + "\n")
+		b.WriteString("  " + accent("value > ") + m.nameInput.View() + "\n")
+	}
+	b.WriteString("\n  " + dim("referenced as ") + slotVar("{$"+displayOr(ve.name, "name")+"}") +
+		dim(" in cmd / workdir / list values") + "\n")
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("Enter: next / save   Esc: back") + "\n")
+	return b.String()
+}
+
+// displayOr returns s, or fallback when s is empty.
+func displayOr(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
+}
+
+func (m Model) viewVarRebase(w int) string {
+	vr := m.vr
+	var b strings.Builder
+	b.WriteString("\n" + header("Rebase values onto {$"+vr.varName+"}", w) + "\n\n")
+	b.WriteString("  " + fmt.Sprintf("%d literal value(s) start with the old value.", len(vr.items)) + "\n")
+	b.WriteString("  " + gray("Rewrite the checked ones to ") + slotVar("{$"+vr.varName+"}") +
+		gray(" references so they follow future changes:") + "\n\n")
+
+	labelCol := 0
+	for _, it := range vr.items {
+		if lw := len(it.label); lw > labelCol {
+			labelCol = lw
+		}
+	}
+	for i, it := range vr.items {
+		check := dim("[ ]")
+		if it.on {
+			check = success("[x]")
+		}
+		pad := strings.Repeat(" ", labelCol-len(it.label)+2)
+		row := check + " " + it.label + pad + it.oldValue + "  " + gray("→") + "  " + white(it.newValue)
+		if i == vr.cursor {
+			b.WriteString("  " + accentBold("▶") + " " + row + "\n")
+		} else {
+			b.WriteString("    " + row + "\n")
+		}
+	}
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("↑↓  Tab: toggle   Enter: apply   Esc: keep literals") + "\n")
+	return b.String()
+}
+
 // ── Delete list (with confirmation) ──────────────────────────────────────────
 
 func (m Model) viewDeleteList(title string, items []string, w int) string {
@@ -1049,6 +1164,10 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 	if m.screen == ScreenDeleteList && !m.deleteConfirm &&
 		m.listCursor >= 0 && m.listCursor < len(items) {
 		m.writeListEntriesPreview(&b, items[m.listCursor], w)
+	}
+	if m.screen == ScreenDeleteVar && !m.deleteConfirm &&
+		m.listCursor >= 0 && m.listCursor < len(items) {
+		m.writeVarRefsPreview(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	if m.deleteConfirm {

@@ -64,6 +64,8 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor = 0
 		case "Manage lists":
 			m.gotoManageLists()
+		case "Manage vars":
+			m.gotoVarsMgmt()
 		case "Switch config":
 			m.screen = ScreenSwitchConfig
 			m.listItems = m.projects

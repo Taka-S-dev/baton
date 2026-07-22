@@ -107,6 +107,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateEditList(msg)
 		case ScreenDeleteList:
 			return m.updateDeleteLists(msg)
+		case ScreenManageVars:
+			return m.updateVarsMgmt(msg)
+		case ScreenEditVarPick:
+			return m.updateEditVarPick(msg)
+		case ScreenVarForm:
+			return m.updateVarForm(msg)
+		case ScreenDeleteVar:
+			return m.updateDeleteVars(msg)
+		case ScreenVarRebase:
+			return m.updateVarRebase(msg)
 		case ScreenManageCommands:
 			return m.updateManageCommands(msg)
 		case ScreenCreateCommandKind:

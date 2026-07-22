@@ -41,6 +41,11 @@ const (
 	ScreenEditListPick
 	ScreenEditList
 	ScreenDeleteList
+	ScreenManageVars
+	ScreenEditVarPick
+	ScreenVarForm
+	ScreenDeleteVar
+	ScreenVarRebase
 	ScreenSwitchConfig
 	ScreenManageCommands
 	ScreenEditCommandPick
@@ -160,6 +165,35 @@ func (s *slotPickState) applyFilter() {
 			s.filtered = append(s.filtered, e)
 		}
 	}
+}
+
+// varEditState holds state for the variable create/edit form.
+type varEditState struct {
+	mode     int    // 0=create, 1=edit
+	name     string // being typed (create) or fixed (edit)
+	fieldIdx int    // create: 0=name, 1=value
+	oldValue string // edit: value before the change, drives the rebase offer
+}
+
+// varRebaseItem is one literal value that starts with a variable's old
+// value and can be rewritten to a {$name} reference.
+type varRebaseItem struct {
+	kind     int    // 0 = scoped vars.tsv value, 1 = list entry
+	key      string // kind 0: vars map key ("command.slot")
+	listName string // kind 1
+	entryIdx int    // kind 1
+	label    string // display: where the value lives
+	oldValue string
+	newValue string
+	on       bool
+}
+
+// varRebaseState holds the post-edit offer to rewrite matching literals
+// into references. Replacement is prefix-anchored, never substring.
+type varRebaseState struct {
+	varName string
+	items   []varRebaseItem
+	cursor  int
 }
 
 // resolveFlowState tracks multi-command slot resolution.
@@ -288,6 +322,10 @@ type Model struct {
 	pickTexts  []string
 	pickMap    []int
 
+	// Manage vars picks: pickBase holds display labels ("name = value"),
+	// varPickNames the raw names, parallel to pickBase.
+	varPickNames []string
+
 	// Multi-select
 	msItems     []msItem
 	msCursor    int
@@ -298,6 +336,10 @@ type Model struct {
 
 	// Slot picking
 	sp *slotPickState
+
+	// Manage vars
+	ve *varEditState
+	vr *varRebaseState
 
 	// Resolve flow (Run commands / Run workflow)
 	resolve *resolveFlowState

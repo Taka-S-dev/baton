@@ -279,7 +279,23 @@ deploy	deploy		deploy --env {env} --dir {$root}
 
 **Per-command fixed values** (rows with a command name) are written by baton itself: when you save a template-derived command, the slot values you picked land here instead of inside `commands.local.json`. Every fixed value of every saved command is editable in this one file, and baton keeps the table in sync when commands are renamed or deleted.
 
-When the project moves — a new phase folder, another drive, someone else's machine — edit `root` (or find & replace inside this single file) and every command, saved value, and list entry that references it follows.
+When the project moves — a new phase folder, another drive, someone else's machine — change `root` once and every command, saved value, and list entry that references it follows.
+
+### Manage vars
+
+**Manage vars** in the TUI edits the global rows: create, change a value, delete (with a "referenced by" preview so you see the impact first). Changing a value is not string replacement — everything written as `{$root}` follows automatically because it references the variable, so unrelated values that merely look similar can never be caught.
+
+Values that contain the old value as a **literal** (a hand-typed path in a saved value or a list entry) don't follow by themselves. After a change, baton scans for literals that *start with* the old value and offers to rewrite them into `{$name}` references:
+
+```
+  [ Rebase values onto {$root} ]
+  ▶ [x] saved value build-api.workdir   C:\demo\phase1\api  →  {$root}\api
+    [x] list project                    C:\demo\phase1\web  →  {$root}\web
+    [ ] list project                    C:\demo\phase1docs  →  (odd boundary: off by default)
+  ↑↓  Tab: toggle   Enter: apply   Esc: keep literals
+```
+
+The match is prefix-anchored — values containing the old value somewhere in the middle are never candidates — and a match whose next character isn't a path separator defaults to unchecked. Applied values become references, so the next move is a one-line change.
 
 Rules:
 
