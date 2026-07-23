@@ -320,6 +320,36 @@ func TestDeleteScopedValue(t *testing.T) {
 	}
 }
 
+// TestVarForm_PromptNotDoubled guards the shared textinput's prompt:
+// the var form sets its own field prompts, and the plain name inputs
+// must reset the prompt afterwards instead of showing a leftover.
+func TestVarForm_PromptNotDoubled(t *testing.T) {
+	m := varsModel(t)
+	nm, _ := m.updateVarsMgmt(tea.KeyMsg{Type: tea.KeyEnter}) // Create
+	m = nm.(Model)
+	if m.nameInput.Prompt != "name  > " {
+		t.Fatalf("create form prompt = %q, want the form's own field prompt", m.nameInput.Prompt)
+	}
+	view := m.viewVarForm(80)
+	if strings.Contains(view, "Name >") {
+		t.Fatalf("default prompt leaked into the var form:\n%s", view)
+	}
+
+	m.nameInput.SetValue("root")
+	nm, _ = m.updateVarForm(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.nameInput.Prompt != "value > " {
+		t.Fatalf("value field prompt = %q", m.nameInput.Prompt)
+	}
+
+	// A later plain name input must get its default prompt back.
+	nm, _ = m.openNameInput(nameInputWorkflow)
+	m = nm.(Model)
+	if m.nameInput.Prompt != "Name > " {
+		t.Fatalf("openNameInput prompt = %q, want the default restored", m.nameInput.Prompt)
+	}
+}
+
 // TestVarRefLocations counts references across commands, lists and
 // saved values.
 func TestVarRefLocations(t *testing.T) {

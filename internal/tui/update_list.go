@@ -18,6 +18,9 @@ import (
 
 func (m Model) openNameInput(mode nameInputMode) (tea.Model, tea.Cmd) {
 	m.nameInput.SetValue("")
+	// Other forms (command fields, vars) repurpose the shared input with
+	// their own prompts — reset so a leftover prompt never leaks in here.
+	m.nameInput.Prompt = "Name > "
 	m.nameInputMode = mode
 	m.nameInputErr = ""
 	m.screen = ScreenNameInput

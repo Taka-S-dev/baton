@@ -1087,12 +1087,14 @@ func (m Model) viewVarForm(w int) string {
 		title = "Edit variable"
 	}
 	b.WriteString("\n" + header(title, w) + "\n\n")
+	// The textinput renders its own "name > " / "value > " prompt; the
+	// inactive field is echoed as plain text with a matching label.
 	if ve.mode == 0 && ve.fieldIdx == 0 {
-		b.WriteString("  " + accent("name  > ") + m.nameInput.View() + "\n")
+		b.WriteString("  " + m.nameInput.View() + "\n")
 		b.WriteString("  " + gray("value >") + "\n")
 	} else {
 		b.WriteString("  " + gray("name  > ") + white(ve.name) + "\n")
-		b.WriteString("  " + accent("value > ") + m.nameInput.View() + "\n")
+		b.WriteString("  " + m.nameInput.View() + "\n")
 	}
 	if cmdName, slotName, scoped := scopedKey(ve.name); scoped {
 		b.WriteString("\n  " + dim("fixed value of command \""+cmdName+"\", slot \""+slotName+"\"") + "\n")

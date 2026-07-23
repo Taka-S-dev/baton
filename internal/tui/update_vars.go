@@ -135,6 +135,7 @@ func (m Model) updateVarsMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "Create variable (global)":
 			m.ve = &varEditState{mode: 0}
 			m.nameInput.SetValue("")
+			m.nameInput.Prompt = "name  > "
 			m.screen = ScreenVarForm
 			return m, m.nameInput.Focus()
 		case "Edit variable":
@@ -166,6 +167,7 @@ func (m Model) updateEditVarPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		name := m.varPickNames[m.pickOrig(m.listCursor)]
 		m.ve = &varEditState{mode: 1, name: name, oldValue: m.vars[name]}
 		m.nameInput.SetValue(m.vars[name])
+		m.nameInput.Prompt = "value > "
 		m.screen = ScreenVarForm
 		return m, m.nameInput.Focus()
 	case "esc":
@@ -199,6 +201,7 @@ func (m Model) updateVarForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			ve.name = val
 			ve.fieldIdx = 1
 			m.nameInput.SetValue("")
+			m.nameInput.Prompt = "value > "
 			return m, nil
 		}
 		if val == "" {
@@ -210,6 +213,7 @@ func (m Model) updateVarForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if ve.mode == 0 && ve.fieldIdx == 1 {
 			ve.fieldIdx = 0
 			m.nameInput.SetValue(ve.name)
+			m.nameInput.Prompt = "name  > "
 			return m, nil
 		}
 		m.ve = nil

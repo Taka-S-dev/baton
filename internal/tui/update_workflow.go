@@ -93,6 +93,7 @@ func (m Model) updateEditWorkflowMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch m.listItems[m.listCursor] {
 		case "Rename":
 			m.nameInput.SetValue(m.workflows[m.editTargetIdx].Name)
+			m.nameInput.Prompt = "Name > "
 			m.nameInputMode = nameInputEditWorkflow
 			m.nameInputErr = ""
 			m.screen = ScreenNameInput

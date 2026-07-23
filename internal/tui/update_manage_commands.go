@@ -446,6 +446,7 @@ func (m *Model) updateEditCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch m.listItems[m.listCursor] {
 		case "Rename":
 			m.nameInput.SetValue(m.sce.name)
+			m.nameInput.Prompt = "Name > "
 			m.nameInputMode = nameInputRenameCommand
 			m.nameInputErr = ""
 			m.screen = ScreenNameInput
