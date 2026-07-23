@@ -165,6 +165,22 @@ func TestViewDeleteCommand_ShowsPreview(t *testing.T) {
 	}
 }
 
+// TestViewDeleteCommand_MarksSavedCommands checks Delete command rows use
+// the shared picker labels: saved (template-derived) commands carry the
+// $ marker and their template name, like the edit picker.
+func TestViewDeleteCommand_MarksSavedCommands(t *testing.T) {
+	m := Model{width: 80, height: 24, screen: ScreenDeleteCommand}
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make {x}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Cmd: "make src", Source: "local"}}
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+
+	view := m.viewDeleteList("Delete commands", m.listItems, 80)
+	if !strings.Contains(view, "$") || !strings.Contains(view, "(build)") {
+		t.Fatalf("saved command must carry the $ marker and its template:\n%s", view)
+	}
+}
+
 // TestViewSlotPick_Variadic checks the multi-pick rendering: checkbox
 // markers on entries, the joined picks in the command preview, and the
 // Tab hint in the key guide.

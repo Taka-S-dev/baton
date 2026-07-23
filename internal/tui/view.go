@@ -748,6 +748,23 @@ func (m Model) writePickFilter(b *strings.Builder) {
 	b.WriteString("  " + accent("/") + " " + white(m.pickSearch) + dim("_") + "  " + count + "\n\n")
 }
 
+// commandPickLabel renders a command's row label the same way in every
+// picker: $ and the template name for derived commands, the group tag,
+// and {...} for slotted ones.
+func (m Model) commandPickLabel(cmd *mdl.Command) string {
+	label := cmd.Name
+	if cmd.Group != "" {
+		label += "  " + sGroup.Render("["+cmd.Group+"]")
+	}
+	switch {
+	case cmd.Template != "":
+		label = accent("$") + " " + label + "  " + gray("("+cmd.Template+")")
+	case slot.HasPlaceholders(*cmd):
+		label += "  " + gray("{...}")
+	}
+	return label
+}
+
 // writeCommandHover renders the hover panel for a command: template and
 // values for derived commands, the resolved command line otherwise.
 func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
@@ -796,17 +813,7 @@ func (m Model) viewEditCommandPick(w int) string {
 	}
 	m.writePickFilter(&b)
 	for i := range m.listItems {
-		cmd := m.editRefCommand(m.editRefs[m.pickOrig(i)])
-		label := cmd.Name
-		if cmd.Group != "" {
-			label += "  " + sGroup.Render("["+cmd.Group+"]")
-		}
-		switch {
-		case cmd.Template != "":
-			label = accent("$") + " " + label + "  " + gray("("+cmd.Template+")")
-		case slot.HasPlaceholders(*cmd):
-			label += "  " + gray("{...}")
-		}
+		label := m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
 		if i == m.listCursor {
 			b.WriteString("  " + accentBold("▶") + " " + label + "\n")
 		} else {
@@ -1166,6 +1173,11 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 			check := gray("[ ]")
 			if selectedSet[m.pickOrig(i)] {
 				check = warn("[x]")
+			}
+			// Delete command rows carry the same markers as every other
+			// command picker ($ template, group, {...}).
+			if m.screen == ScreenDeleteCommand {
+				item = m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
 			}
 			if i == m.listCursor {
 				b.WriteString("  " + accentBold("▶") + " " + check + " " + item + "\n")
