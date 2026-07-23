@@ -136,7 +136,14 @@ func TestEditVariable_RebaseOffer(t *testing.T) {
 		t.Fatalf("list entry must be a default-on candidate: %+v", it)
 	}
 
-	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter}) // apply defaults
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter}) // → confirm window
+	m = nm.(Model)
+	if !m.vr.confirm {
+		t.Fatal("Enter with checked items must open the No/Yes window")
+	}
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyTab}) // → Yes
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter})
 	m = nm.(Model)
 	if m.screen != ScreenManageVars || !strings.Contains(m.successMsg, "rebased 2") {
 		t.Fatalf("apply must return with a rebase notice, got %q", m.successMsg)
@@ -317,6 +324,200 @@ func TestDeleteScopedValue(t *testing.T) {
 	}
 	if !strings.Contains(m.successMsg, "prompted at run time") {
 		t.Fatalf("notice must explain the un-fix, got %q", m.successMsg)
+	}
+}
+
+// TestEditScopedValue_PropagateOffer checks editing a fixed value whose
+// old value is shared by OTHER rows opens an explicit propagate offer:
+// the edited row is excluded, non-matching rows are not candidates, and
+// applying changes the checked rows and syncs their commands.
+func TestEditScopedValue_PropagateOffer(t *testing.T) {
+	m := varsModel(t)
+	if err := os.MkdirAll(filepath.Join(m.projectDir, "lists"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{
+		{Name: "ddd", Template: "build", Values: map[string]string{"workdir": "./src"}, Dir: "./src", Cmd: "make", Source: "local"},
+		{Name: "fffff", Template: "build", Values: map[string]string{"workdir": "./src"}, Dir: "./src", Cmd: "make", Source: "local"},
+	}
+	m.vars = map[string]string{
+		"ddd.workdir":   "./src",
+		"fffff.workdir": "./src",
+		"other.workdir": "./elsewhere",
+	}
+	m.lists = map[string][]mdl.ListEntry{"paths": {{Value: "./src"}, {Value: "./elsewhere"}}}
+
+	m.ve = &varEditState{mode: 1, name: "ddd.workdir", oldValue: "./src"}
+	nm, _ := m.saveVar("./step")
+	m = nm.(Model)
+	if m.screen != ScreenVarRebase || m.vr == nil || !m.vr.propagate {
+		t.Fatalf("shared old value must open the propagate offer, screen=%v", m.screen)
+	}
+	if len(m.vr.items) != 2 {
+		t.Fatalf("items = %+v, want fffff.workdir and the list entry only", m.vr.items)
+	}
+	for _, it := range m.vr.items {
+		if it.key == "ddd.workdir" {
+			t.Fatal("the edited row must not be offered to itself")
+		}
+		if !it.on || it.newValue != "./step" {
+			t.Fatalf("exact match must default on with the new value: %+v", it)
+		}
+	}
+
+	// Enter opens the No/Yes window; No returns to the checklist untouched.
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter}) // No (default)
+	m = nm.(Model)
+	if m.vr == nil || m.vr.confirm || m.vars["fffff.workdir"] != "./src" {
+		t.Fatalf("No must return to the checklist without applying, vars=%v", m.vars)
+	}
+
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter}) // → confirm
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyTab}) // → Yes
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.vars["fffff.workdir"] != "./step" || m.vars["other.workdir"] != "./elsewhere" {
+		t.Fatalf("vars after propagate = %v", m.vars)
+	}
+	if m.lists["paths"][0].Value != "./step" || m.lists["paths"][1].Value != "./elsewhere" {
+		t.Fatalf("lists after propagate = %+v", m.lists["paths"])
+	}
+	cmd, _ := m.config.FindCommand("fffff")
+	if cmd.Dir != "./step" {
+		t.Fatalf("command must re-bake with the propagated value, got %+v", cmd)
+	}
+	if !strings.Contains(m.successMsg, "changed 2 matching value(s)") {
+		t.Fatalf("notice = %q", m.successMsg)
+	}
+}
+
+// TestEditScopedValue_PropagateEscKeepsOthers checks Esc applies nothing
+// beyond the edited row itself.
+func TestEditScopedValue_PropagateEscKeepsOthers(t *testing.T) {
+	m := varsModel(t)
+	m.vars = map[string]string{"ddd.workdir": "./src", "fffff.workdir": "./src"}
+
+	m.ve = &varEditState{mode: 1, name: "ddd.workdir", oldValue: "./src"}
+	nm, _ := m.saveVar("./step")
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEscape})
+	m = nm.(Model)
+	if m.vars["ddd.workdir"] != "./step" || m.vars["fffff.workdir"] != "./src" {
+		t.Fatalf("Esc must keep the others, got %v", m.vars)
+	}
+}
+
+// TestEditListEntry_PropagateOffer checks the symmetric direction:
+// editing a list entry whose old value other places share (fixed
+// values, other lists) opens the same offer, applying syncs
+// everything, and the flow returns to the entry editor with a fresh
+// working copy.
+func TestEditListEntry_PropagateOffer(t *testing.T) {
+	m := varsModel(t)
+	if err := os.MkdirAll(filepath.Join(m.projectDir, "lists"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{{Name: "bbb", Template: "build", Values: map[string]string{"workdir": "./src"}, Dir: "./src", Cmd: "make", Source: "local"}}
+	m.vars = map[string]string{"bbb.workdir": "./src"}
+	m.lists = map[string][]mdl.ListEntry{
+		"paths":  {{Value: "./src", Label: "src"}, {Value: "./other"}},
+		"backup": {{Value: "./src"}},
+	}
+	m.le = &listEditState{name: "paths", entries: append([]mdl.ListEntry{}, m.lists["paths"]...), fromPick: true}
+	m.le.editing = true
+	m.le.editValTI = newListTextinput("Value > ", "./step")
+	m.le.editLblTI = newListTextinput("Label > ", "src")
+	m.le.editFld = 1
+	m.screen = ScreenEditList
+
+	nm, _ := m.updateEditList(tea.KeyMsg{Type: tea.KeyEnter}) // save entry
+	m = nm.(Model)
+	if m.screen != ScreenVarRebase || m.vr == nil || !m.vr.propagate || !m.vr.returnToList {
+		t.Fatalf("shared old value must open the propagate offer, screen=%v", m.screen)
+	}
+	// Candidates: the fixed value and backup's entry — NOT the edited
+	// entry itself, and not ./other.
+	if len(m.vr.items) != 2 {
+		t.Fatalf("items = %+v, want the fixed value and the backup entry", m.vr.items)
+	}
+
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter}) // → confirm
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyTab}) // → Yes
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+
+	if m.screen != ScreenEditList {
+		t.Fatalf("flow must return to the entry editor, screen=%v", m.screen)
+	}
+	if m.vars["bbb.workdir"] != "./step" || m.lists["backup"][0].Value != "./step" {
+		t.Fatalf("propagate missed a target: vars=%v backup=%v", m.vars, m.lists["backup"])
+	}
+	cmd, _ := m.config.FindCommand("bbb")
+	if cmd.Dir != "./step" {
+		t.Fatalf("command must re-bake, got %+v", cmd)
+	}
+	if m.le.entries[0].Value != "./step" {
+		t.Fatalf("editor working copy must be refreshed, got %+v", m.le.entries)
+	}
+	raw, _ := os.ReadFile(filepath.Join(m.projectDir, "lists", "backup.tsv"))
+	if !strings.Contains(string(raw), "./step") {
+		t.Fatalf("backup.tsv = %q", raw)
+	}
+}
+
+// TestCreateVariable_ExtractsLiterals checks the create-time offer:
+// creating a global whose value matches existing literals proposes
+// rewriting them to {$name}, so values that should move together end
+// up sharing the variable — the safe alternative to propagating a
+// scoped edit to other rows that merely hold the same string.
+func TestCreateVariable_ExtractsLiterals(t *testing.T) {
+	m := varsModel(t)
+	m.config.Base = []mdl.Command{{Name: "say", Cmd: "echo {message}", Source: "tsv"}}
+	m.config.Commands = []mdl.Command{
+		{Name: "aaaa", Template: "say", Values: map[string]string{"message": "hello"}, Cmd: "echo hello", Source: "local"},
+		{Name: "ddd", Template: "say", Values: map[string]string{"message": "hello"}, Cmd: "echo hello", Source: "local"},
+	}
+	m.vars = map[string]string{"aaaa.message": "hello", "ddd.message": "hello"}
+
+	m.ve = &varEditState{mode: 0, name: "msg"}
+	nm, _ := m.saveVar("hello")
+	m = nm.(Model)
+	if m.screen != ScreenVarRebase || m.vr == nil || !m.vr.created {
+		t.Fatalf("create with matching literals must open the extraction offer, screen=%v", m.screen)
+	}
+	if len(m.vr.items) != 2 {
+		t.Fatalf("items = %+v, want both scoped values", m.vr.items)
+	}
+	for _, it := range m.vr.items {
+		if !it.on || it.newValue != "{$msg}" {
+			t.Fatalf("exact matches must default on and become plain references: %+v", it)
+		}
+	}
+
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter}) // → confirm
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyTab}) // → Yes
+	m = nm.(Model)
+	nm, _ = m.updateVarRebase(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.vars["aaaa.message"] != "{$msg}" || m.vars["ddd.message"] != "{$msg}" {
+		t.Fatalf("vars after extraction = %v", m.vars)
+	}
+	if !strings.Contains(m.successMsg, "created") || !strings.Contains(m.successMsg, "rebased 2") {
+		t.Fatalf("notice = %q", m.successMsg)
+	}
+	// Both commands re-baked; {$msg} resolves at run time.
+	cmd, _ := m.config.FindCommand("aaaa")
+	if cmd.Values["message"] != "{$msg}" {
+		t.Fatalf("command not synced: %+v", cmd)
 	}
 }
 

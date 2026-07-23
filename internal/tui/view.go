@@ -1125,14 +1125,38 @@ func displayOr(s, fallback string) string {
 func (m Model) viewVarRebase(w int) string {
 	vr := m.vr
 	var b strings.Builder
-	b.WriteString("\n" + header("Rebase values onto {$"+vr.varName+"}", w) + "\n\n")
-	b.WriteString("  " + fmt.Sprintf("%d literal value(s) start with the old value.", len(vr.items)) + "\n")
-	b.WriteString("  " + gray("Rewrite the checked ones to ") + slotVar("{$"+vr.varName+"}") +
-		gray(" references so they follow future changes:") + "\n\n")
+	if vr.propagate {
+		b.WriteString("\n" + header("Change matching values too?", w) + "\n\n")
+		// The edit that opened this window is already saved — say so, so
+		// Esc clearly keeps it and only skips the values below.
+		b.WriteString("  " + success("✓") + " " + white(vr.varName) + "   " +
+			vr.editedOld + "  " + gray("→") + "  " + accent(vr.editedNew) + "  " + dim("(already saved)") + "\n\n")
+		b.WriteString("  " + fmt.Sprintf("%d other value(s) shared the old value.", len(vr.items)) + "\n")
+		b.WriteString("  " + gray("Apply the same change to the checked ones:") + "\n")
+		b.WriteString("  " + dim("(tip: values that should always move together can share a") + "\n")
+		b.WriteString("  " + dim(" global — Create variable (global) extracts them into {$name})") + "\n\n")
+	} else {
+		b.WriteString("\n" + header("Rebase values onto {$"+vr.varName+"}", w) + "\n\n")
+		if vr.created {
+			b.WriteString("  " + fmt.Sprintf("%d literal value(s) match the new variable's value.", len(vr.items)) + "\n")
+		} else {
+			b.WriteString("  " + fmt.Sprintf("%d literal value(s) start with the old value.", len(vr.items)) + "\n")
+		}
+		b.WriteString("  " + gray("Rewrite the checked ones to ") + slotVar("{$"+vr.varName+"}") +
+			gray(" references so they follow future changes:") + "\n\n")
+	}
 
+	// Rows: kind tag, then where the value lives, then the change.
+	kindTag := func(kind int) string {
+		if kind == 0 {
+			return "fixed value"
+		}
+		return "list entry"
+	}
+	const tagCol = len("fixed value")
 	labelCol := 0
 	for _, it := range vr.items {
-		if lw := len(it.label); lw > labelCol {
+		if lw := lipgloss.Width(it.label); lw > labelCol {
 			labelCol = lw
 		}
 	}
@@ -1141,8 +1165,11 @@ func (m Model) viewVarRebase(w int) string {
 		if it.on {
 			check = success("[x]")
 		}
-		pad := strings.Repeat(" ", labelCol-len(it.label)+2)
-		row := check + " " + it.label + pad + it.oldValue + "  " + gray("→") + "  " + white(it.newValue)
+		tag := kindTag(it.kind)
+		tagPad := strings.Repeat(" ", tagCol-len(tag)+2)
+		pad := strings.Repeat(" ", labelCol-lipgloss.Width(it.label)+2)
+		row := check + " " + sGroup.Render("["+tag+"]") + tagPad + white(it.label) + pad +
+			it.oldValue + "  " + gray("→") + "  " + accent(it.newValue)
 		if i == vr.cursor {
 			b.WriteString("  " + accentBold("▶") + " " + row + "\n")
 		} else {
@@ -1150,7 +1177,15 @@ func (m Model) viewVarRebase(w int) string {
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓  Tab: toggle   Enter: apply   Esc: keep literals") + "\n")
+	if vr.confirm {
+		b.WriteString("  " + warn(fmt.Sprintf("Apply %d change(s)?", vr.checkedCount())) + "\n\n")
+		b.WriteString(renderBtns(vr.confirmBtn, "  No  ", "  Yes  ") + "\n")
+		b.WriteString("\n  " + gray("Tab: switch   Enter: confirm   Esc: back") + "\n")
+	} else if vr.propagate {
+		b.WriteString("  " + gray("↑↓  Tab: toggle   Enter: apply   Esc: keep others") + "\n")
+	} else {
+		b.WriteString("  " + gray("↑↓  Tab: toggle   Enter: apply   Esc: keep literals") + "\n")
+	}
 	return b.String()
 }
 

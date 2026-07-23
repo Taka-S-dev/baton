@@ -197,6 +197,7 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				cmd := le.editLblTI.Focus()
 				return m, cmd
 			}
+			oldVal := le.entries[le.cursor].Value
 			le.entries[le.cursor] = mdl.ListEntry{
 				Value: le.editValTI.Value(),
 				Label: le.editLblTI.Value(),
@@ -207,6 +208,16 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.errMsg = "failed to save list: " + err.Error()
 			}
 			m.lists[le.name] = append([]mdl.ListEntry{}, le.entries...)
+			// Other values that shared the old value — fixed values and
+			// entries of any list — can follow, offered explicitly.
+			if newVal := le.editValTI.Value(); oldVal != "" && oldVal != newVal {
+				if vr := m.buildPropagate("list \""+le.name+"\" entry", oldVal, newVal, "", le.name, le.cursor); vr != nil {
+					vr.returnToList = true
+					vr.editedOld, vr.editedNew = oldVal, newVal
+					m.vr = vr
+					m.screen = ScreenVarRebase
+				}
+			}
 		case "esc":
 			le.editing = false
 		default:

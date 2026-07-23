@@ -219,6 +219,33 @@ func TestViewSlotPick_Variadic(t *testing.T) {
 	}
 }
 
+// TestViewVarRebase_LabelsShowKindAndOwner checks the offer rows say
+// what each value is and where it lives: a kind tag, the owning
+// command and slot for fixed values, and the list file for entries.
+func TestViewVarRebase_LabelsShowKindAndOwner(t *testing.T) {
+	m := Model{width: 100, height: 24}
+	m.vr = &varRebaseState{
+		varName:   "bbb.workdir",
+		propagate: true,
+		editedOld: "./src",
+		editedNew: "./step",
+		items: []varRebaseItem{
+			{kind: 0, key: "bbb.workdir", label: fixedValueLabel("bbb.workdir"), oldValue: "./src", newValue: "./step", on: true},
+			{kind: 1, listName: "source_path", entryIdx: 0, label: "lists/source_path.tsv", oldValue: "./src", newValue: "./step", on: true},
+		},
+	}
+	view := m.viewVarRebase(100)
+	for _, want := range []string{
+		"[fixed value]", `command "bbb" · slot "workdir"`,
+		"[list entry]", "lists/source_path.tsv",
+		"(already saved)", // the committed edit is echoed, so Esc clearly keeps it
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("offer row missing %q:\n%s", want, view)
+		}
+	}
+}
+
 // TestViewCommandNameInput_StableValueOrder does the same for the
 // create/edit command name screen, which lists the chosen slot values.
 func TestViewCommandNameInput_StableValueOrder(t *testing.T) {

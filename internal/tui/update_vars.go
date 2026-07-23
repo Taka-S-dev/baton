@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
@@ -86,7 +87,7 @@ func (m *Model) varRefLocations(name string) []string {
 	}
 	for _, k := range sortedKeys(m.vars) {
 		if strings.Contains(k, ".") && strings.Contains(m.vars[k], ref) {
-			out = append(out, "saved value "+k)
+			out = append(out, "fixed value: "+fixedValueLabel(k))
 		}
 	}
 	return out
@@ -245,8 +246,17 @@ func (m Model) saveVar(value string) (tea.Model, tea.Cmd) {
 
 	if _, _, scoped := scopedKey(ve.name); scoped {
 		// A saved command's fixed value: mirror it into the command and
-		// re-bake. No rebase offer — that is for globals.
+		// re-bake. Values that shared the old value can be changed
+		// together — offered explicitly, never applied silently.
 		m.syncScopedVar(ve.name, value, false)
+		if ve.oldValue != "" && ve.oldValue != value {
+			if vr := m.buildPropagate("fixed value "+ve.name, ve.oldValue, value, ve.name, "", -1); vr != nil {
+				vr.editedOld, vr.editedNew = ve.oldValue, value
+				m.vr = vr
+				m.screen = ScreenVarRebase
+				return m, nil
+			}
+		}
 		m.successMsg = "updated fixed value " + ve.name
 		m.gotoVarsMgmt()
 		return m, nil
@@ -262,7 +272,17 @@ func (m Model) saveVar(value string) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// A NEW variable extracts existing literals: values matching the
+	// created value can be rewritten to {$name} on the spot. Resolution
+	// is unchanged (the variable equals the prefix), so this is a pure
+	// extraction — and afterwards one edit moves them all together.
 	if ve.mode == 0 {
+		if vr := m.buildVarRebase(ve.name, value); vr != nil {
+			vr.created = true
+			m.vr = vr
+			m.screen = ScreenVarRebase
+			return m, nil
+		}
 		m.successMsg = "created variable {$" + ve.name + "}"
 	} else {
 		m.successMsg = "updated variable {$" + ve.name + "}"
@@ -303,6 +323,16 @@ func (m Model) updateDeleteVars(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // ── Rebase offer ──────────────────────────────────────────────────────────────
 
+// fixedValueLabel describes a scoped vars.tsv row by its owner:
+// `command "bbb" · slot "workdir"`.
+func fixedValueLabel(key string) string {
+	cmdName, slotName, ok := scopedKey(key)
+	if !ok {
+		return key
+	}
+	return "command \"" + cmdName + "\" · slot \"" + slotName + "\""
+}
+
 // buildVarRebase scans for literal values that start with the variable's
 // old value — scoped vars.tsv values and list entries, the files baton
 // manages. The match is PREFIX-anchored, never substring: values that
@@ -323,7 +353,7 @@ func (m *Model) buildVarRebase(name, oldVal string) *varRebaseState {
 		v := m.vars[k]
 		if strings.Contains(k, ".") && strings.HasPrefix(v, oldVal) {
 			items = append(items, varRebaseItem{
-				kind: 0, key: k, label: "saved value " + k,
+				kind: 0, key: k, label: fixedValueLabel(k),
 				oldValue: v, newValue: ref + v[len(oldVal):], on: cleanBoundary(v),
 			})
 		}
@@ -332,7 +362,7 @@ func (m *Model) buildVarRebase(name, oldVal string) *varRebaseState {
 		for i, e := range m.lists[ln] {
 			if strings.HasPrefix(e.Value, oldVal) {
 				items = append(items, varRebaseItem{
-					kind: 1, listName: ln, entryIdx: i, label: "list " + ln,
+					kind: 1, listName: ln, entryIdx: i, label: "lists/" + ln + ".tsv",
 					oldValue: e.Value, newValue: ref + e.Value[len(oldVal):], on: cleanBoundary(e.Value),
 				})
 			}
@@ -344,8 +374,68 @@ func (m *Model) buildVarRebase(name, oldVal string) *varRebaseState {
 	return &varRebaseState{varName: name, items: items}
 }
 
+// buildPropagate scans for OTHER values that shared an edited value's
+// old value — scoped vars and list entries, prefix-anchored like the
+// rebase scan — and offers to apply the same change to them. subject
+// names the edited thing in the notices; the skip parameters exclude
+// it from its own offer. Values stay literals; sharing a global is the
+// durable way to keep them moving together, and the window says so.
+func (m *Model) buildPropagate(subject, oldVal, newVal, skipVarKey, skipListName string, skipEntryIdx int) *varRebaseState {
+	cleanBoundary := func(v string) bool {
+		if len(v) == len(oldVal) {
+			return true
+		}
+		c := v[len(oldVal)]
+		return c == '\\' || c == '/'
+	}
+	var items []varRebaseItem
+	for _, k := range sortedKeys(m.vars) {
+		v := m.vars[k]
+		if k != skipVarKey && strings.Contains(k, ".") && strings.HasPrefix(v, oldVal) {
+			items = append(items, varRebaseItem{
+				kind: 0, key: k, label: fixedValueLabel(k),
+				oldValue: v, newValue: newVal + v[len(oldVal):], on: cleanBoundary(v),
+			})
+		}
+	}
+	for _, ln := range m.sortedListNames() {
+		for i, e := range m.lists[ln] {
+			if ln == skipListName && i == skipEntryIdx {
+				continue
+			}
+			if strings.HasPrefix(e.Value, oldVal) {
+				items = append(items, varRebaseItem{
+					kind: 1, listName: ln, entryIdx: i, label: "lists/" + ln + ".tsv",
+					oldValue: e.Value, newValue: newVal + e.Value[len(oldVal):], on: cleanBoundary(e.Value),
+				})
+			}
+		}
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return &varRebaseState{varName: subject, propagate: true, items: items}
+}
+
 func (m Model) updateVarRebase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	vr := m.vr
+	if vr.confirm {
+		switch msg.String() {
+		case "tab", "left", "right", "h", "l":
+			vr.confirmBtn = 1 - vr.confirmBtn
+		case "enter":
+			confirmed := vr.confirmBtn == 1
+			vr.confirm = false
+			vr.confirmBtn = 0
+			if confirmed {
+				return m.applyVarRebase()
+			}
+		case "esc":
+			vr.confirm = false
+			vr.confirmBtn = 0
+		}
+		return m, nil
+	}
 	switch msg.String() {
 	case "up":
 		if vr.cursor > 0 {
@@ -358,13 +448,37 @@ func (m Model) updateVarRebase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab":
 		vr.items[vr.cursor].on = !vr.items[vr.cursor].on
 	case "enter":
-		return m.applyVarRebase()
+		// Nothing checked applies nothing — no dialog to confirm.
+		if vr.checkedCount() == 0 {
+			return m.applyVarRebase()
+		}
+		vr.confirm = true
+		vr.confirmBtn = 0
 	case "esc":
 		m.vr = nil
-		m.successMsg = "updated variable {$" + vr.varName + "} (literals left as-is)"
-		m.gotoVarsMgmt()
+		switch {
+		case vr.propagate:
+			m.successMsg = "updated " + vr.varName + " (others left as-is)"
+		case vr.created:
+			m.successMsg = "created variable {$" + vr.varName + "} (literals left as-is)"
+		default:
+			m.successMsg = "updated variable {$" + vr.varName + "} (literals left as-is)"
+		}
+		m.closeRebase(vr)
 	}
 	return m, nil
+}
+
+// closeRebase leaves the offer window for wherever it was opened from.
+func (m *Model) closeRebase(vr *varRebaseState) {
+	if vr.returnToList && m.le != nil {
+		// Applied changes may have touched other entries of the open
+		// list — refresh the editor's working copy before showing it.
+		m.le.entries = append([]mdl.ListEntry{}, m.lists[m.le.name]...)
+		m.screen = ScreenEditList
+		return
+	}
+	m.gotoVarsMgmt()
 }
 
 func (m Model) applyVarRebase() (tea.Model, tea.Cmd) {
@@ -399,12 +513,22 @@ func (m Model) applyVarRebase() (tea.Model, tea.Cmd) {
 		}
 	}
 	name := vr.varName
-	m.vr = nil
-	if applied == 0 {
-		m.successMsg = "updated variable {$" + name + "} (literals left as-is)"
-	} else {
-		m.successMsg = fmt.Sprintf("updated {$%s} and rebased %d value(s) onto it", name, applied)
+	verb := "updated"
+	if vr.created {
+		verb = "created"
 	}
-	m.gotoVarsMgmt()
+	propagated := vr.propagate
+	m.vr = nil
+	switch {
+	case propagated && applied == 0:
+		m.successMsg = "updated " + name + " (others left as-is)"
+	case propagated:
+		m.successMsg = fmt.Sprintf("updated %s and changed %d matching value(s) with it", name, applied)
+	case applied == 0:
+		m.successMsg = verb + " variable {$" + name + "} (literals left as-is)"
+	default:
+		m.successMsg = fmt.Sprintf("%s {$%s} and rebased %d value(s) onto it", verb, name, applied)
+	}
+	m.closeRebase(vr)
 	return m, nil
 }

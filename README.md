@@ -286,7 +286,9 @@ When the project moves — a new phase folder, another drive, someone else's mac
 **Manage vars** in the TUI shows the whole table — globals first, then every saved command's fixed values — and edits it in place:
 
 - **Globals**: create, change a value (with a "referenced by" preview), delete. Changing a value is not string replacement — everything written as `{$root}` follows automatically because it references the variable, so unrelated values that merely look similar can never be caught.
+- **Creating a global extracts literals**: if existing values match the new variable's value, baton offers to rewrite them into `{$name}` references on the spot (resolution unchanged). That is the intended way to make several values move together — two rows that merely hold the same string are never propagated into each other.
 - **Fixed values** (`command.slot` rows): edit the value directly — a shortcut past **Edit command → Change values** when you just want to fix a path or a typo. Deleting one **un-fixes the slot**: that placeholder is prompted at run time again. New rows are never created here; they appear when you save a template-derived command.
+- **Editing a fixed value whose old value other rows share** opens a "change matching values too?" offer — same prefix-anchored, checkbox-previewed mechanics as the rebase window, applied to the literals you check. Nothing is ever propagated silently; for values that should *always* move together, extract a global instead.
 
 Values that contain the old value as a **literal** (a hand-typed path in a saved value or a list entry) don't follow by themselves. After a change, baton scans for literals that *start with* the old value and offers to rewrite them into `{$name}` references:
 

@@ -189,11 +189,37 @@ type varRebaseItem struct {
 }
 
 // varRebaseState holds the post-edit offer to rewrite matching literals
-// into references. Replacement is prefix-anchored, never substring.
+// into references (rebase), or — after a scoped value edit — to apply
+// the same change to other values that shared the old value (propagate).
+// Both are prefix-anchored, never substring, and always opt-in.
 type varRebaseState struct {
-	varName string
-	items   []varRebaseItem
-	cursor  int
+	varName    string // global name (rebase) or the edited key (propagate)
+	created    bool   // offer follows a Create (pure extraction) vs an edit
+	propagate  bool   // literal-to-literal propagation after a scoped edit
+	items      []varRebaseItem
+	cursor     int
+	confirm    bool // No/Yes window is up (same shape as the delete flows)
+	confirmBtn int  // 0=No, 1=Yes
+
+	// The offer opened from the list entry editor: return there instead
+	// of the vars submenu when it closes.
+	returnToList bool
+
+	// The already-committed edit that triggered a propagate offer,
+	// echoed in the window so it's clear Esc keeps it.
+	editedOld string
+	editedNew string
+}
+
+// checkedCount returns how many items are toggled on.
+func (s *varRebaseState) checkedCount() int {
+	n := 0
+	for _, it := range s.items {
+		if it.on {
+			n++
+		}
+	}
+	return n
 }
 
 // resolveFlowState tracks multi-command slot resolution.
