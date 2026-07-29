@@ -19,11 +19,8 @@ type DoneMsg struct {
 func Exec(idx int, cmd model.Command, dryRun bool) tea.Cmd {
 	if dryRun {
 		return func() tea.Msg {
-			fmt.Printf("\n  [dry-run] %s\n  $ %s\n", cmd.Name, cmd.Cmd)
-			if cmd.Dir != "" {
-				fmt.Printf("    dir: %s\n", cmd.Dir)
-			}
-			fmt.Println()
+			// The step header already echoes the name, command, and workdir.
+			fmt.Printf("   [dry-run] skipped\n")
 			return DoneMsg{Index: idx}
 		}
 	}

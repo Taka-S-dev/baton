@@ -61,6 +61,17 @@ func (m Model) startRunningRetry(items []mdl.RunItem, startIdx int, label string
 	)
 }
 
+// stepHeader builds the lines printed before a step runs: position, name,
+// workdir, and the resolved command line so the exact invocation is visible
+// in the scrollback.
+func stepHeader(pos, total int, name string, cmd mdl.Command) string {
+	h := fmt.Sprintf("\n── [%d/%d] %s", pos, total, name)
+	if cmd.Dir != "" {
+		h += fmt.Sprintf("   workdir: %s", cmd.Dir)
+	}
+	return h + fmt.Sprintf("\n   $ %s", cmd.Cmd)
+}
+
 func (m Model) runNext() tea.Cmd {
 	r := m.running
 	if r.current >= len(r.items) {
@@ -68,10 +79,7 @@ func (m Model) runNext() tea.Cmd {
 	}
 	item := r.items[r.current]
 	cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
-	stepHeader := fmt.Sprintf("\n── [%d/%d] %s", r.current+1, len(r.items), item.Name)
-	if cmd.Dir != "" {
-		stepHeader += fmt.Sprintf("   workdir: %s", cmd.Dir)
-	}
+	header := stepHeader(r.current+1, len(r.items), item.Name, cmd)
 	prefix := ""
 	if r.current == r.startIdx {
 		label := r.label
@@ -85,7 +93,7 @@ func (m Model) runNext() tea.Cmd {
 		}
 		prefix = "\n" + sep + "\n"
 	}
-	return tea.Sequence(tea.Println(prefix+stepHeader), runner.Exec(r.current, cmd, m.dryRun))
+	return tea.Sequence(tea.Println(prefix+header), runner.Exec(r.current, cmd, m.dryRun))
 }
 
 func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {

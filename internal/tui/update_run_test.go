@@ -24,6 +24,33 @@ func wfModel() Model {
 	return m
 }
 
+// TestStepHeader_ShowsResolvedCommand checks that the header printed before
+// each step echoes the resolved command line, so users can see (and re-run)
+// exactly what executed.
+func TestStepHeader_ShowsResolvedCommand(t *testing.T) {
+	cases := []struct {
+		name string
+		cmd  mdl.Command
+		want string
+	}{
+		{
+			name: "with workdir",
+			cmd:  mdl.Command{Name: "deploy", Cmd: "kubectl apply -n prod", Dir: "infra"},
+			want: "\n── [2/3] deploy   workdir: infra\n   $ kubectl apply -n prod",
+		},
+		{
+			name: "without workdir",
+			cmd:  mdl.Command{Name: "build", Cmd: "make build"},
+			want: "\n── [2/3] build\n   $ make build",
+		},
+	}
+	for _, c := range cases {
+		if got := stepHeader(2, 3, c.cmd.Name, c.cmd); got != c.want {
+			t.Errorf("%s: stepHeader = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 // TestWfFiltered_AndSearch checks the Run workflow list search: AND terms
 // matching the workflow name, its command names, and the command bodies.
 func TestWfFiltered_AndSearch(t *testing.T) {

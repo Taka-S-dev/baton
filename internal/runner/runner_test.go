@@ -1,6 +1,8 @@
 package runner_test
 
 import (
+	"io"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -8,6 +10,25 @@ import (
 	"github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/runner"
 )
+
+// captureStdout runs fn with os.Stdout redirected and returns what it printed.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+	defer func() { os.Stdout = old }()
+	fn()
+	w.Close()
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}
 
 // ── Shell selection (buildExec is tested via Exec dry-run) ────────────────────
 
@@ -27,6 +48,22 @@ func TestExec_DryRun_ReturnsCmd(t *testing.T) {
 	}
 	if done.Err != nil {
 		t.Errorf("want no error, got %v", done.Err)
+	}
+}
+
+// TestExec_DryRun_SkipMarkerOnly checks the dry-run branch prints only a skip
+// marker: the step header already echoes the name, command, and workdir, so
+// repeating them here would double up in the scrollback.
+func TestExec_DryRun_SkipMarkerOnly(t *testing.T) {
+	cmd := model.Command{Name: "build", Cmd: "echo hello", Dir: "/tmp"}
+	out := captureStdout(t, func() { runner.Exec(0, cmd, true)() })
+	if !strings.Contains(out, "[dry-run]") {
+		t.Errorf("want [dry-run] marker, got %q", out)
+	}
+	for _, dup := range []string{"echo hello", "build", "/tmp"} {
+		if strings.Contains(out, dup) {
+			t.Errorf("dry-run output repeats %q already shown in the step header: %q", dup, out)
+		}
 	}
 }
 
