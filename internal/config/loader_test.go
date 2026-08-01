@@ -240,6 +240,40 @@ func TestExampleProjectsLoad(t *testing.T) {
 
 // TestLoadProject_Warnings checks the diagnostics behind `baton check`:
 // a project wired with known mistakes reports each of them.
+// TestDiagnose_DeadVarRows checks fixed-value rows that can never apply
+// are warned about: a name column matching no slot of the template, and
+// a command column naming a command that is not template-derived. Valid
+// rows and globals stay quiet.
+func TestDiagnose_DeadVarRows(t *testing.T) {
+	cfg := model.Config{
+		Base: []model.Command{
+			{Name: "build", Cmd: "make {mode}", Dir: "{workdir}"},
+			{Name: "plain", Cmd: "echo hi"},
+		},
+		Commands: []model.Command{{Name: "as", Template: "build"}},
+	}
+	vars := map[string]string{
+		"as.workdir":  "./src",  // applies — must stay quiet
+		"as.workdirx": "./typo", // matches no slot
+		"plain.x":     "v",      // command is not template-derived
+		"root":        `C:\x`,   // global — never scoped
+	}
+
+	warnings := Diagnose(cfg, nil, nil, vars)
+	joined := strings.Join(warnings, "; ")
+	for _, want := range []string{
+		`"as.workdirx" is not a slot of template "build"`,
+		`"plain.x" has no effect`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("warnings missing %q, got %q", want, joined)
+		}
+	}
+	if len(warnings) != 2 {
+		t.Fatalf("warnings = %q, want exactly the two dead rows flagged", warnings)
+	}
+}
+
 func TestLoadProject_Warnings(t *testing.T) {
 	dir := t.TempDir()
 	tsv := "name\tgroup\tworkdir\tcmd\tshell\tslots\n" +

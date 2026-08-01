@@ -352,7 +352,7 @@ Unlike command renames, name changes inside `vars.tsv` are not auto-repaired —
 
 - **Renaming a global** (`*` row): every `{$oldname}` reference stays literal, and the startup warning names each command and list still using it. Update the references yourself, or create the new name via **Manage vars** and let the rebase offer rewrite the values.
 - **Changing the command column** of a fixed-value row detaches the value: that slot is prompted at run time again, the row is flagged as belonging to an unknown command, and the next TUI save removes it.
-- **Changing the name column** of a fixed-value row to something that isn't a slot of the template: the value silently stops applying and the slot is prompted at run time.
+- **Changing the name column** of a fixed-value row to something that isn't a slot of the template: the value stops applying, the slot is prompted at run time again, and the startup warning flags the row.
 
 In short: rename commands in `commands.tsv`, rename variables through their references, and treat the first two columns of `vars.tsv` as addresses rather than free text.
 

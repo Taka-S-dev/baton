@@ -147,5 +147,42 @@ func Diagnose(cfg model.Config, workflows []model.Workflow, lists map[string][]m
 	for _, name := range orphans {
 		warnings = append(warnings, "vars.tsv: values for unknown command \""+name+"\" (removed on next save)")
 	}
+	// Fixed-value rows whose command exists but that can never apply —
+	// the command is not template-derived, or the name column matches no
+	// slot of the template. Without a warning these fail silently: the
+	// value stops applying and the slot is prompted at run time.
+	var scoped []string
+	for k := range vars {
+		if strings.Contains(k, ".") {
+			scoped = append(scoped, k)
+		}
+	}
+	sort.Strings(scoped)
+	for _, k := range scoped {
+		i := strings.LastIndex(k, ".")
+		cmdName, slotName := k[:i], k[i+1:]
+		cmd, ok := cfg.FindCommand(cmdName)
+		if !ok {
+			continue // already reported as an orphan
+		}
+		if cmd.Template == "" {
+			warnings = append(warnings, "vars.tsv: \""+k+"\" has no effect (\""+cmdName+"\" is not template-derived)")
+			continue
+		}
+		tpl, ok := cfg.FindCommand(cmd.Template)
+		if !ok || tpl.Template != "" {
+			continue // the missing-template warning covers this command
+		}
+		found := false
+		for _, def := range slot.GetSlots(tpl) {
+			if def.Name == slotName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			warnings = append(warnings, "vars.tsv: \""+k+"\" is not a slot of template \""+tpl.Name+"\"")
+		}
+	}
 	return warnings
 }
