@@ -18,6 +18,7 @@ func (m Model) startConfirmRun(items []mdl.RunItem, label string) (tea.Model, te
 	m.confirmRunItems = items
 	m.confirmRunLabel = label
 	m.confirmRunBtn = 0
+	m.confirmRunScroll = 0
 	m.screen = ScreenConfirmRun
 	m.resolve = nil
 	m.sp = nil
@@ -26,6 +27,14 @@ func (m Model) startConfirmRun(items []mdl.RunItem, label string) (tea.Model, te
 
 func (m Model) updateConfirmRun(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "up":
+		if m.confirmRunScroll > 0 {
+			m.confirmRunScroll--
+		}
+	case "down":
+		if m.confirmRunScroll < max(0, len(m.confirmRunItems)-m.confirmRunPerPage()) {
+			m.confirmRunScroll++
+		}
 	case "tab", "left", "right":
 		m.confirmRunBtn = 1 - m.confirmRunBtn
 	case "enter":

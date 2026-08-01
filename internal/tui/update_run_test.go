@@ -110,3 +110,29 @@ func TestUpdateRunWorkflow_SearchKeys(t *testing.T) {
 		t.Fatalf("second Esc: screen=%v, want main menu", m.screen)
 	}
 }
+
+// TestUpdateConfirmRun_ScrollClampsToLastPage checks ↑↓ scroll the item
+// window and stop at the edges: Up at the top and Down past the last
+// page must both be no-ops, so the counter can never drift off-screen.
+func TestUpdateConfirmRun_ScrollClampsToLastPage(t *testing.T) {
+	m := Model{width: 80, height: 20, screen: ScreenConfirmRun}
+	cmd := mdl.Command{Name: "c", Cmd: "echo hi"}
+	for i := 0; i < 10; i++ {
+		m.confirmRunItems = append(m.confirmRunItems, mdl.RunItem{Name: "c", Cmd: &cmd})
+	}
+
+	nm, _ := m.updateConfirmRun(tea.KeyMsg{Type: tea.KeyUp})
+	m = nm.(Model)
+	if m.confirmRunScroll != 0 {
+		t.Fatalf("scroll = %d after Up at the top, want 0", m.confirmRunScroll)
+	}
+
+	maxScroll := len(m.confirmRunItems) - m.confirmRunPerPage()
+	for i := 0; i < 50; i++ {
+		nm, _ = m.updateConfirmRun(tea.KeyMsg{Type: tea.KeyDown})
+		m = nm.(Model)
+	}
+	if m.confirmRunScroll != maxScroll {
+		t.Fatalf("scroll = %d after holding Down, want clamp at %d", m.confirmRunScroll, maxScroll)
+	}
+}

@@ -363,34 +363,21 @@ func (m Model) viewRunWorkflow(w int) string {
 		cur = max(0, n-1)
 	}
 
-	if n == 0 {
-		b.WriteString("  " + gray("No results.") + "\n")
-	} else {
-		// Reserve lines for preview panel + footer
-		previewH := min(len(m.workflows[filtered[cur]].Commands), 5) + 2
-		viewH := max(1, m.height-10-previewH)
-		viewStart := max(0, min(cur-viewH/2, n-viewH))
-		viewEnd := min(viewStart+viewH, n)
-
-		if viewStart > 0 {
-			b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
+	// The steps viewport below has a fixed height, so budget against it
+	// instead of the hovered workflow's step count — a per-item budget
+	// makes the list grow and shrink as the cursor moves.
+	viewH := m.listBudget(&b, m.stepsVP.Height+5)
+	writeWindowedList(&b, viewH, n, cur, "No results.", func(i int) string {
+		wf := m.workflows[filtered[i]]
+		suffix := ""
+		if wf.Name == m.lastWorkflow {
+			suffix = "  " + gray("(last)")
 		}
-		for i := viewStart; i < viewEnd; i++ {
-			wf := m.workflows[filtered[i]]
-			suffix := ""
-			if wf.Name == m.lastWorkflow {
-				suffix = "  " + gray("(last)")
-			}
-			if i == cur {
-				b.WriteString("  " + accentBold("▶") + " " + bold(wf.Name) + suffix + "\n")
-			} else {
-				b.WriteString("    " + wf.Name + suffix + "\n")
-			}
+		if i == cur {
+			return "  " + accentBold("▶") + " " + bold(wf.Name) + suffix
 		}
-		if viewEnd < n {
-			b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-viewEnd)) + "\n")
-		}
-	}
+		return "    " + wf.Name + suffix
+	})
 
 	// Step preview for hovered workflow (scrollable viewport)
 	if m.stepsFocused {
@@ -414,32 +401,15 @@ func (m Model) viewMultiSelect(w int) string {
 	}
 	filtered := m.msFiltered()
 	n := len(filtered)
-	if m.msCursor >= n && n > 0 {
-		// cursor out of bounds after filter — benign, view clamps it
-	}
 
-	// Fixed-height layout: the list region (viewH rows + 2 marker lines)
-	// and the preview (previewH lines) are padded to a constant size, so
-	// the frame never exceeds the terminal height. An overflowing frame
-	// makes the terminal itself scroll on every repaint, which the user
-	// sees as the whole screen jittering while moving the cursor.
-	previewH := 3
-	for i := range m.msItems {
-		if h := hoverHeight(m.msItems[i].cmd); h > previewH {
-			previewH = h
+	previewH := maxLines(len(m.msItems), 3, func(i int, tb *strings.Builder) {
+		if cmd := m.msItems[i].cmd; cmd != nil {
+			m.writeCommandHover(tb, cmd, w)
 		}
-	}
-	viewH := max(1, m.height-14-previewH)
+	})
 	cursor := m.msCursor
 	if cursor >= n {
 		cursor = max(0, n-1)
-	}
-	viewStart := m.msViewStart
-	if cursor < viewStart {
-		viewStart = cursor
-	}
-	if cursor >= viewStart+viewH {
-		viewStart = cursor - viewH + 1
 	}
 
 	var b strings.Builder
@@ -447,68 +417,47 @@ func (m Model) viewMultiSelect(w int) string {
 
 	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))) + "\n\n")
 
-	if viewStart > 0 {
-		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
-	} else {
-		b.WriteString("\n")
-	}
-	rows := 0
-	if n == 0 {
-		b.WriteString("  " + gray("No results.") + "\n")
-		rows = 1
-	} else {
-		viewEnd := min(viewStart+viewH, n)
-		rows = viewEnd - viewStart
-		for i := viewStart; i < viewEnd; i++ {
-			origIdx := filtered[i]
-			item := m.msItems[origIdx]
+	viewH := m.listBudget(&b, previewH+5)
+	writeWindowedList(&b, viewH, n, cursor, "No results.", func(i int) string {
+		origIdx := filtered[i]
+		item := m.msItems[origIdx]
 
-			selOrder := -1
-			for j, s := range m.msSelected {
-				if s == origIdx {
-					selOrder = j
-					break
-				}
-			}
-			check := gray("[ ]")
-			if selOrder >= 0 {
-				check = sSelNum.Render(fmt.Sprintf("[%d]", selOrder+1))
-			}
-
-			var label string
-			if item.cmd.Template != "" {
-				grp := ""
-				if item.cmd.Group != "" {
-					grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
-				}
-				label = accent("$") + " " + item.cmd.Name + grp + "  " + gray("("+item.cmd.Template+")")
-			} else {
-				grp := ""
-				if item.cmd.Group != "" {
-					grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
-				}
-				hasVars := ""
-				if slot.HasPlaceholders(*item.cmd) {
-					hasVars = "  " + gray("{...}")
-				}
-				label = item.cmd.Name + grp + hasVars
-			}
-
-			if i == cursor {
-				b.WriteString("  " + accentBold("▶") + " " + check + " " + label + "\n")
-			} else {
-				b.WriteString("    " + check + " " + label + "\n")
+		selOrder := -1
+		for j, s := range m.msSelected {
+			if s == origIdx {
+				selOrder = j
+				break
 			}
 		}
-	}
-	for ; rows < viewH; rows++ {
-		b.WriteString("\n")
-	}
-	if viewStart+viewH < n {
-		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-(viewStart+viewH))) + "\n")
-	} else {
-		b.WriteString("\n")
-	}
+		check := gray("[ ]")
+		if selOrder >= 0 {
+			check = sSelNum.Render(fmt.Sprintf("[%d]", selOrder+1))
+		}
+
+		var label string
+		if item.cmd.Template != "" {
+			grp := ""
+			if item.cmd.Group != "" {
+				grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
+			}
+			label = accent("$") + " " + item.cmd.Name + grp + "  " + gray("("+item.cmd.Template+")")
+		} else {
+			grp := ""
+			if item.cmd.Group != "" {
+				grp = "  " + sGroup.Render("["+item.cmd.Group+"]")
+			}
+			hasVars := ""
+			if slot.HasPlaceholders(*item.cmd) {
+				hasVars = "  " + gray("{...}")
+			}
+			label = item.cmd.Name + grp + hasVars
+		}
+
+		if i == cursor {
+			return "  " + accentBold("▶") + " " + check + " " + label
+		}
+		return "    " + check + " " + label
+	})
 
 	// Hover preview, padded to previewH so the footer below never moves.
 	b.WriteString("\n")
@@ -522,10 +471,7 @@ func (m Model) viewMultiSelect(w int) string {
 	if pv.Len() == 0 {
 		pv.WriteString(hline(w) + "\n")
 	}
-	b.WriteString(pv.String())
-	for i := strings.Count(pv.String(), "\n"); i < previewH; i++ {
-		b.WriteString("\n")
-	}
+	writePadded(&b, pv.String(), previewH)
 
 	var selNames []string
 	for _, idx := range m.msSelected {
@@ -679,18 +625,11 @@ func (m Model) viewSlotPick(w int) string {
 	}
 
 	// List
-	contextLines := 0
-	if sp.contextNames != nil {
-		contextLines = len(sp.contextNames) + 3
-	}
-	viewH := max(1, m.height-8-contextLines)
 	skipRow := len(sp.filtered) + 1
 	total := skipRow
 	if sp.canSkip {
 		total++
 	}
-	viewStart := max(0, min(sp.cursor-viewH/2, total-viewH))
-	viewEnd := min(viewStart+viewH, total)
 
 	// Compute label column alignment
 	labelCol := 0
@@ -700,15 +639,12 @@ func (m Model) viewSlotPick(w int) string {
 		}
 	}
 
-	if viewStart > 0 {
-		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
-	}
-	for i := viewStart; i < viewEnd; i++ {
+	viewH := m.listBudget(&b, 3)
+	writeWindowedList(&b, viewH, total, sp.cursor, "", func(i int) string {
 		isCustom := i == len(sp.filtered)
 		isSkip := sp.canSkip && i == skipRow
-		selected := i == sp.cursor
 
-		if selected {
+		if i == sp.cursor {
 			// Render raw text inside sCursor to avoid ANSI width miscalculation
 			var rawLine string
 			if isSkip {
@@ -735,39 +671,35 @@ func (m Model) viewSlotPick(w int) string {
 					}
 				}
 			}
-			b.WriteString(sCursor.Width(w-2).Render("    "+rawLine) + "\n")
-		} else {
-			var line string
-			if isSkip {
-				line = dim("[ → skip — resolve at run time ]")
-			} else if isCustom {
-				if sp.search != "" {
-					line = accent("[") + " + " + white(sp.search) + "  " + dim("(custom)") + accent(" ]")
-				} else {
-					line = dim("[ + custom value ]")
-				}
+			return sCursor.Width(w - 2).Render("    " + rawLine)
+		}
+		var line string
+		if isSkip {
+			line = dim("[ → skip — resolve at run time ]")
+		} else if isCustom {
+			if sp.search != "" {
+				line = accent("[") + " + " + white(sp.search) + "  " + dim("(custom)") + accent(" ]")
 			} else {
-				e := sp.filtered[i]
-				if e.Label != "" {
-					pad := strings.Repeat(" ", max(1, labelCol-len(e.Value)))
-					line = white(e.Value) + dim(pad+"·  "+e.Label)
+				line = dim("[ + custom value ]")
+			}
+		} else {
+			e := sp.filtered[i]
+			if e.Label != "" {
+				pad := strings.Repeat(" ", max(1, labelCol-len(e.Value)))
+				line = white(e.Value) + dim(pad+"·  "+e.Label)
+			} else {
+				line = white(e.Value)
+			}
+			if sp.variadic {
+				if sp.isPicked(e.Value) {
+					line = success("[x] ") + line
 				} else {
-					line = white(e.Value)
-				}
-				if sp.variadic {
-					if sp.isPicked(e.Value) {
-						line = success("[x] ") + line
-					} else {
-						line = dim("[ ] ") + line
-					}
+					line = dim("[ ] ") + line
 				}
 			}
-			b.WriteString("    " + line + "\n")
 		}
-	}
-	if viewEnd < total {
-		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", total-viewEnd)) + "\n")
-	}
+		return "    " + line
+	})
 
 	b.WriteString("\n" + hline(w) + "\n")
 	if sp.variadic {
@@ -889,22 +821,6 @@ func (m Model) commandPickLabel(cmd *mdl.Command) string {
 
 // writeCommandHover renders the hover panel for a command: template and
 // values for derived commands, the resolved command line otherwise.
-// hoverHeight returns the number of lines writeCommandHover emits for cmd,
-// so callers can reserve a fixed-size preview region up front.
-func hoverHeight(cmd *mdl.Command) int {
-	if cmd == nil {
-		return 1
-	}
-	if cmd.Template != "" {
-		h := 3 // label + template + resolved cmd
-		if len(cmd.Values) > 0 {
-			h += 1 + len(cmd.Values)
-		}
-		return h
-	}
-	return 3 // label + cmd + workdir
-}
-
 func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
 	if cmd.Template != "" {
 		b.WriteString(hlineLabel(w, "command") + "\n")
@@ -976,10 +892,33 @@ func (m Model) viewEditCommandPick(w int) string {
 
 // ── Confirm run ──────────────────────────────────────────────────────────────
 
+// confirmRunPerPage returns how many three-line items fit on the confirm
+// screen. The view and the ↑↓ handler share it so scrolling stops exactly
+// at the last page.
+func (m Model) confirmRunPerPage() int {
+	var b strings.Builder
+	b.WriteString("\n" + header("Confirm", m.width) + "\n")
+	return max(1, m.listBudget(&b, 6)/3)
+}
+
 func (m Model) viewConfirmRun(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Confirm", w) + "\n")
-	for i, item := range m.confirmRunItems {
+
+	// Every item spans three lines, so the window scrolls whole items.
+	// There is no row cursor here — ↑↓ move the window directly.
+	n := len(m.confirmRunItems)
+	perPage := m.confirmRunPerPage()
+	scroll := min(max(0, m.confirmRunScroll), max(0, n-perPage))
+	end := min(scroll+perPage, n)
+
+	if scroll > 0 {
+		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", scroll)) + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+	for i := scroll; i < end; i++ {
+		item := m.confirmRunItems[i]
 		b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
 		if item.Cmd != nil {
 			b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
@@ -988,11 +927,22 @@ func (m Model) viewConfirmRun(w int) string {
 				workdir = "."
 			}
 			b.WriteString("         " + dim("workdir: "+workdir) + "\n")
+		} else {
+			b.WriteString("\n\n")
 		}
 	}
+	for pad := end - scroll; pad < perPage; pad++ {
+		b.WriteString("\n\n\n")
+	}
+	if end < n {
+		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-end)) + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+
 	b.WriteString("\n" + hline(w) + "\n\n")
 	b.WriteString(renderBtns(m.confirmRunBtn, "  Run  ", "  Cancel  ") + "\n")
-	b.WriteString("\n  " + gray("Tab: switch   Enter: confirm   Esc: back") + "\n")
+	b.WriteString("\n  " + gray("↑↓: scroll   Tab: switch   Enter: confirm   Esc: back") + "\n")
 	return b.String()
 }
 

@@ -353,12 +353,11 @@ type Model struct {
 	varPickNames []string
 
 	// Multi-select
-	msItems     []msItem
-	msCursor    int
-	msViewStart int
-	msSelected  []int
-	msSearchTI  textinput.Model
-	msEscArmed  bool // first Esc with selections pressed; next Esc discards
+	msItems    []msItem
+	msCursor   int
+	msSelected []int
+	msSearchTI textinput.Model
+	msEscArmed bool // first Esc with selections pressed; next Esc discards
 
 	// Slot picking
 	sp *slotPickState
@@ -374,9 +373,10 @@ type Model struct {
 	pendingWorkflowCmds []string
 
 	// Confirm run
-	confirmRunItems []mdl.RunItem
-	confirmRunLabel string
-	confirmRunBtn   int
+	confirmRunItems  []mdl.RunItem
+	confirmRunLabel  string
+	confirmRunBtn    int
+	confirmRunScroll int
 
 	// Running
 	running *runningState

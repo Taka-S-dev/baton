@@ -17,7 +17,6 @@ import (
 func (m *Model) setupMultiSelect() tea.Cmd {
 	m.msItems = nil
 	m.msCursor = 0
-	m.msViewStart = 0
 	m.msSelected = nil
 	for i := range m.config.Base {
 		m.msItems = append(m.msItems, msItem{cmd: &m.config.Base[i]})
@@ -129,7 +128,6 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.msSearchTI.Value() != "" {
 			m.msSearchTI.SetValue("")
 			m.msCursor = 0
-			m.msViewStart = 0
 			return m, nil
 		}
 		if len(m.msSelected) > 0 && !escArmed {
@@ -153,7 +151,6 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.msSearchTI, cmd = m.msSearchTI.Update(msg)
 		if m.msSearchTI.Value() != prevSearch {
 			m.msCursor = 0
-			m.msViewStart = 0
 		}
 		return m, cmd
 	}

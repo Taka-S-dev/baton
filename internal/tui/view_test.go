@@ -251,6 +251,63 @@ func TestViewPickScreens_FixedHeight(t *testing.T) {
 	}
 }
 
+// TestViewSlotPick_FixedHeight checks the slot picker frame stays a
+// constant size that fits the terminal while the cursor sweeps the
+// entries, the custom row and the skip row.
+func TestViewSlotPick_FixedHeight(t *testing.T) {
+	cmd := mdl.Command{Name: "up", Cmd: "up {env}"}
+	var entries []mdl.ListEntry
+	for i := 0; i < 30; i++ {
+		entries = append(entries, mdl.ListEntry{Value: fmt.Sprintf("env-%02d", i)})
+	}
+	m := Model{width: 80, height: 20}
+	m.sp = &slotPickState{
+		slotName: "env", listName: "env", entries: entries,
+		canSkip: true, currentCmd: &cmd, resolvedSoFar: map[string]string{},
+	}
+	m.sp.applyFilter()
+
+	lines := func(s string) int { return strings.Count(s, "\n") }
+	first := lines(m.viewSlotPick(80))
+	if first > m.height {
+		t.Fatalf("view is %d lines for a %d-line terminal", first, m.height)
+	}
+	total := len(m.sp.filtered) + 2 // + custom row + skip row
+	for c := 0; c < total; c++ {
+		m.sp.cursor = c
+		if got := lines(m.viewSlotPick(80)); got != first {
+			t.Fatalf("cursor=%d: view height %d != %d — layout must not shift while scrolling", c, got, first)
+		}
+	}
+}
+
+// TestViewRunWorkflow_FixedHeight checks the workflow list budgets
+// against the fixed steps viewport, not the hovered workflow's step
+// count, so the frame fits the terminal at every cursor position.
+func TestViewRunWorkflow_FixedHeight(t *testing.T) {
+	m := Model{width: 80, height: 20}
+	for i := 0; i < 20; i++ {
+		m.workflows = append(m.workflows, mdl.Workflow{
+			Name: fmt.Sprintf("wf-%02d", i), Commands: []string{"a", "b", "c"},
+		})
+	}
+	m.wfSearchTI = textinput.New()
+	m.updateStepsViewport()
+
+	lines := func(s string) int { return strings.Count(s, "\n") }
+	first := lines(m.viewRunWorkflow(80))
+	if first > m.height {
+		t.Fatalf("view is %d lines for a %d-line terminal", first, m.height)
+	}
+	for c := range m.workflows {
+		m.listCursor = c
+		m.updateStepsViewport()
+		if got := lines(m.viewRunWorkflow(80)); got != first {
+			t.Fatalf("cursor=%d: view height %d != %d — layout must not shift while scrolling", c, got, first)
+		}
+	}
+}
+
 // TestViewEditCommandPick_ShowsPreview checks the edit picker renders a
 // hover preview for the highlighted command: template and values for
 // derived commands, the command line otherwise.
@@ -310,7 +367,9 @@ func TestViewDeleteCommand_MarksSavedCommands(t *testing.T) {
 // Tab hint in the key guide.
 func TestViewSlotPick_Variadic(t *testing.T) {
 	cmd := mdl.Command{Name: "up", Cmd: "docker compose up {services...}"}
-	m := Model{width: 80, height: 24}
+	// Tall enough that the entries, custom row and skip row all fit the
+	// row window — the context panel and command preview eat ~16 lines.
+	m := Model{width: 80, height: 30}
 	m.sp = &slotPickState{
 		slotName: "services", listName: "services", variadic: true,
 		entries:       []mdl.ListEntry{{Value: "api"}, {Value: "web"}, {Value: "worker"}},
