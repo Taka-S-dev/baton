@@ -135,6 +135,19 @@ If multiple projects exist, baton shows a selection screen on startup. Use **Swi
 
 ## Configuration
 
+### Growing a project
+
+A project starts as one file with one line, and every feature is an optional upgrade on top of it. The typical path:
+
+1. **One command.** Create `commands.tsv` with the header and a row — name and cmd are the only required columns. baton now lists and runs it.
+2. **Ask at run time.** Write `make {target}` and baton prompts for `{target}` on each run (free-text for now).
+3. **Pick from a list.** Add `lists/target.tsv`, one value per line — the prompt becomes a searchable picker.
+4. **Extract machine-specific paths.** Move `C:\work\...` into a `*` row of `vars.tsv` and write `{$root}` instead — relocating the project becomes a one-line change.
+5. **Save filled-in variants.** In the TUI, **Create command → From template** turns any slotted command plus concrete values into a new named command. Its files are app-managed — nothing for you to edit.
+6. **Chain into workflows.** **Manage workflows** strings commands into a sequence that runs on one Enter.
+
+Steps 1–4 are plain file edits; 5–6 live in the TUI. The complete file spec — every column, what may be left empty, what references what by name — is [AGENTS.md](AGENTS.md), written for hand-editors and AI agents alike: point an agent at that file and `baton check`, and it can generate or refactor a whole project for you.
+
 ### Which file do I edit?
 
 One kind of data, one editable home. Everything on the left column can be edited by hand (or through the matching TUI screen); the files on the last two rows are app-managed and never need hand edits:
@@ -188,10 +201,10 @@ deploy	deploy		echo deploying {env}
 | Field   | Required | Description |
 |---------|----------|-------------|
 | `name`  | Yes      | Command name |
-| `group` | No       | Group label for filtering |
+| `group` | No       | Group label for filtering. Referenced by nothing — rename or empty it freely. A template-derived entry with an empty group inherits the template's |
 | `workdir`   | No       | Working directory (leave empty to use current). Supports `{placeholders}` |
 | `cmd`   | Yes*     | Command to execute. Supports `{placeholders}` |
-| `shell` | No       | `"ps"` for PowerShell (`powershell` on Windows, `pwsh` on Linux/macOS), omit to use the platform default (`cmd /C` on Windows, `sh -c` elsewhere) |
+| `shell` | No       | `"ps"` for PowerShell (`powershell` on Windows, `pwsh` on Linux/macOS), omit to use the platform default (`cmd /C` on Windows, `sh -c` elsewhere). A template-derived entry with an empty shell inherits the template's |
 | `slots` | No       | Maps slot names to list names (see Placeholders) |
 | `template` | No    | Name of a slotted command this entry derives from (used by TUI-created commands) |
 | `values` | No      | Slot values applied to the template. The baked `cmd` is recomputed from `template` + `values` on every load, so template edits propagate |
@@ -369,8 +382,8 @@ baton check [project|path]
 warning (undefined variables, missing templates, unknown shells, broken
 workflow references, …) and exits non-zero when anything is wrong. Use it
 in CI, or as the verification loop when generating project files with an
-AI agent — the full file-format spec for that lives in
-[AGENTS.md](AGENTS.md).
+AI agent — the complete file spec, shared by hand-editors and agents,
+lives in [AGENTS.md](AGENTS.md).
 
 ```
   [ baton ]
