@@ -198,6 +198,27 @@ build-api	projCmd	Z:\api
 
 The actual command line is recomputed from `template` + `vars.tsv` on every load, so editing either propagates immediately. Deleting the template breaks its derived commands, which the startup warning points out.
 
+### Renaming commands
+
+Command names are the reference key everywhere — workflow steps, the `template` field of derived commands, and per-command `vars.tsv` rows all point at them. Renames keep those references intact from either direction:
+
+- **In the TUI** (Edit command), every reference is rewritten in the same save.
+- **By hand in `commands.tsv` / `commands.json`** — just change the name. baton records each command's name and content fingerprint in `.command_names` (app-managed, like `.last_workflow`), so the next start recognizes "a referenced name vanished, the same content reappeared under a new one" as a rename and offers a one-key repair before the main menu:
+
+```
+  Rename detected
+
+  1 command(s) look renamed outside baton:
+
+    apistart → api-start   2 workflow step(s)
+
+  Update these references to the new names?
+
+  [  No  ] [ ▶Yes  ]
+```
+
+The match is by content, so renaming a command *and* editing its definition in the same session is not detectable — that case falls back to the usual broken-reference warnings. Declining keeps every file untouched and the offer is not repeated.
+
 ## Placeholders and Selection Lists
 
 Use `{name}` placeholders in `cmd` or `workdir` to prompt for a value at runtime.

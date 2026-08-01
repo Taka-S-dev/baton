@@ -57,6 +57,7 @@ const (
 	ScreenEditCommandTemplate
 	ScreenCommandForm
 	ScreenDeleteCommand
+	ScreenRenameRepair
 )
 
 type nameInputMode int
@@ -401,6 +402,15 @@ type Model struct {
 	// Command form (direct input)
 	cf *commandFormState
 
+	// Rename repair: renames detected at load by matching the command
+	// snapshot, offered on the repair screen before the main menu.
+	// snapOld is the snapshot as loaded, minus declined proposals — its
+	// stale entries are carried forward for names still referenced, so
+	// an unresolved rename stays detectable on a later start.
+	renames   []config.Rename
+	renameBtn int // 0=No, 1=Yes
+	snapOld   map[string]string
+
 	editTargetIdx  int
 	mainMenuCursor int
 	lastWorkflow   string
@@ -455,7 +465,7 @@ func New(dryRun bool) (Model, error) {
 		if err := m.loadProject(filepath.Join(projectsDir, projects[0])); err != nil {
 			return Model{}, err
 		}
-		m.gotoMainMenu()
+		m.gotoPostLoad()
 	} else {
 		m.screen = ScreenProjectSelect
 		m.listItems = projects
@@ -477,7 +487,37 @@ func (m *Model) loadProject(projectDir string) error {
 	m.vars = p.Vars
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
 	m.loadWarnings = p.Warnings
+	m.snapOld = config.LoadSnapshot(projectDir)
+	m.renames = config.DetectRenames(p.Config, p.Workflows, p.Vars, m.snapOld)
+	m.renameBtn = 1
 	return nil
+}
+
+// gotoPostLoad enters the rename-repair offer when loading detected
+// hand-edited renames, otherwise the main menu.
+func (m *Model) gotoPostLoad() {
+	if len(m.renames) > 0 {
+		m.gotoRenameRepair()
+		return
+	}
+	m.gotoMainMenu()
+}
+
+// writeSnapshot records every command's name and fingerprint for the
+// next start's rename detection. Stale entries whose names are still
+// referenced somewhere are carried forward. Best-effort, like
+// SaveLastWorkflow: a failed write only costs future detection.
+func (m *Model) writeSnapshot() {
+	entries := make(map[string]string)
+	for _, c := range m.config.AllCommands() {
+		entries[c.Name] = config.Fingerprint(c)
+	}
+	for _, name := range config.DanglingCommandRefs(m.config, m.workflows, m.vars) {
+		if fp, ok := m.snapOld[name]; ok {
+			entries[name] = fp
+		}
+	}
+	_ = config.SaveSnapshot(m.projectDir, entries)
 }
 
 // saveConfig persists user commands to commands.local.json.
@@ -529,6 +569,7 @@ func (m *Model) gotoMainMenu() {
 	// edits since load (deleted commands, workflows, …) are reflected.
 	if m.projectDir != "" {
 		m.loadWarnings = config.Diagnose(m.config, m.workflows, m.lists, m.vars)
+		m.writeSnapshot()
 	}
 	m.listCursor = m.mainMenuCursor
 }

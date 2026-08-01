@@ -17,7 +17,7 @@ func (m Model) updateProjectSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err := m.loadProject(dir); err != nil {
 			m.errMsg = err.Error()
 		} else {
-			m.gotoMainMenu()
+			m.gotoPostLoad()
 		}
 	case "esc", "q":
 		return m, tea.Quit
@@ -90,7 +90,7 @@ func (m Model) updateSwitchConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err := m.loadProject(dir); err != nil {
 			m.errMsg = err.Error()
 		} else {
-			m.gotoMainMenu()
+			m.gotoPostLoad()
 		}
 	case "esc":
 		m.gotoMainMenu()

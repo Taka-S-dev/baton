@@ -83,6 +83,8 @@ func (m Model) View() string {
 		view = m.viewEditCommand(w)
 	case ScreenDeleteCommand:
 		view = m.viewDeleteList("Delete commands", m.listItems, w)
+	case ScreenRenameRepair:
+		view = m.viewRenameRepair(w)
 	}
 	if m.errMsg != "" {
 		view += "\n" + errorText("  Error: "+m.errMsg) + "\n"
@@ -1386,6 +1388,32 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 	} else {
 		b.WriteString("  " + gray("↑↓ Tab: toggle   Enter: confirm   Esc: back") + "\n")
 	}
+	return b.String()
+}
+
+// ── Rename repair ─────────────────────────────────────────────────────────────
+
+func (m Model) viewRenameRepair(w int) string {
+	var b strings.Builder
+	b.WriteString("\n" + header("Rename detected", w) + "\n\n")
+	b.WriteString("  " + warn(fmt.Sprintf("%d command(s) look renamed outside baton:", len(m.renames))) + "\n\n")
+	for _, r := range m.renames {
+		var refs []string
+		if r.WfSteps > 0 {
+			refs = append(refs, fmt.Sprintf("%d workflow step(s)", r.WfSteps))
+		}
+		if r.TplRefs > 0 {
+			refs = append(refs, fmt.Sprintf("%d derived command(s)", r.TplRefs))
+		}
+		if r.VarKeys > 0 {
+			refs = append(refs, fmt.Sprintf("%d vars.tsv row(s)", r.VarKeys))
+		}
+		b.WriteString("    " + r.Old + " " + accentBold("→") + " " + r.New + "   " + gray(strings.Join(refs, ", ")) + "\n")
+	}
+	b.WriteString("\n  Update these references to the new names?\n\n")
+	b.WriteString(renderBtns(m.renameBtn, "  No  ", "  Yes  ") + "\n")
+	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString("  " + gray("←→ Tab: switch   Enter: confirm   Esc: keep as is") + "\n")
 	return b.String()
 }
 

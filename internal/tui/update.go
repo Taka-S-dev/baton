@@ -135,6 +135,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateDeleteCommand(msg)
 		case ScreenSwitchConfig:
 			return m.updateSwitchConfig(msg)
+		case ScreenRenameRepair:
+			return m.updateRenameRepair(msg)
 		}
 	}
 	return m, nil
