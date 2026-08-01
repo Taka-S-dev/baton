@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -10,6 +11,40 @@ import (
 )
 
 // ── Workflow management ───────────────────────────────────────────────────────
+
+// suggestWorkflowName proposes "cmd1+cmd2+cmd3" (a "+n" tail counts the
+// rest) from the picked commands, so workflow names show what they run.
+// A numeric suffix resolves collisions with existing workflow names.
+func (m Model) suggestWorkflowName() string {
+	cmds := m.pendingWorkflowCmds
+	if len(cmds) == 0 {
+		return ""
+	}
+	shown := cmds
+	if len(shown) > 3 {
+		shown = shown[:3]
+	}
+	base := strings.Join(shown, "+")
+	if rest := len(cmds) - len(shown); rest > 0 {
+		base += fmt.Sprintf("+%d", rest)
+	}
+	if r := []rune(base); len(r) > 48 {
+		base = strings.TrimRight(string(r[:48]), "+-")
+	}
+	taken := func(n string) bool {
+		for _, wf := range m.workflows {
+			if wf.Name == n {
+				return true
+			}
+		}
+		return false
+	}
+	name := base
+	for i := 2; taken(name); i++ {
+		name = fmt.Sprintf("%s-%d", base, i)
+	}
+	return name
+}
 
 // gotoWorkflowMgmt opens the Manage workflows submenu.
 func (m *Model) gotoWorkflowMgmt() {

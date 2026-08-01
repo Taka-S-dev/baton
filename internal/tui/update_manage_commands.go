@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -735,11 +736,84 @@ func (m *Model) gotoCommandNameInput() (tea.Model, tea.Cmd) {
 		m.screen = ScreenEditCommandName
 		m.nameInput.SetValue(sce.name)
 	} else {
+		// Pre-fill a suggested name so saved commands follow one naming
+		// rule by default — Enter accepts it, editing replaces it.
 		m.screen = ScreenCreateCommandName
-		m.nameInput.SetValue("")
+		m.nameInput.SetValue(m.suggestCommandName())
 	}
 	m.sp = nil
 	return m, m.nameInput.Focus()
+}
+
+// suggestCommandName proposes "<template>-<value>-..." from the picked
+// slot values (in slot order, skipped slots omitted), so saved commands
+// get distinguishable names without inventing a scheme each time.
+//
+// On a collision with an existing name the values are rebuilt with their
+// parent path segment first — two workdirs like app1/src and app2/src
+// usually differ there, not in the basename — and only when that still
+// collides does a numeric suffix step in.
+func (m *Model) suggestCommandName() string {
+	sce := m.sce
+	build := func(segments int) string {
+		parts := []string{m.templateCandidates()[sce.templateRefIdx].Name}
+		for _, s := range sce.currentSlots {
+			if v, ok := sce.currentValues[s.Name]; ok {
+				if p := sanitizeNamePart(v, segments); p != "" {
+					parts = append(parts, p)
+				}
+			}
+		}
+		base := strings.Join(parts, "-")
+		if r := []rune(base); len(r) > 48 {
+			base = strings.TrimRight(string(r[:48]), "-.")
+		}
+		return base
+	}
+	name := build(1)
+	if !m.commandNameTaken(name, -1) {
+		return name
+	}
+	if deep := build(2); deep != name {
+		name = deep
+		if !m.commandNameTaken(name, -1) {
+			return name
+		}
+	}
+	base := name
+	for i := 2; m.commandNameTaken(name, -1); i++ {
+		name = fmt.Sprintf("%s-%d", base, i)
+	}
+	return name
+}
+
+// sanitizeNamePart reduces a slot value to a short name fragment: its
+// last `segments` path segments, lowercased, with everything but
+// letters, digits and dots collapsed into single hyphens.
+func sanitizeNamePart(v string, segments int) string {
+	fields := strings.FieldsFunc(v, func(r rune) bool { return r == '/' || r == '\\' })
+	if len(fields) > segments {
+		fields = fields[len(fields)-segments:]
+	}
+	v = strings.ToLower(strings.Join(fields, "-"))
+	var sb strings.Builder
+	pendingHyphen := false
+	for _, r := range v {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' {
+			if pendingHyphen && sb.Len() > 0 {
+				sb.WriteByte('-')
+			}
+			sb.WriteRune(r)
+			pendingHyphen = false
+		} else {
+			pendingHyphen = true
+		}
+	}
+	out := strings.Trim(sb.String(), "-.")
+	if r := []rune(out); len(r) > 20 {
+		out = strings.TrimRight(string(r[:20]), "-.")
+	}
+	return out
 }
 
 func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd) {

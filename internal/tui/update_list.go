@@ -21,6 +21,11 @@ func (m Model) openNameInput(mode nameInputMode) (tea.Model, tea.Cmd) {
 	// Other forms (command fields, vars) repurpose the shared input with
 	// their own prompts — reset so a leftover prompt never leaks in here.
 	m.nameInput.Prompt = "Name > "
+	if mode == nameInputWorkflow {
+		// Pre-fill a suggested name built from the picked commands —
+		// Enter accepts it, editing replaces it.
+		m.nameInput.SetValue(m.suggestWorkflowName())
+	}
 	m.nameInputMode = mode
 	m.nameInputErr = ""
 	m.screen = ScreenNameInput

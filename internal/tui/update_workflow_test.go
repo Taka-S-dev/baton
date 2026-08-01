@@ -138,3 +138,24 @@ func TestEditWorkflowPick_FilterMapsTarget(t *testing.T) {
 		t.Fatalf("screen = %v, want the mode menu", got.screen)
 	}
 }
+
+// TestSuggestWorkflowName checks the pre-filled workflow name lists the
+// picked commands, counts the overflow, and dodges existing names.
+func TestSuggestWorkflowName(t *testing.T) {
+	m := Model{}
+	m.pendingWorkflowCmds = []string{"build", "test", "deploy", "smoke", "notify"}
+	if got := m.suggestWorkflowName(); got != "build+test+deploy+2" {
+		t.Fatalf("suggested = %q, want %q", got, "build+test+deploy+2")
+	}
+
+	m.pendingWorkflowCmds = []string{"build", "deploy"}
+	m.workflows = []mdl.Workflow{{Name: "build+deploy"}}
+	if got := m.suggestWorkflowName(); got != "build+deploy-2" {
+		t.Fatalf("suggested = %q with a collision, want %q", got, "build+deploy-2")
+	}
+
+	m.pendingWorkflowCmds = nil
+	if got := m.suggestWorkflowName(); got != "" {
+		t.Fatalf("suggested = %q with no commands, want empty", got)
+	}
+}

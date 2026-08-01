@@ -282,6 +282,90 @@ func TestOpenSlotPick_CursorOnCurrentValue(t *testing.T) {
 	}
 }
 
+// TestSuggestCommandName checks the pre-filled name follows one rule —
+// "<template>-<value>-...": values reduce to their sanitized last path
+// segment in slot order, skipped slots drop out, and collisions with
+// existing names get a numeric suffix.
+func TestSuggestCommandName(t *testing.T) {
+	m := &Model{}
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make {mode}", Dir: "{workdir}"}}
+	m.sce = &commandEditState{
+		templateRefIdx: 0,
+		currentSlots:   []slot.Def{{Name: "workdir"}, {Name: "mode"}},
+		currentValues:  map[string]string{"workdir": "./src", "mode": "Fast Build"},
+	}
+	if got := m.suggestCommandName(); got != "build-src-fast-build" {
+		t.Fatalf("suggested = %q, want %q", got, "build-src-fast-build")
+	}
+
+	// A skipped slot is simply absent from the name.
+	delete(m.sce.currentValues, "mode")
+	if got := m.suggestCommandName(); got != "build-src" {
+		t.Fatalf("suggested = %q after skip, want %q", got, "build-src")
+	}
+
+	// A basename collision pulls in the parent path segment — that is
+	// where workdirs like app1/src and app2/src actually differ.
+	m.sce.currentValues["workdir"] = "projects/app1/src"
+	m.config.Commands = []mdl.Command{{Name: "build-src"}}
+	if got := m.suggestCommandName(); got != "build-app1-src" {
+		t.Fatalf("suggested = %q on basename collision, want %q", got, "build-app1-src")
+	}
+
+	// No parent segment to pull in: fall back to a numeric suffix.
+	m.sce.currentValues["workdir"] = "./src"
+	m.config.Commands = []mdl.Command{{Name: "build-src"}, {Name: "build-src-2"}}
+	if got := m.suggestCommandName(); got != "build-src-3" {
+		t.Fatalf("suggested = %q with collisions, want %q", got, "build-src-3")
+	}
+}
+
+// TestSanitizeNamePart checks the value-to-fragment reduction: the last
+// path segment(s), lowercased, non-word runs collapsed to single hyphens.
+func TestSanitizeNamePart(t *testing.T) {
+	cases := map[string]string{
+		"./src":       "src",
+		`Z:\api\`:     "api",
+		"api web":     "api-web",
+		"Feature/X_1": "x-1",
+		"v1.2.3":      "v1.2.3",
+		"///":         "",
+	}
+	for in, want := range cases {
+		if got := sanitizeNamePart(in, 1); got != want {
+			t.Fatalf("sanitizeNamePart(%q, 1) = %q, want %q", in, got, want)
+		}
+	}
+	if got := sanitizeNamePart("projects/app1/src", 2); got != "app1-src" {
+		t.Fatalf("sanitizeNamePart(2 segments) = %q, want %q", got, "app1-src")
+	}
+}
+
+// TestGotoCommandNameInput_PrefillsSuggestion checks the create flow
+// lands on the name input with the suggestion already typed, while the
+// edit flow keeps the command's current name.
+func TestGotoCommandNameInput_PrefillsSuggestion(t *testing.T) {
+	m := &Model{}
+	m.nameInput = textinput.New()
+	m.config.Base = []mdl.Command{{Name: "build", Dir: "{workdir}", Cmd: "make"}}
+	m.sce = &commandEditState{
+		templateRefIdx: 0,
+		currentSlots:   []slot.Def{{Name: "workdir"}},
+		currentValues:  map[string]string{"workdir": "./src"},
+	}
+	m.gotoCommandNameInput()
+	if got := m.nameInput.Value(); got != "build-src" {
+		t.Fatalf("create: name input = %q, want the suggestion %q", got, "build-src")
+	}
+
+	m.sce.mode = 1
+	m.sce.name = "my-name"
+	m.gotoCommandNameInput()
+	if got := m.nameInput.Value(); got != "my-name" {
+		t.Fatalf("edit: name input = %q, want the current name", got)
+	}
+}
+
 // TestCommandForm_CtrlSSavesFromAnyField checks Ctrl+S saves the form
 // without walking the remaining fields.
 func TestCommandForm_CtrlSSavesFromAnyField(t *testing.T) {
