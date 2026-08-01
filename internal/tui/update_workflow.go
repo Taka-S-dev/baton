@@ -195,6 +195,12 @@ func (m Model) renameWorkflow(idx int, name string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	// .last_workflow references workflows by name, so it follows the
+	// rename — otherwise the Run workflow cursor loses its position.
+	if m.lastWorkflow == m.workflows[idx].Name {
+		m.lastWorkflow = name
+		store.SaveLastWorkflow(m.projectDir, name)
+	}
 	m.workflows[idx].Name = name
 	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
 		m.errMsg = "failed to save workflows: " + err.Error()

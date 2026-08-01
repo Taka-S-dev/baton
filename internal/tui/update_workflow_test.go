@@ -8,7 +8,36 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/store"
 )
+
+// TestRenameWorkflow_LastWorkflowFollows checks .last_workflow follows a
+// rename of the workflow it points at, and ignores renames of others.
+func TestRenameWorkflow_LastWorkflowFollows(t *testing.T) {
+	dir := t.TempDir()
+	m := Model{}
+	m.projectDir = dir
+	m.workflows = []mdl.Workflow{
+		{Name: "release", Commands: []string{"build"}},
+		{Name: "ci", Commands: []string{"test"}},
+	}
+	m.lastWorkflow = "release"
+
+	nm, _ := m.renameWorkflow(1, "checks")
+	got := nm.(Model)
+	if got.lastWorkflow != "release" {
+		t.Fatalf("renaming another workflow must not touch lastWorkflow, got %q", got.lastWorkflow)
+	}
+
+	nm, _ = got.renameWorkflow(0, "ship")
+	got = nm.(Model)
+	if got.lastWorkflow != "ship" {
+		t.Fatalf("lastWorkflow = %q, want it to follow the rename", got.lastWorkflow)
+	}
+	if disk := store.LoadLastWorkflow(dir); disk != "ship" {
+		t.Fatalf(".last_workflow = %q, want ship", disk)
+	}
+}
 
 // TestWorkflowMgmt_Navigation checks the Manage workflows submenu mirrors
 // the Manage aliases pattern: Enter opens the chosen action, Esc returns
