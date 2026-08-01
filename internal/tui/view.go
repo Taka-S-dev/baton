@@ -139,14 +139,15 @@ func (m Model) viewProjectSelect(w int) string {
 	}
 	b.WriteString("  " + gray("Command Runner") + "\n\n")
 	b.WriteString(hlineLabel(w, "Projects") + "\n\n")
-	for i, p := range m.projects {
+	viewH := m.listBudget(&b, 3)
+	writeWindowedList(&b, viewH, len(m.projects), m.listCursor, "(no projects)", func(i int) string {
+		p := m.projects[i]
 		count := fmt.Sprintf("%d commands", m.projectCmdCounts[p])
 		if i == m.listCursor {
-			b.WriteString("  " + accentBold("▶") + " " + p + "   " + gray(count) + "\n")
-		} else {
-			b.WriteString("    " + p + "   " + gray(count) + "\n")
+			return "  " + accentBold("▶") + " " + p + "   " + gray(count)
 		}
-	}
+		return "    " + p + "   " + gray(count)
+	})
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ move   Enter select   q quit") + "\n")
 	return b.String()
@@ -321,17 +322,17 @@ func (m Model) viewSingleSelect(title string, w int) string {
 	if m.screen == ScreenEditWorkflow {
 		m.writePickFilter(&b)
 	}
-	if len(m.listItems) == 0 {
-		b.WriteString("  " + gray("(empty)") + "\n")
-	} else {
-		for i, item := range m.listItems {
-			if i == m.listCursor {
-				b.WriteString("  " + accentBold("▶") + " " + item + "\n")
-			} else {
-				b.WriteString("    " + item + "\n")
-			}
-		}
+	reserved := 3
+	if m.screen == ScreenEditWorkflow {
+		reserved += 2 + m.stepsVP.Height
 	}
+	viewH := m.listBudget(&b, reserved)
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "(empty)", func(i int) string {
+		if i == m.listCursor {
+			return "  " + accentBold("▶") + " " + m.listItems[i]
+		}
+		return "    " + m.listItems[i]
+	})
 	if m.screen == ScreenEditWorkflow {
 		b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
 		b.WriteString(m.stepsVP.View() + "\n")
@@ -797,6 +798,78 @@ func (m Model) writePickFilter(b *strings.Builder) {
 	b.WriteString("  " + accent("/") + " " + white(m.pickSearch) + dim("_") + "  " + count + "\n\n")
 }
 
+// ── Fixed-height windowed lists ──────────────────────────────────────────────
+//
+// Scrolling screens share one discipline: the row window and the hover
+// preview are padded to constant heights, so the frame never exceeds the
+// terminal (an overflowing frame makes the terminal itself scroll on every
+// repaint — visible jitter) and nothing below the list shifts as the
+// cursor moves.
+
+// listBudget returns the row budget for a windowed list: the terminal
+// height minus what the frame already holds, the two scroll-marker lines,
+// what is still to come below the list, and one spare line.
+func (m Model) listBudget(b *strings.Builder, reservedBelow int) int {
+	h := m.height
+	if h == 0 {
+		h = 24
+	}
+	return max(1, h-strings.Count(b.String(), "\n")-2-reservedBelow-1)
+}
+
+// writeWindowedList renders a cursor-following window over n rows framed
+// by count-aware scroll markers, padded to exactly viewH+2 lines.
+// render(i) returns row i without a trailing newline; emptyMsg is shown
+// when the list is empty.
+func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string, render func(i int) string) {
+	viewStart := max(0, min(cursor-viewH/2, n-viewH))
+	viewEnd := min(viewStart+viewH, n)
+	if viewStart > 0 {
+		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+	rows := 0
+	if n == 0 && emptyMsg != "" {
+		b.WriteString("  " + gray(emptyMsg) + "\n")
+		rows++
+	}
+	for i := viewStart; i < viewEnd; i++ {
+		b.WriteString(render(i) + "\n")
+		rows++
+	}
+	for ; rows < viewH; rows++ {
+		b.WriteString("\n")
+	}
+	if viewEnd < n {
+		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-viewEnd)) + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+}
+
+// writePadded appends s, then blank lines until it spans exactly h lines.
+func writePadded(b *strings.Builder, s string, h int) {
+	b.WriteString(s)
+	for i := strings.Count(s, "\n"); i < h; i++ {
+		b.WriteString("\n")
+	}
+}
+
+// maxLines measures the tallest of n candidate renders, so a preview
+// region can be reserved before drawing. floor is the minimum returned.
+func maxLines(n, floor int, render func(i int, b *strings.Builder)) int {
+	h := floor
+	for i := 0; i < n; i++ {
+		var tb strings.Builder
+		render(i, &tb)
+		if c := strings.Count(tb.String(), "\n"); c > h {
+			h = c
+		}
+	}
+	return h
+}
+
 // commandPickLabel renders a command's row label the same way in every
 // picker: $ and the template name for derived commands, the group tag,
 // and {...} for slotted ones.
@@ -877,18 +950,25 @@ func (m Model) viewEditCommandPick(w int) string {
 		return b.String()
 	}
 	m.writePickFilter(&b)
-	for i := range m.listItems {
+	previewH := maxLines(len(m.editRefs), 3, func(i int, tb *strings.Builder) {
+		m.writeCommandHover(tb, m.editRefCommand(m.editRefs[i]), w)
+	})
+	viewH := m.listBudget(&b, previewH+4)
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "", func(i int) string {
 		label := m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
 		if i == m.listCursor {
-			b.WriteString("  " + accentBold("▶") + " " + label + "\n")
-		} else {
-			b.WriteString("    " + label + "\n")
+			return "  " + accentBold("▶") + " " + label
 		}
-	}
+		return "    " + label
+	})
 	b.WriteString("\n")
+	var pv strings.Builder
 	if m.listCursor >= 0 && m.listCursor < len(m.listItems) {
-		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
+		m.writeCommandHover(&pv, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
+	} else {
+		pv.WriteString(hline(w) + "\n")
 	}
+	writePadded(&b, pv.String(), previewH)
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter Esc") + "\n")
 	return b.String()
@@ -1021,25 +1101,26 @@ func (m Model) viewEditList(w int) string {
 			labelCol = len(e.Value) + 2
 		}
 	}
-	for i, e := range le.entries {
+	// The "+ Add value" row scrolls with the entries as the last row.
+	viewH := m.listBudget(&b, 3)
+	writeWindowedList(&b, viewH, len(le.entries)+1, le.cursor, "", func(i int) string {
+		if i == len(le.entries) {
+			if i == le.cursor {
+				return "  " + accentBold("▶") + " " + success("+ Add value")
+			}
+			return "    " + gray("+ Add value")
+		}
+		e := le.entries[i]
 		lbl := ""
 		if e.Label != "" {
 			pad := strings.Repeat(" ", max(1, labelCol-len(e.Value)))
 			lbl = pad + gray(e.Label)
 		}
-		line := e.Value + lbl
 		if i == le.cursor {
-			b.WriteString("  " + accentBold("▶") + " " + line + "\n")
-		} else {
-			b.WriteString("    " + line + "\n")
+			return "  " + accentBold("▶") + " " + e.Value + lbl
 		}
-	}
-	addLine := success("+ Add value")
-	if le.cursor == len(le.entries) {
-		b.WriteString("  " + accentBold("▶") + " " + addLine + "\n")
-	} else {
-		b.WriteString("    " + gray("+ Add value") + "\n")
-	}
+		return "    " + e.Value + lbl
+	})
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter: edit   Del: remove   Esc: done") + "\n")
 	return b.String()
@@ -1074,20 +1155,24 @@ func (m Model) viewEditListPick(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Edit list", w) + "\n")
 	m.writePickFilter(&b)
-	if len(m.listItems) == 0 {
-		b.WriteString("  " + gray("(no lists)") + "\n")
+	names := m.sortedListNames()
+	previewH := maxLines(len(names), 3, func(i int, tb *strings.Builder) {
+		m.writeListEntriesPreview(tb, names[i], w)
+	})
+	viewH := m.listBudget(&b, previewH+3)
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "(no lists)", func(i int) string {
+		if i == m.listCursor {
+			return "  " + accentBold("▶") + " " + m.listItems[i]
+		}
+		return "    " + m.listItems[i]
+	})
+	var pv strings.Builder
+	if len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
+		m.writeListEntriesPreview(&pv, m.listItems[m.listCursor], w)
 	} else {
-		for i, item := range m.listItems {
-			if i == m.listCursor {
-				b.WriteString("  " + accentBold("▶") + " " + item + "\n")
-			} else {
-				b.WriteString("    " + item + "\n")
-			}
-		}
-		if m.listCursor < len(m.listItems) {
-			m.writeListEntriesPreview(&b, m.listItems[m.listCursor], w)
-		}
+		pv.WriteString("\n" + hline(w) + "\n")
 	}
+	writePadded(&b, pv.String(), previewH)
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter: edit   Esc: back") + "\n")
 	return b.String()
@@ -1132,20 +1217,24 @@ func (m Model) viewEditVarPick(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Edit variable", w) + "\n")
 	m.writePickFilter(&b)
-	if len(m.listItems) == 0 {
-		b.WriteString("  " + gray("(vars.tsv is empty — create a global, or save a command with fixed values)") + "\n")
-	} else {
-		for i, item := range m.listItems {
+	previewH := maxLines(len(m.varPickNames), 3, func(i int, tb *strings.Builder) {
+		m.writeVarHover(tb, m.varPickNames[i], w)
+	})
+	viewH := m.listBudget(&b, previewH+3)
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor,
+		"(vars.tsv is empty — create a global, or save a command with fixed values)", func(i int) string {
 			if i == m.listCursor {
-				b.WriteString("  " + accentBold("▶") + " " + item + "\n")
-			} else {
-				b.WriteString("    " + item + "\n")
+				return "  " + accentBold("▶") + " " + m.listItems[i]
 			}
-		}
-		if m.listCursor < len(m.listItems) {
-			m.writeVarHover(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
-		}
+			return "    " + m.listItems[i]
+		})
+	var pv strings.Builder
+	if len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
+		m.writeVarHover(&pv, m.varPickNames[m.pickOrig(m.listCursor)], w)
+	} else {
+		pv.WriteString("\n" + hline(w) + "\n")
 	}
+	writePadded(&b, pv.String(), previewH)
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter: edit   Esc: back") + "\n")
 	return b.String()
@@ -1225,7 +1314,13 @@ func (m Model) viewVarRebase(w int) string {
 			labelCol = lw
 		}
 	}
-	for i, it := range vr.items {
+	reserved := 3
+	if vr.confirm {
+		reserved = 7
+	}
+	viewH := m.listBudget(&b, reserved)
+	writeWindowedList(&b, viewH, len(vr.items), vr.cursor, "", func(i int) string {
+		it := vr.items[i]
 		check := dim("[ ]")
 		if it.on {
 			check = success("[x]")
@@ -1236,11 +1331,10 @@ func (m Model) viewVarRebase(w int) string {
 		row := check + " " + sGroup.Render("["+tag+"]") + tagPad + white(it.label) + pad +
 			it.oldValue + "  " + gray("→") + "  " + accent(it.newValue)
 		if i == vr.cursor {
-			b.WriteString("  " + accentBold("▶") + " " + row + "\n")
-		} else {
-			b.WriteString("    " + row + "\n")
+			return "  " + accentBold("▶") + " " + row
 		}
-	}
+		return "    " + row
+	})
 	b.WriteString("\n" + hline(w) + "\n")
 	if vr.confirm {
 		b.WriteString("  " + warn(fmt.Sprintf("Apply %d change(s)?", vr.checkedCount())) + "\n\n")
@@ -1262,46 +1356,72 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 	if !m.deleteConfirm {
 		m.writePickFilter(&b)
 	}
-	if len(items) == 0 {
-		b.WriteString("  " + gray("(empty)") + "\n")
-	} else {
-		selectedSet := make(map[int]bool, len(m.deleteSelected))
-		for _, s := range m.deleteSelected {
-			selectedSet[s] = true
-		}
-		for i, item := range items {
-			check := gray("[ ]")
-			if selectedSet[m.pickOrig(i)] {
-				check = warn("[x]")
-			}
-			// Delete command rows carry the same markers as every other
-			// command picker ($ template, group, {...}).
-			if m.screen == ScreenDeleteCommand {
-				item = m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
-			}
-			if i == m.listCursor {
-				b.WriteString("  " + accentBold("▶") + " " + check + " " + item + "\n")
-			} else {
-				b.WriteString("    " + check + " " + item + "\n")
-			}
+	// Preview region height per screen (previews hide while confirming).
+	previewH := 0
+	if !m.deleteConfirm {
+		switch m.screen {
+		case ScreenDeleteWorkflow:
+			previewH = 2 + m.stepsVP.Height
+		case ScreenDeleteCommand:
+			previewH = 1 + maxLines(len(m.editRefs), 3, func(i int, tb *strings.Builder) {
+				m.writeCommandHover(tb, m.editRefCommand(m.editRefs[i]), w)
+			})
+		case ScreenDeleteList:
+			names := m.sortedListNames()
+			previewH = maxLines(len(names), 3, func(i int, tb *strings.Builder) {
+				m.writeListEntriesPreview(tb, names[i], w)
+			})
+		case ScreenDeleteVar:
+			previewH = maxLines(len(m.varPickNames), 3, func(i int, tb *strings.Builder) {
+				m.writeVarHover(tb, m.varPickNames[i], w)
+			})
 		}
 	}
-	if m.screen == ScreenDeleteWorkflow && !m.deleteConfirm {
-		b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
-		b.WriteString(m.stepsVP.View() + "\n")
+	footer := 3
+	if m.deleteConfirm {
+		footer = 7
 	}
-	if m.screen == ScreenDeleteCommand && !m.deleteConfirm &&
-		m.listCursor >= 0 && m.listCursor < len(items) {
-		b.WriteString("\n")
-		m.writeCommandHover(&b, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
+
+	selectedSet := make(map[int]bool, len(m.deleteSelected))
+	for _, s := range m.deleteSelected {
+		selectedSet[s] = true
 	}
-	if m.screen == ScreenDeleteList && !m.deleteConfirm &&
-		m.listCursor >= 0 && m.listCursor < len(items) {
-		m.writeListEntriesPreview(&b, items[m.listCursor], w)
-	}
-	if m.screen == ScreenDeleteVar && !m.deleteConfirm &&
-		m.listCursor >= 0 && m.listCursor < len(items) {
-		m.writeVarHover(&b, m.varPickNames[m.pickOrig(m.listCursor)], w)
+	viewH := m.listBudget(&b, previewH+footer)
+	writeWindowedList(&b, viewH, len(items), m.listCursor, "(empty)", func(i int) string {
+		item := items[i]
+		check := gray("[ ]")
+		if selectedSet[m.pickOrig(i)] {
+			check = warn("[x]")
+		}
+		// Delete command rows carry the same markers as every other
+		// command picker ($ template, group, {...}).
+		if m.screen == ScreenDeleteCommand {
+			item = m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
+		}
+		if i == m.listCursor {
+			return "  " + accentBold("▶") + " " + check + " " + item
+		}
+		return "    " + check + " " + item
+	})
+
+	if previewH > 0 {
+		var pv strings.Builder
+		switch {
+		case m.screen == ScreenDeleteWorkflow:
+			pv.WriteString("\n" + hlineLabel(w, "steps") + "\n")
+			pv.WriteString(m.stepsVP.View() + "\n")
+		case m.screen == ScreenDeleteCommand && m.listCursor >= 0 && m.listCursor < len(items):
+			pv.WriteString("\n")
+			m.writeCommandHover(&pv, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
+		case m.screen == ScreenDeleteList && m.listCursor >= 0 && m.listCursor < len(items):
+			m.writeListEntriesPreview(&pv, items[m.listCursor], w)
+		case m.screen == ScreenDeleteVar && m.listCursor >= 0 && m.listCursor < len(items):
+			m.writeVarHover(&pv, m.varPickNames[m.pickOrig(m.listCursor)], w)
+		}
+		if pv.Len() == 0 {
+			pv.WriteString("\n" + hline(w) + "\n")
+		}
+		writePadded(&b, pv.String(), previewH)
 	}
 	b.WriteString("\n" + hline(w) + "\n")
 	if m.deleteConfirm {

@@ -219,6 +219,38 @@ func TestViewMultiSelect_DiscardWindow(t *testing.T) {
 	}
 }
 
+// TestViewPickScreens_FixedHeight checks the management pickers hold a
+// constant frame height that fits the terminal while the cursor sweeps
+// the whole list — the same guarantee the command selector has.
+func TestViewPickScreens_FixedHeight(t *testing.T) {
+	m := Model{width: 80, height: 20, screen: ScreenDeleteCommand}
+	for i := 0; i < 30; i++ {
+		m.config.Commands = append(m.config.Commands,
+			mdl.Command{Name: fmt.Sprintf("c%02d", i), Cmd: "echo hi", Source: "local"})
+	}
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+
+	lines := func(s string) int { return strings.Count(s, "\n") }
+	views := map[string]func() string{
+		"edit pick":   func() string { return m.viewEditCommandPick(80) },
+		"delete list": func() string { return m.viewDeleteList("Delete commands", m.listItems, 80) },
+	}
+	for name, render := range views {
+		m.listCursor = 0
+		first := lines(render())
+		if first > m.height {
+			t.Fatalf("%s: view is %d lines for a %d-line terminal", name, first, m.height)
+		}
+		for c := range names {
+			m.listCursor = c
+			if got := lines(render()); got != first {
+				t.Fatalf("%s: cursor=%d height %d != %d — layout must not shift while scrolling", name, c, got, first)
+			}
+		}
+	}
+}
+
 // TestViewEditCommandPick_ShowsPreview checks the edit picker renders a
 // hover preview for the highlighted command: template and values for
 // derived commands, the command line otherwise.
