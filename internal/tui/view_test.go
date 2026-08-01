@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -33,6 +34,48 @@ func TestViewMultiSelect_StableValueOrder(t *testing.T) {
 		if got := m.viewMultiSelect(80); got != first {
 			t.Fatalf("render %d differs from first render — map iteration order is leaking into the view", i)
 		}
+	}
+}
+
+// TestViewMultiSelect_FixedHeight guards against the frame overflowing the
+// terminal or changing height as the cursor moves: an overflowing frame
+// makes the terminal itself scroll on every repaint (visible jitter), and
+// the "..." markers / hover preview appearing at different heights makes
+// the footer jump around.
+func TestViewMultiSelect_FixedHeight(t *testing.T) {
+	cmds := make([]mdl.Command, 30)
+	var items []msItem
+	for i := range cmds {
+		cmds[i] = mdl.Command{Name: fmt.Sprintf("cmd-%02d", i), Cmd: "echo hi"}
+		items = append(items, msItem{cmd: &cmds[i]})
+	}
+	tmpl := mdl.Command{
+		Name: "copy-all", Template: "copy", Cmd: "cp a b",
+		Values: map[string]string{"src": "./src", "dest": "./dist"},
+	}
+	items = append(items, msItem{cmd: &tmpl})
+
+	m := Model{width: 80, height: 20}
+	m.msItems = items
+	m.msSearchTI = textinput.New()
+
+	lines := func(s string) int { return strings.Count(s, "\n") }
+	first := lines(m.viewMultiSelect(80))
+	if first > m.height {
+		t.Fatalf("view is %d lines for a %d-line terminal — overflow scrolls the terminal on every repaint", first, m.height)
+	}
+	for c := range items {
+		m.msCursor = c
+		if got := lines(m.viewMultiSelect(80)); got != first {
+			t.Fatalf("cursor=%d: view height %d != %d — layout must not shift while scrolling", c, got, first)
+		}
+	}
+
+	// Filtering down to a handful of rows must not change the height either.
+	m.msCursor = 0
+	m.msSearchTI.SetValue("cmd-0")
+	if got := lines(m.viewMultiSelect(80)); got != first {
+		t.Fatalf("filtered: view height %d != %d — the list region must stay padded", got, first)
 	}
 }
 

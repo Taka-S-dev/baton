@@ -401,7 +401,18 @@ func (m Model) viewMultiSelect(w int) string {
 		// cursor out of bounds after filter — benign, view clamps it
 	}
 
-	viewH := max(1, m.height-13)
+	// Fixed-height layout: the list region (viewH rows + 2 marker lines)
+	// and the preview (previewH lines) are padded to a constant size, so
+	// the frame never exceeds the terminal height. An overflowing frame
+	// makes the terminal itself scroll on every repaint, which the user
+	// sees as the whole screen jittering while moving the cursor.
+	previewH := 3
+	for i := range m.msItems {
+		if h := hoverHeight(m.msItems[i].cmd); h > previewH {
+			previewH = h
+		}
+	}
+	viewH := max(1, m.height-14-previewH)
 	cursor := m.msCursor
 	if cursor >= n {
 		cursor = max(0, n-1)
@@ -419,13 +430,18 @@ func (m Model) viewMultiSelect(w int) string {
 
 	b.WriteString("  " + m.msSearchTI.View() + "\n\n")
 
+	if viewStart > 0 {
+		b.WriteString("  " + gray("...") + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+	rows := 0
 	if n == 0 {
 		b.WriteString("  " + gray("No results.") + "\n")
+		rows = 1
 	} else {
-		if viewStart > 0 {
-			b.WriteString("  " + gray("...") + "\n")
-		}
 		viewEnd := min(viewStart+viewH, n)
+		rows = viewEnd - viewStart
 		for i := viewStart; i < viewEnd; i++ {
 			origIdx := filtered[i]
 			item := m.msItems[origIdx]
@@ -467,20 +483,31 @@ func (m Model) viewMultiSelect(w int) string {
 				b.WriteString("    " + check + " " + label + "\n")
 			}
 		}
-		if viewEnd < n {
-			b.WriteString("  " + gray("...") + "\n")
-		}
+	}
+	for ; rows < viewH; rows++ {
+		b.WriteString("\n")
+	}
+	if viewStart+viewH < n {
+		b.WriteString("  " + gray("...") + "\n")
+	} else {
+		b.WriteString("\n")
 	}
 
-	// Hover preview
+	// Hover preview, padded to previewH so the footer below never moves.
 	b.WriteString("\n")
+	var pv strings.Builder
 	if n > 0 && cursor >= 0 && cursor < n {
 		hovered := m.msItems[filtered[cursor]]
 		if hovered.cmd != nil {
-			m.writeCommandHover(&b, hovered.cmd, w)
+			m.writeCommandHover(&pv, hovered.cmd, w)
 		}
-	} else {
-		b.WriteString(hline(w) + "\n")
+	}
+	if pv.Len() == 0 {
+		pv.WriteString(hline(w) + "\n")
+	}
+	b.WriteString(pv.String())
+	for i := strings.Count(pv.String(), "\n"); i < previewH; i++ {
+		b.WriteString("\n")
 	}
 
 	var selNames []string
@@ -491,7 +518,13 @@ func (m Model) viewMultiSelect(w int) string {
 	if len(m.msSelected) > 0 {
 		orderHint = "  " + dim("[n] = run order")
 	}
-	b.WriteString("\n  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + strings.Join(selNames, ", ") + "\n")
+	// Keep the Selected line to one row: a wrapped line would grow the
+	// frame past the terminal height and bring the jitter back.
+	joined := strings.Join(selNames, ", ")
+	if maxSel := max(10, w-40); len([]rune(joined)) > maxSel {
+		joined = string([]rune(joined)[:maxSel-3]) + "..."
+	}
+	b.WriteString("\n  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
 	b.WriteString(hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Move  Tab Select  Enter Confirm  Esc Back") + "\n")
 
@@ -767,6 +800,22 @@ func (m Model) commandPickLabel(cmd *mdl.Command) string {
 
 // writeCommandHover renders the hover panel for a command: template and
 // values for derived commands, the resolved command line otherwise.
+// hoverHeight returns the number of lines writeCommandHover emits for cmd,
+// so callers can reserve a fixed-size preview region up front.
+func hoverHeight(cmd *mdl.Command) int {
+	if cmd == nil {
+		return 1
+	}
+	if cmd.Template != "" {
+		h := 3 // label + template + resolved cmd
+		if len(cmd.Values) > 0 {
+			h += 1 + len(cmd.Values)
+		}
+		return h
+	}
+	return 3 // label + cmd + workdir
+}
+
 func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
 	if cmd.Template != "" {
 		b.WriteString(hlineLabel(w, "command") + "\n")
