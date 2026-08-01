@@ -309,6 +309,44 @@ func TestUpdateSlotPick_VariadicEnterFallsBackToSingle(t *testing.T) {
 	}
 }
 
+// TestUpdateSlotPick_BackspaceEditsFilter checks that Backspace removes
+// one character from the slot-pick filter (rune-safe) and refilters,
+// rather than being swallowed.
+func TestUpdateSlotPick_BackspaceEditsFilter(t *testing.T) {
+	cmd := mdl.Command{Name: "up", Cmd: "up {env}"}
+	m := Model{}
+	m.lists = map[string][]mdl.ListEntry{"env": {{Value: "prod"}, {Value: "dev"}}}
+	nm, _ := m.startResolveFlow([]msItem{{cmd: &cmd}})
+	m = nm.(Model)
+
+	key := func(k tea.KeyMsg) {
+		nm, _ = m.updateSlotPick(k)
+		m = nm.(Model)
+	}
+	for _, r := range "prodx" {
+		key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if len(m.sp.filtered) != 0 {
+		t.Fatalf("filtered = %v, want no matches for %q", m.sp.filtered, m.sp.search)
+	}
+
+	key(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.sp.search != "prod" {
+		t.Fatalf("search = %q after Backspace, want %q", m.sp.search, "prod")
+	}
+	if len(m.sp.filtered) != 1 || m.sp.filtered[0].Value != "prod" {
+		t.Fatalf("filtered = %v — Backspace must refilter", m.sp.filtered)
+	}
+
+	// Deleting on an empty filter must be a no-op, not a crash.
+	for i := 0; i < 5; i++ {
+		key(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	if m.sp.search != "" {
+		t.Fatalf("search = %q, want empty", m.sp.search)
+	}
+}
+
 // TestUpdateMultiSelect_EnterActsOnHoveredRow checks the fzf-style
 // fallback: with nothing toggled, Enter runs the hovered row alone —
 // respecting the active filter — and with no matches it does nothing.

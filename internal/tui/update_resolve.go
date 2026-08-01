@@ -313,6 +313,13 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m.acceptSlotValue(sp.filtered[sp.cursor].Value)
 		}
+	case "backspace":
+		if sp.search != "" {
+			r := []rune(sp.search)
+			sp.search = string(r[:len(r)-1])
+			sp.applyFilter()
+			sp.cursor = 0
+		}
 	case "esc":
 		if sp.search != "" {
 			sp.search = ""
