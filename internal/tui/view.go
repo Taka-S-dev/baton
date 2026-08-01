@@ -337,10 +337,9 @@ func (m Model) viewRunWorkflow(w int) string {
 		return b.String()
 	}
 
-	b.WriteString("  " + m.wfSearchTI.View() + "\n\n")
-
 	filtered := m.wfFiltered()
 	n := len(filtered)
+	b.WriteString("  " + m.wfSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n\n")
 	cur := m.listCursor
 	if cur >= n {
 		cur = max(0, n-1)
@@ -356,7 +355,7 @@ func (m Model) viewRunWorkflow(w int) string {
 		viewEnd := min(viewStart+viewH, n)
 
 		if viewStart > 0 {
-			b.WriteString("  " + gray("...") + "\n")
+			b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
 		}
 		for i := viewStart; i < viewEnd; i++ {
 			wf := m.workflows[filtered[i]]
@@ -371,7 +370,7 @@ func (m Model) viewRunWorkflow(w int) string {
 			}
 		}
 		if viewEnd < n {
-			b.WriteString("  " + gray("...") + "\n")
+			b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-viewEnd)) + "\n")
 		}
 	}
 
@@ -428,10 +427,10 @@ func (m Model) viewMultiSelect(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header(title, w) + "\n")
 
-	b.WriteString("  " + m.msSearchTI.View() + "\n\n")
+	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))) + "\n\n")
 
 	if viewStart > 0 {
-		b.WriteString("  " + gray("...") + "\n")
+		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
 	} else {
 		b.WriteString("\n")
 	}
@@ -488,7 +487,7 @@ func (m Model) viewMultiSelect(w int) string {
 		b.WriteString("\n")
 	}
 	if viewStart+viewH < n {
-		b.WriteString("  " + gray("...") + "\n")
+		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-(viewStart+viewH))) + "\n")
 	} else {
 		b.WriteString("\n")
 	}
@@ -684,7 +683,7 @@ func (m Model) viewSlotPick(w int) string {
 	}
 
 	if viewStart > 0 {
-		b.WriteString("  " + dim("↑ more") + "\n")
+		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
 	}
 	for i := viewStart; i < viewEnd; i++ {
 		isCustom := i == len(sp.filtered)
@@ -749,7 +748,7 @@ func (m Model) viewSlotPick(w int) string {
 		}
 	}
 	if viewEnd < total {
-		b.WriteString("  " + dim("↓ more") + "\n")
+		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", total-viewEnd)) + "\n")
 	}
 
 	b.WriteString("\n" + hline(w) + "\n")

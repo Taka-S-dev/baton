@@ -79,6 +79,40 @@ func TestViewMultiSelect_FixedHeight(t *testing.T) {
 	}
 }
 
+// TestViewMultiSelect_ScrollMarkersAndCounter checks the overflow hints:
+// the search row shows a filtered/total counter and the scroll markers
+// carry the hidden-row counts instead of a bare "...".
+func TestViewMultiSelect_ScrollMarkersAndCounter(t *testing.T) {
+	cmds := make([]mdl.Command, 30)
+	var items []msItem
+	for i := range cmds {
+		cmds[i] = mdl.Command{Name: fmt.Sprintf("cmd-%02d", i), Cmd: "echo hi"}
+		items = append(items, msItem{cmd: &cmds[i]})
+	}
+	m := Model{width: 80, height: 20}
+	m.msItems = items
+	m.msSearchTI = textinput.New()
+
+	view := m.viewMultiSelect(80)
+	if !strings.Contains(view, "30/30") {
+		t.Fatal("search row must show the filtered/total counter")
+	}
+	if !strings.Contains(view, "↓") || !strings.Contains(view, "more") {
+		t.Fatal("rows below the fold must be announced as \"↓ N more\"")
+	}
+
+	m.msCursor = len(items) - 1
+	view = m.viewMultiSelect(80)
+	if !strings.Contains(view, "↑") {
+		t.Fatal("rows above the fold must be announced as \"↑ N more\"")
+	}
+
+	m.msSearchTI.SetValue("cmd-0")
+	if view = m.viewMultiSelect(80); !strings.Contains(view, "10/30") {
+		t.Fatal("counter must reflect the active filter")
+	}
+}
+
 // TestViewPlaceholderWindow_StableWidth guards against the picker window
 // resizing as the cursor moves between lists: the right pane's width must
 // come from the widest entry across ALL lists (clamped to the terminal),
