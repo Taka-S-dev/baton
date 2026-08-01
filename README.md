@@ -135,6 +135,22 @@ If multiple projects exist, baton shows a selection screen on startup. Use **Swi
 
 ## Configuration
 
+### Which file do I edit?
+
+One kind of data, one editable home. Everything on the left column can be edited by hand (or through the matching TUI screen); the files on the last two rows are app-managed and never need hand edits:
+
+| To change | Edit |
+|------|------|
+| Command definitions — name, cmd, workdir, group, shell, slots | `commands.tsv` / `commands.json` (or **Manage commands**) |
+| A command's name only | the `name` column alone — references are repaired on the next start (see [Renaming commands](#renaming-commands)) |
+| Project variables — `{$name}` values | the `*` rows of `vars.tsv` (or **Manage vars**) |
+| A saved command's fixed slot values | its rows in `vars.tsv` (or **Edit command → Change values**) |
+| Selection-list entries | `lists/<name>.tsv` (or **Manage lists**) |
+| Workflows — steps, order, names | the TUI (**Manage workflows**) — `workflows.json` is app-managed |
+| A saved command's identity or template | the TUI (**Manage commands**) — `commands.local.json` is app-managed |
+
+Hand edits are picked up on the next start or **Switch config**; `baton check` verifies everything still resolves.
+
 A project has two command layers:
 
 | File | Written by | Contents |
@@ -329,6 +345,16 @@ Rules:
 - Undefined references stay literal and are reported as a startup warning.
 - Substitution is a single pass; values are never expanded recursively.
 - Edits are picked up on the next start or **Switch config**.
+
+### Renames inside vars.tsv
+
+Unlike command renames, name changes inside `vars.tsv` are not auto-repaired — the columns of this file are the references themselves:
+
+- **Renaming a global** (`*` row): every `{$oldname}` reference stays literal, and the startup warning names each command and list still using it. Update the references yourself, or create the new name via **Manage vars** and let the rebase offer rewrite the values.
+- **Changing the command column** of a fixed-value row detaches the value: that slot is prompted at run time again, the row is flagged as belonging to an unknown command, and the next TUI save removes it.
+- **Changing the name column** of a fixed-value row to something that isn't a slot of the template: the value silently stops applying and the slot is prompted at run time.
+
+In short: rename commands in `commands.tsv`, rename variables through their references, and treat the first two columns of `vars.tsv` as addresses rather than free text.
 
 ## Usage
 
