@@ -252,14 +252,31 @@ func (m Model) viewMainMenu(w int) string {
 		}
 	}
 
+	// The pane is padded to the same height for every item (longest
+	// description and shortcut list win), so moving the cursor never
+	// changes the frame height and the footer stays put.
+	maxShortcuts := 0
+	for _, info := range menuItemInfos {
+		if len(info.shortcuts) > maxShortcuts {
+			maxShortcuts = len(info.shortcuts)
+		}
+	}
+
 	if info, ok := menuItemInfos[selected]; ok {
+		desc := info.desc
+		if maxLen := max(10, rightW-2); len(desc) > maxLen {
+			desc = desc[:maxLen-3] + "..."
+		}
 		rightLines = append(rightLines, white(selected))
 		rightLines = append(rightLines, gray(strings.Repeat("─", min(rightW-2, 24))))
-		rightLines = append(rightLines, dim(info.desc))
+		rightLines = append(rightLines, dim(desc))
 		rightLines = append(rightLines, "")
 		rightLines = append(rightLines, gray("Keys"))
 		for _, sc := range info.shortcuts {
 			rightLines = append(rightLines, fmt.Sprintf("  %-8s %s", white(sc[0]), gray(sc[1])))
+		}
+		for i := len(info.shortcuts); i < maxShortcuts; i++ {
+			rightLines = append(rightLines, "")
 		}
 		rightLines = append(rightLines, "")
 		rightLines = append(rightLines, gray("Config"))

@@ -79,6 +79,21 @@ func TestViewMultiSelect_FixedHeight(t *testing.T) {
 	}
 }
 
+// TestViewMainMenu_StableHeight checks the two-pane menu keeps a constant
+// frame height while the cursor moves: the right pane's shortcut list
+// varies per item and must be padded, or the footer bounces around.
+func TestViewMainMenu_StableHeight(t *testing.T) {
+	m := Model{width: 100, height: 30, projectDir: "proj"}
+	lines := func(s string) int { return strings.Count(s, "\n") }
+	first := lines(m.viewMainMenu(100))
+	for i := range mainMenuItems() {
+		m.listCursor = i
+		if got := lines(m.viewMainMenu(100)); got != first {
+			t.Fatalf("cursor=%d: height %d != %d — pad the right pane to a constant height", i, got, first)
+		}
+	}
+}
+
 // TestViewMultiSelect_ScrollMarkersAndCounter checks the overflow hints:
 // the search row shows a filtered/total counter and the scroll markers
 // carry the hidden-row counts instead of a bare "...".
