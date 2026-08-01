@@ -10,6 +10,7 @@ import (
 	"github.com/Taka-S-dev/baton/internal/config"
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
+	"github.com/Taka-S-dev/baton/internal/store"
 )
 
 // ── Manage menu (Create / Edit / Delete) ──────────────────────────────────────
@@ -176,6 +177,11 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		} else {
 			m.config.Base[cf.editIdx] = newCmd
 			m.successMsg = "updated command \"" + name + "\" in " + file
+			if cf.origName != name {
+				if err := m.persistRetargetedRefs(cf.origName, name); err != nil {
+					m.errMsg = "failed to update references: " + err.Error()
+				}
+			}
 		}
 		m.closeCommandForm()
 		m.listCursor = 1
@@ -183,12 +189,21 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 	}
 	if cf.mode == 1 {
 		cmd := m.config.Commands[cf.editIdx]
+		oldName := cmd.Name
 		cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
 		m.config.Commands[cf.editIdx] = cmd
-		if err := m.saveConfig(); err != nil {
+		var wfSteps, tplRefs int
+		if oldName != name {
+			wfSteps, tplRefs, _ = m.retargetCommandRefs(oldName, name)
+		}
+		err := m.saveConfig()
+		if err == nil && wfSteps > 0 {
+			err = store.SaveWorkflows(m.projectDir, m.workflows)
+		}
+		if err != nil {
 			m.errMsg = "failed to save: " + err.Error()
 		} else {
-			m.successMsg = "updated command \"" + name + "\""
+			m.successMsg = "updated command \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 		}
 		m.closeCommandForm()
 		m.listCursor = 0
@@ -468,6 +483,84 @@ func (m *Model) updateEditCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// retargetCommandRefs rewrites every reference to a renamed command from
+// oldName to newName: workflow steps, template references of derived
+// commands, and scoped vars.tsv keys. It only mutates memory — callers
+// persist the files whose returned count is non-zero.
+func (m *Model) retargetCommandRefs(oldName, newName string) (wfSteps, tplRefs, varKeys int) {
+	for wi := range m.workflows {
+		for si, step := range m.workflows[wi].Commands {
+			if step == oldName {
+				m.workflows[wi].Commands[si] = newName
+				wfSteps++
+			}
+		}
+	}
+	for i := range m.config.Commands {
+		if m.config.Commands[i].Template == oldName {
+			m.config.Commands[i].Template = newName
+			tplRefs++
+		}
+	}
+	// Scoped keys are "command.slot" with the separator on the last dot;
+	// a key re-keys only when the suffix after oldName is a single segment.
+	prefix := oldName + "."
+	var moved []string
+	for k := range m.vars {
+		if strings.HasPrefix(k, prefix) && !strings.Contains(k[len(prefix):], ".") {
+			moved = append(moved, k)
+		}
+	}
+	for _, k := range moved {
+		m.vars[newName+"."+k[len(prefix):]] = m.vars[k]
+		delete(m.vars, k)
+		varKeys++
+	}
+	return wfSteps, tplRefs, varKeys
+}
+
+// persistRetargetedRefs retargets references after a rename outside the
+// local layer (a TSV row) and writes only the files that changed —
+// commands.local.json is untouched unless a template reference moved.
+// The reference summary is appended to the current success message.
+func (m *Model) persistRetargetedRefs(oldName, newName string) error {
+	wfSteps, tplRefs, varKeys := m.retargetCommandRefs(oldName, newName)
+	if wfSteps > 0 {
+		if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
+			return err
+		}
+	}
+	if tplRefs > 0 {
+		// saveConfig persists the moved template references and, via its
+		// vars mirror, the re-keyed scoped values in one pass.
+		if err := m.saveConfig(); err != nil {
+			return err
+		}
+	} else if varKeys > 0 {
+		if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+			return err
+		}
+	}
+	m.successMsg += refSummary(wfSteps, tplRefs)
+	return nil
+}
+
+// refSummary phrases retargeted reference counts for a success message,
+// or "" when nothing referenced the old name.
+func refSummary(wfSteps, tplRefs int) string {
+	var parts []string
+	if wfSteps > 0 {
+		parts = append(parts, fmt.Sprintf("%d workflow step(s)", wfSteps))
+	}
+	if tplRefs > 0 {
+		parts = append(parts, fmt.Sprintf("%d derived command(s)", tplRefs))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " (updated " + strings.Join(parts, ", ") + ")"
+}
+
 // renameCommand renames the command being edited without touching its
 // template or values; vars.tsv rows follow the new name on save.
 func (m Model) renameCommand(name string) (tea.Model, tea.Cmd) {
@@ -482,11 +575,17 @@ func (m Model) renameCommand(name string) (tea.Model, tea.Cmd) {
 		m.nameInputErr = "name already in use: " + name
 		return m, nil
 	}
+	oldName := m.config.Commands[sce.editIdx].Name
 	m.config.Commands[sce.editIdx].Name = name
-	if err := m.saveConfig(); err != nil {
+	wfSteps, tplRefs, _ := m.retargetCommandRefs(oldName, name)
+	err := m.saveConfig()
+	if err == nil && wfSteps > 0 {
+		err = store.SaveWorkflows(m.projectDir, m.workflows)
+	}
+	if err != nil {
 		m.errMsg = "failed to save: " + err.Error()
 	} else {
-		m.successMsg = "renamed command to \"" + name + "\""
+		m.successMsg = "renamed command to \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 	}
 	m.sce = nil
 	m.screen = ScreenManageCommands
@@ -617,11 +716,20 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			Values:   sce.currentValues,
 		}
 		entry, _ = slot.MaterializeCommand(entry, m.config)
+		oldName := m.config.Commands[sce.editIdx].Name
 		m.config.Commands[sce.editIdx] = entry
-		if err := m.saveConfig(); err != nil {
+		var wfSteps, tplRefs int
+		if oldName != name {
+			wfSteps, tplRefs, _ = m.retargetCommandRefs(oldName, name)
+		}
+		err := m.saveConfig()
+		if err == nil && wfSteps > 0 {
+			err = store.SaveWorkflows(m.projectDir, m.workflows)
+		}
+		if err != nil {
 			m.errMsg = "failed to save: " + err.Error()
 		} else {
-			m.successMsg = "updated command \"" + name + "\""
+			m.successMsg = "updated command \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 		}
 		m.screen = ScreenManageCommands
 		m.listCursor = 1

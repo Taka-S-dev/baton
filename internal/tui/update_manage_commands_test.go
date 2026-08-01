@@ -154,6 +154,129 @@ func TestEditCommand_RenameOnly(t *testing.T) {
 	}
 }
 
+// TestRenameCommand_UpdatesWorkflowSteps checks renaming a saved command
+// rewrites every workflow step that referenced the old name and persists
+// workflows.json alongside the config.
+func TestRenameCommand_UpdatesWorkflowSteps(t *testing.T) {
+	dir := t.TempDir()
+	m := &Model{}
+	m.projectDir = dir
+	m.nameInput = textinput.New()
+	m.config.Base = []mdl.Command{{Name: "build", Cmd: "make", Dir: "{workdir}"}}
+	m.config.Commands = []mdl.Command{{Name: "as", Template: "build", Values: map[string]string{"workdir": "./src"}}}
+	m.vars = map[string]string{"as.workdir": "./src"}
+	m.workflows = []mdl.Workflow{{Name: "deploy", Commands: []string{"as", "build", "as"}}}
+	m.sce = &commandEditState{mode: 1, editIdx: 0, name: "as"}
+
+	nm, _ := m.renameCommand("as2")
+	got := nm.(Model)
+	if steps := got.workflows[0].Commands; steps[0] != "as2" || steps[1] != "build" || steps[2] != "as2" {
+		t.Fatalf("workflow steps = %v, want the renamed steps only", steps)
+	}
+	if !strings.Contains(got.successMsg, "2 workflow step(s)") {
+		t.Fatalf("successMsg = %q, want the reference summary", got.successMsg)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "workflows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "as2") || strings.Contains(string(raw), `"as"`) {
+		t.Fatalf("workflows.json = %q, want steps renamed on disk", raw)
+	}
+}
+
+// TestTSVEdit_RenameUpdatesRefs checks renaming a TSV row from the form
+// carries its references: workflow steps and the template field of
+// derived commands follow the new name, on disk and in memory.
+func TestTSVEdit_RenameUpdatesRefs(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"commands.tsv":        "name\tgroup\tworkdir\tcmd\tshell\tslots\nbuild\t\t{workdir}\tmake\t\t\n",
+		"commands.local.json": `{"commands": [{"name": "as", "template": "build"}]}`,
+		"workflows.json":      `[{"name": "wf", "commands": ["build", "as"]}]`,
+		"vars.tsv":            "command\tname\tvalue\nas\tworkdir\t./src\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := &Model{}
+	m.nameInput = textinput.New()
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+	m.screen = ScreenEditCommandPick
+	m.listCursor = 0 // the TSV row "build"
+	m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.cf == nil || !m.cf.tsvEdit {
+		t.Fatalf("picking the TSV row must open the form in TSV mode, cf=%+v", m.cf)
+	}
+	m.nameInput.SetValue("build2")
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if m.errMsg != "" {
+		t.Fatalf("save failed: %q", m.errMsg)
+	}
+
+	if m.config.Commands[0].Template != "build2" {
+		t.Fatalf("derived command template = %q, want build2", m.config.Commands[0].Template)
+	}
+	checks := map[string]string{
+		"commands.tsv":        "build2\t",
+		"commands.local.json": `"template": "build2"`,
+		"workflows.json":      `"build2"`,
+	}
+	for file, want := range checks {
+		raw, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("%s = %q, want it to contain %q", file, raw, want)
+		}
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, "workflows.json"))
+	if strings.Contains(string(raw), `"build"`) || !strings.Contains(string(raw), `"as"`) {
+		t.Fatalf("workflows.json = %q, want only the build step renamed", raw)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(dir, "vars.tsv")); !strings.Contains(string(raw), "as\tworkdir\t./src") {
+		t.Fatalf("vars.tsv = %q, rows of unrelated commands must survive", raw)
+	}
+}
+
+// TestTSVEdit_RenameWithoutRefsWritesNothingExtra checks renaming an
+// unreferenced TSV row touches only commands.tsv.
+func TestTSVEdit_RenameWithoutRefsWritesNothingExtra(t *testing.T) {
+	dir := t.TempDir()
+	tsv := "name\tgroup\tworkdir\tcmd\tshell\tslots\nsolo\t\t\techo hi\t\t\n"
+	if err := os.WriteFile(filepath.Join(dir, "commands.tsv"), []byte(tsv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := &Model{}
+	m.nameInput = textinput.New()
+	if err := m.loadProject(dir); err != nil {
+		t.Fatal(err)
+	}
+	names, refs := m.editableCommands()
+	m.listItems, m.editRefs = names, refs
+	m.screen = ScreenEditCommandPick
+	m.listCursor = 0
+	m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
+	m.nameInput.SetValue("solo2")
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if m.errMsg != "" {
+		t.Fatalf("save failed: %q", m.errMsg)
+	}
+	for _, file := range []string{"workflows.json", "commands.local.json", "vars.tsv"} {
+		if _, err := os.Stat(filepath.Join(dir, file)); err == nil {
+			t.Fatalf("%s must not be created by a rename nothing references", file)
+		}
+	}
+}
+
 // TestEditCommandMode_ValuesVsTemplate checks the two edit paths:
 // Change values goes straight to the slot picker (skipping the template
 // screen) and Esc from the first slot returns to the menu; Change
