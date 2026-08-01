@@ -207,6 +207,20 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		wf := m.workflows[filtered[m.listCursor]]
+		// A step that no longer resolves refuses the whole run: silently
+		// executing 4 of 5 steps looks like success while skipping real
+		// work, which is worse than making the user fix the workflow.
+		var missing []string
+		for _, name := range wf.Commands {
+			if _, ok := m.config.FindCommand(name); !ok {
+				missing = append(missing, name)
+			}
+		}
+		if len(missing) > 0 {
+			m.errMsg = fmt.Sprintf("cannot run %q — step(s) not found: %s (renamed or deleted? fix it in Manage workflows)",
+				wf.Name, strings.Join(missing, ", "))
+			break
+		}
 		store.SaveLastWorkflow(m.projectDir, wf.Name)
 		m.lastWorkflow = wf.Name
 
@@ -214,10 +228,7 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var msItems []msItem
 		var names []string
 		for _, name := range wf.Commands {
-			cmd, ok := m.config.FindCommand(name)
-			if !ok {
-				continue
-			}
+			cmd, _ := m.config.FindCommand(name)
 			cmdCopy := cmd
 			msItems = append(msItems, msItem{cmd: &cmdCopy})
 			names = append(names, name)

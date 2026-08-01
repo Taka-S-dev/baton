@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -108,6 +109,38 @@ func TestUpdateRunWorkflow_SearchKeys(t *testing.T) {
 	m = nm.(Model)
 	if m.screen != ScreenMainMenu {
 		t.Fatalf("second Esc: screen=%v, want main menu", m.screen)
+	}
+}
+
+// TestUpdateRunWorkflow_RefusesMissingSteps checks a workflow whose step
+// no longer resolves refuses to run entirely — a partial run would look
+// like success while skipping real work — and names the missing steps.
+func TestUpdateRunWorkflow_RefusesMissingSteps(t *testing.T) {
+	m := wfModel()
+	m.projectDir = t.TempDir()
+	m.screen = ScreenRunWorkflow
+	m.workflows[0].Commands = []string{"build", "ghost", "deploy"}
+
+	nm, _ := m.updateRunWorkflow(tea.KeyMsg{Type: tea.KeyEnter}) // cursor 0 = release
+	m = nm.(Model)
+	if m.screen != ScreenRunWorkflow || m.resolve != nil {
+		t.Fatalf("a broken workflow must not start resolving: screen=%v resolve=%v", m.screen, m.resolve)
+	}
+	if !strings.Contains(m.errMsg, "ghost") {
+		t.Fatalf("errMsg = %q, want it to name the missing step", m.errMsg)
+	}
+	if m.lastWorkflow != "" {
+		t.Fatalf("a refused run must not become the last workflow, got %q", m.lastWorkflow)
+	}
+
+	// An intact workflow still runs.
+	m.errMsg = ""
+	nm, _ = m.updateRunWorkflow(tea.KeyMsg{Type: tea.KeyDown})
+	m = nm.(Model)
+	nm, _ = m.updateRunWorkflow(tea.KeyMsg{Type: tea.KeyEnter}) // ci
+	m = nm.(Model)
+	if m.errMsg != "" || m.lastWorkflow != "ci" {
+		t.Fatalf("intact workflow must run: errMsg=%q lastWorkflow=%q", m.errMsg, m.lastWorkflow)
 	}
 }
 
