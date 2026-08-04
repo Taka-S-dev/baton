@@ -47,21 +47,24 @@ baton/
 ├── main.go                   # Entry point, CLI flags, bubbletea program setup
 ├── internal/
 │   ├── model/                # Shared data types (Command, Workflow, RunItem)
-│   ├── config/               # Config loading (JSON/TSV) and projects/ directory discovery
-│   ├── slot/                 # {placeholder} parsing, resolution, and .tsv list loading
-│   ├── store/                # Workflow persistence (JSON files)
+│   ├── config/               # Config loading (JSON/TSV), projects/ discovery, diagnostics
+│   ├── slot/                 # {placeholder} and {$var} resolution, lists and vars.tsv
+│   ├── store/                # App-managed state (workflows, saved commands, last workflow)
 │   ├── runner/               # Command execution via tea.ExecProcess (suspends TUI)
 │   └── tui/                  # Bubbletea Model / Update / View
-│       ├── model.go          # Model struct, screen enum, sub-states, New()
-│       ├── update.go         # Update() entry point, message dispatch
-│       ├── update_menu.go    # Project select, main menu, config switch
-│       ├── update_run.go     # Run, confirm, retry
-│       ├── update_resolve.go # Multi-select, slot resolution, confirm vars
-│       ├── update_workflow.go# Workflow CRUD
+│       ├── model.go                  # Model struct, screen enum, sub-states, New()
+│       ├── update.go                 # Update() entry point, message dispatch
+│       ├── update_menu.go            # Project select, main menu, config switch
+│       ├── update_run.go             # Run workflow, per-run step selection, confirm, retry
+│       ├── update_resolve.go         # Multi-select, slot resolution and answer reuse
+│       ├── update_workflow.go        # Workflow CRUD
 │       ├── update_manage_commands.go # Command CRUD (direct input / from template)
-│       ├── update_list.go    # List and name-input screens
-│       ├── view.go           # All rendering functions
-│       └── styles.go         # Lipgloss styles and helper render functions
+│       ├── update_vars.go            # Project variable CRUD, reference rebase offer
+│       ├── update_rename.go          # Hand-edited rename detection and reference repair
+│       ├── update_list.go            # Selection lists and name-input screens
+│       ├── update_helpers.go         # Cursor, pick-filter and delete-flow helpers
+│       ├── view.go                   # All rendering functions
+│       └── styles.go                 # Lipgloss styles and helper render functions
 └── projects.example/         # Sample projects (JSON and TSV) to copy as a starting point
 ```
 
