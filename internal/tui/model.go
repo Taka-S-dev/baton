@@ -125,6 +125,12 @@ type slotPickState struct {
 	contextIdx    int
 	currentCmd    *mdl.Command
 	resolvedSoFar map[string]string
+
+	// Set when an earlier step in this run already answered the same
+	// question: the picker opens on that answer, and reuseFrom names the
+	// command it came from.
+	reuseFrom  string
+	reuseValue string
 }
 
 // placeholder returns the literal placeholder text being resolved.
@@ -244,6 +250,13 @@ func (s *wfStepPickState) count() int {
 	return n
 }
 
+// answeredSlot is a slot value already chosen during this run, and the
+// command that chose it.
+type answeredSlot struct {
+	value string
+	by    string
+}
+
 // resolveFlowState tracks multi-command slot resolution.
 type resolveFlowState struct {
 	purpose       resolveFlowPurpose
@@ -256,6 +269,11 @@ type resolveFlowState struct {
 	currentSlots   []slot.Def
 	currentSlotIdx int
 	currentValues  map[string]string
+
+	// Answers given so far in this run, keyed by slot name and list, so
+	// steps sharing a question open on the previous answer instead of
+	// asking it from scratch.
+	answered map[string]answeredSlot
 
 	resolved []mdl.RunItem
 }

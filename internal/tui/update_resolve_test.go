@@ -16,6 +16,106 @@ func msModel(items []msItem) Model {
 	return m
 }
 
+// runModel starts a run over the given commands, resolving slots the
+// way Run commands does, and returns the model sitting on the first
+// slot picker.
+func runModel(t *testing.T, lists map[string][]mdl.ListEntry, cmds ...*mdl.Command) Model {
+	t.Helper()
+	m := Model{lists: lists}
+	items := make([]msItem, len(cmds))
+	for i, c := range cmds {
+		items[i] = msItem{cmd: c}
+	}
+	nm, _ := m.startResolveFlow(items)
+	return nm.(Model)
+}
+
+// TestSlotReuse_SecondStepOpensOnTheFirstAnswer checks the everyday case
+// of clean and build asking for the same directory: the second picker
+// opens on the first answer and says where it came from, but still lets
+// a different value be chosen — nothing is applied silently.
+func TestSlotReuse_SecondStepOpensOnTheFirstAnswer(t *testing.T) {
+	lists := map[string][]mdl.ListEntry{
+		"dirs": {{Value: "./app"}, {Value: "./api"}, {Value: "./web"}},
+	}
+	clean := mdl.Command{Name: "clean", Cmd: "make clean", Dir: "{workdir}", Slots: map[string]string{"workdir": "dirs"}}
+	build := mdl.Command{Name: "build", Cmd: "make build", Dir: "{workdir}", Slots: map[string]string{"workdir": "dirs"}}
+	m := runModel(t, lists, &clean, &build)
+
+	if m.sp == nil || m.sp.reuseFrom != "" {
+		t.Fatalf("the first question has no earlier answer to reuse, sp=%+v", m.sp)
+	}
+	nm, _ := m.acceptSlotValue("./web")
+	m = nm.(Model)
+
+	if m.sp == nil {
+		t.Fatalf("the second step must ask its own question, screen=%v", m.screen)
+	}
+	if m.sp.reuseFrom != "clean" || m.sp.reuseValue != "./web" {
+		t.Fatalf("reuse hint = %q/%q, want it to name clean and ./web", m.sp.reuseFrom, m.sp.reuseValue)
+	}
+	if got := m.sp.filtered[m.sp.cursor].Value; got != "./web" {
+		t.Fatalf("cursor sits on %q, want the earlier answer ./web", got)
+	}
+	// Nothing is forced: picking another value resolves to that value.
+	nm, _ = m.acceptSlotValue("./api")
+	m = nm.(Model)
+	if len(m.confirmRunItems) != 2 {
+		t.Fatalf("both commands must resolve, got %+v", m.confirmRunItems)
+	}
+	if dir := m.confirmRunItems[1].Cmd.Dir; dir != "./api" {
+		t.Fatalf("second command dir = %q, want the newly picked ./api", dir)
+	}
+}
+
+// TestSlotReuse_ScopeAndForms checks which questions count as the same
+// one: a different list under the same slot name is a different
+// question, a variadic answer comes back pre-toggled, and a hand-typed
+// answer comes back as the custom-value row.
+func TestSlotReuse_ScopeAndForms(t *testing.T) {
+	lists := map[string][]mdl.ListEntry{
+		"dirs":  {{Value: "./app"}, {Value: "./api"}},
+		"other": {{Value: "./x"}},
+		"svcs":  {{Value: "api"}, {Value: "web"}, {Value: "worker"}},
+	}
+
+	// Same slot name, different list: no reuse offered.
+	a := mdl.Command{Name: "a", Cmd: "x {target}", Slots: map[string]string{"target": "dirs"}}
+	bOther := mdl.Command{Name: "b", Cmd: "y {target}", Slots: map[string]string{"target": "other"}}
+	m := runModel(t, lists, &a, &bOther)
+	nm, _ := m.acceptSlotValue("./app")
+	m = nm.(Model)
+	if m.sp.reuseFrom != "" {
+		t.Fatalf("a different list is a different question, got reuse from %q", m.sp.reuseFrom)
+	}
+
+	// Variadic: the earlier picks come back toggled on.
+	up1 := mdl.Command{Name: "up1", Cmd: "up {svcs...}"}
+	up2 := mdl.Command{Name: "up2", Cmd: "restart {svcs...}"}
+	m = runModel(t, lists, &up1, &up2)
+	nm, _ = m.acceptSlotValue("api worker")
+	m = nm.(Model)
+	if got := m.sp.picked; len(got) != 2 || got[0] != "api" || got[1] != "worker" {
+		t.Fatalf("variadic picks = %v, want the earlier answer pre-toggled", got)
+	}
+
+	// Hand-typed value: not in the list, so it returns as the custom row.
+	t1 := mdl.Command{Name: "t1", Cmd: "x {target}", Slots: map[string]string{"target": "dirs"}}
+	t2 := mdl.Command{Name: "t2", Cmd: "y {target}", Slots: map[string]string{"target": "dirs"}}
+	m = runModel(t, lists, &t1, &t2)
+	nm, _ = m.acceptSlotValue("./typed-by-hand")
+	m = nm.(Model)
+	if m.sp.search != "./typed-by-hand" || m.sp.cursor != len(m.sp.filtered) {
+		t.Fatalf("typed answer must return as the custom row, search=%q cursor=%d filtered=%d",
+			m.sp.search, m.sp.cursor, len(m.sp.filtered))
+	}
+	nm, _ = m.updateSlotPick(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if len(m.confirmRunItems) != 2 || m.confirmRunItems[1].Cmd.Cmd != "y ./typed-by-hand" {
+		t.Fatalf("Enter on the custom row must keep the typed value, got %+v", m.confirmRunItems)
+	}
+}
+
 // TestMsFiltered_MatchesEmbeddedText checks the search hits text beyond
 // name/group: the command body and template values.
 func TestMsFiltered_MatchesEmbeddedText(t *testing.T) {

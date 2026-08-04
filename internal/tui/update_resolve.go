@@ -227,6 +227,12 @@ func (m Model) itemNeedsSlots(item msItem) bool {
 	return len(slot.GetSlots(*item.cmd)) > 0
 }
 
+// slotAnswerKey identifies a question within one run. The same slot name
+// drawing from the same list is the same question; the same name mapped
+// to a different list (via the slots column) is a different one, so the
+// two never share an answer.
+func slotAnswerKey(s slot.Def) string { return s.Name + "\x00" + s.ListName }
+
 func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 	entries := m.lists[s.ListName]
 	r := m.resolve
@@ -243,9 +249,38 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 		resolvedSoFar: copyMap(r.currentValues),
 	}
 	sp.applyFilter()
+	// An earlier step already answered this question — clean and build
+	// asking for the same directory is the everyday case. Open on that
+	// answer so repeating it costs one Enter, and never apply it on the
+	// user's behalf: steps that need different values still just pick
+	// them, the way the same command twice in a workflow expects.
+	if prev, ok := r.answered[slotAnswerKey(s)]; ok {
+		sp.reuseFrom, sp.reuseValue = prev.by, prev.value
+		if s.Variadic {
+			sp.picked = strings.Fields(prev.value)
+		} else if i := indexOfEntry(sp.filtered, prev.value); i >= 0 {
+			sp.cursor = i
+		} else {
+			// Typed by hand rather than picked: offer it back as the
+			// custom-value row, which sits just past the entries.
+			sp.search = prev.value
+			sp.applyFilter()
+			sp.cursor = len(sp.filtered)
+		}
+	}
 	m.sp = sp
 	m.screen = ScreenSlotPick
 	return m, nil
+}
+
+// indexOfEntry returns the position of value in entries, or -1.
+func indexOfEntry(entries []mdl.ListEntry, value string) int {
+	for i, e := range entries {
+		if e.Value == value {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
@@ -340,7 +375,12 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 	r := m.resolve
-	r.currentValues[r.currentSlots[r.currentSlotIdx].Name] = value
+	def := r.currentSlots[r.currentSlotIdx]
+	r.currentValues[def.Name] = value
+	if r.answered == nil {
+		r.answered = make(map[string]answeredSlot)
+	}
+	r.answered[slotAnswerKey(def)] = answeredSlot{value: value, by: r.itemNames[r.currentIdx]}
 	r.currentSlotIdx++
 
 	if r.currentIdx < len(r.rawItems) {

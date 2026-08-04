@@ -293,6 +293,7 @@ Saved commands can fix a variadic slot the same way as any other — the stored 
 - **Run commands / Run workflow** — baton prompts for each placeholder before execution
 - **Fixed values** belong to saved commands: create one from a template with the values filled in (they land in `vars.tsv`), and use that command anywhere — directly, or inside workflows
 - Placeholders can be **skipped** when creating a template-derived command — skipped ones are prompted at run time instead
+- **Repeated questions carry their answer forward.** When several commands in one run share a placeholder — `clean` and `build` both asking for the same directory — the later picker opens on the earlier answer and says where it came from (`same as clean — Enter keeps it`), so repeating it costs one keypress. The answer is never applied on your behalf: picking a different value works exactly as before, so a workflow that deploys to staging and then to production still asks twice. Two placeholders count as the same question only when both the name and the list behind them match, so a `{target}` mapped to different lists in the `slots` column is always asked separately.
 
 ### Placeholder picker
 

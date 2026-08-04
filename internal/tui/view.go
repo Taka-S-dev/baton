@@ -604,7 +604,14 @@ func (m Model) viewSlotPick(w int) string {
 				b.WriteString("    " + gray("workdir:") + " " + preview(dir) + "\n")
 			}
 		}
-		b.WriteString("\n\n" + hlineLabelBright(w, "Select value") + "\n\n")
+		// The reuse hint rides on the divider rather than taking its own
+		// line: this screen is height-critical, and the value itself is
+		// already visible on the cursor row and in the preview above.
+		selectLabel := "Select value"
+		if sp.reuseFrom != "" {
+			selectLabel += "  ·  same as " + sp.reuseFrom + " — Enter keeps it"
+		}
+		b.WriteString("\n\n" + hlineLabelBright(w, selectLabel) + "\n\n")
 	}
 
 	// Search field

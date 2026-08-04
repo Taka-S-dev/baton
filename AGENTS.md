@@ -101,6 +101,13 @@ multiple selections and joins them with single spaces
 Use it only where the command accepts space-separated arguments.
 There is no `{$name...}` — variables are single fixed values.
 
+Within one run, commands that share a slot name **and** its list are
+treated as the same question: the second picker opens on the first
+answer for the user to confirm or change. Name slots with that in mind
+— the same name for values that normally travel together (`clean` and
+`build` working on one directory), distinct names or a `slots=` mapping
+to another list for values that should be asked independently.
+
 Rows containing `{slot}` also serve as templates for the TUI's
 **Create command → From template**.
 
