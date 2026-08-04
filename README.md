@@ -413,6 +413,8 @@ Workflows are saved sequences of commands. Creating one is just picking commands
 
 Run one from **Run workflow** — the list is searchable like the command selector: the workflow name, its step names, and the step command bodies all match.
 
+**Running part of a workflow.** `Enter` runs every step; `→` opens the step picker for the highlighted workflow, where `Tab` toggles individual steps and `Enter` runs the chosen ones. Selected steps always execute in the workflow's own order — the picker chooses *which* steps run, never the order — so a fixed sequence you deliberately advance a few steps at a time stays one workflow instead of a search each time. With nothing toggled, `Enter` runs just the highlighted step, and steps whose command no longer exists are shown but cannot be selected.
+
 The management pick screens (Edit/Delete of commands, workflows, and lists) are searchable the same way — just start typing to filter; `Esc` clears the filter first, then goes back.
 
 ### Retry on failure

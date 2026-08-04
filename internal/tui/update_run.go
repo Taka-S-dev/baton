@@ -202,6 +202,13 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor++
 			m.updateStepsViewport()
 		}
+	case "right":
+		// Drill into the workflow to pick which steps run. Space is not
+		// available here — it belongs to the search field.
+		if n == 0 || m.listCursor >= n {
+			break
+		}
+		m.gotoWorkflowStepPick(filtered[m.listCursor])
 	case "enter":
 		if n == 0 || m.listCursor >= n {
 			break
@@ -217,30 +224,11 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if len(missing) > 0 {
-			m.errMsg = fmt.Sprintf("cannot run %q — step(s) not found: %s (renamed or deleted? fix it in Manage workflows)",
+			m.errMsg = fmt.Sprintf("cannot run %q — step(s) not found: %s (renamed or deleted? fix it in Manage workflows, or press → to run the steps that resolve)",
 				wf.Name, strings.Join(missing, ", "))
 			break
 		}
-		store.SaveLastWorkflow(m.projectDir, wf.Name)
-		m.lastWorkflow = wf.Name
-
-		// Remaining {slots} are resolved interactively per step.
-		var msItems []msItem
-		var names []string
-		for _, name := range wf.Commands {
-			cmd, _ := m.config.FindCommand(name)
-			cmdCopy := cmd
-			msItems = append(msItems, msItem{cmd: &cmdCopy})
-			names = append(names, name)
-		}
-		m.resolve = &resolveFlowState{
-			purpose:       purposeRunWorkflow,
-			rawItems:      msItems,
-			itemNames:     names,
-			itemNotes:     make([]string, len(msItems)),
-			workflowLabel: wf.Name,
-		}
-		return m.advanceResolve()
+		return m.startWorkflowRun(wf, wf.Commands)
 	case "esc":
 		if m.wfSearchTI.Value() != "" {
 			m.wfSearchTI.SetValue("")
@@ -260,4 +248,117 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+// startWorkflowRun begins the resolve flow for the given steps of wf.
+// Steps keep the workflow's own order — a partial run picks which steps
+// run, never the order they run in. Remaining {slots} are resolved
+// interactively per step.
+func (m Model) startWorkflowRun(wf mdl.Workflow, steps []string) (tea.Model, tea.Cmd) {
+	store.SaveLastWorkflow(m.projectDir, wf.Name)
+	m.lastWorkflow = wf.Name
+
+	var msItems []msItem
+	var names []string
+	for _, name := range steps {
+		cmd, ok := m.config.FindCommand(name)
+		if !ok {
+			continue // unreachable: callers filter unresolvable steps
+		}
+		cmdCopy := cmd
+		msItems = append(msItems, msItem{cmd: &cmdCopy})
+		names = append(names, name)
+	}
+	label := wf.Name
+	if len(names) < len(wf.Commands) {
+		label = fmt.Sprintf("%s (%d/%d steps)", wf.Name, len(names), len(wf.Commands))
+	}
+	m.wfp = nil
+	m.resolve = &resolveFlowState{
+		purpose:       purposeRunWorkflow,
+		rawItems:      msItems,
+		itemNames:     names,
+		itemNotes:     make([]string, len(msItems)),
+		workflowLabel: label,
+	}
+	return m.advanceResolve()
+}
+
+// ── Run workflow: per-run step selection ──────────────────────────────────────
+//
+// → on the workflow list opens this picker, for the common case of a
+// fixed sequence run a few steps at a time. Enter on the list still
+// runs every step, so the plain path stays one keypress.
+
+func (m *Model) gotoWorkflowStepPick(wfIdx int) {
+	m.wfp = &wfStepPickState{
+		wfIdx:  wfIdx,
+		picked: make([]bool, len(m.workflows[wfIdx].Commands)),
+	}
+	m.screen = ScreenRunWorkflowSteps
+}
+
+func (m Model) updateRunWorkflowSteps(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	p := m.wfp
+	if p == nil || p.wfIdx >= len(m.workflows) {
+		m.screen = ScreenRunWorkflow
+		return m, nil
+	}
+	wf := m.workflows[p.wfIdx]
+	n := len(wf.Commands)
+
+	switch msg.String() {
+	case "up":
+		if n > 0 {
+			p.cursor = (p.cursor - 1 + n) % n
+		}
+	case "down":
+		if n > 0 {
+			p.cursor = (p.cursor + 1) % n
+		}
+	case "tab":
+		// Tab alone toggles, as on every other multi-select screen —
+		// Space stays free for the filter this list will want once
+		// workflows grow long enough to need one.
+		if p.cursor < n && m.stepRunnable(wf, p.cursor) {
+			p.picked[p.cursor] = !p.picked[p.cursor]
+		}
+	case "enter":
+		if n == 0 {
+			break
+		}
+		var steps []string
+		for i, name := range wf.Commands {
+			if p.picked[i] {
+				steps = append(steps, name)
+			}
+		}
+		if len(steps) == 0 {
+			// Nothing toggled: Enter runs the hovered step, the same
+			// fzf-style fallback the command selector uses.
+			if p.cursor >= n {
+				break
+			}
+			if !m.stepRunnable(wf, p.cursor) {
+				m.errMsg = "step not found: " + wf.Commands[p.cursor]
+				return m, nil
+			}
+			steps = []string{wf.Commands[p.cursor]}
+		}
+		return m.startWorkflowRun(wf, steps)
+	case "esc", "left":
+		m.wfp = nil
+		m.screen = ScreenRunWorkflow
+	}
+	return m, nil
+}
+
+// stepRunnable reports whether the workflow step at idx resolves to a
+// command. Unresolvable steps stay visible but cannot be selected.
+func (m Model) stepRunnable(wf mdl.Workflow, idx int) bool {
+	if idx < 0 || idx >= len(wf.Commands) {
+		return false
+	}
+	_, ok := m.config.FindCommand(wf.Commands[idx])
+	return ok
 }

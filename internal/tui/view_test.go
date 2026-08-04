@@ -79,6 +79,74 @@ func TestViewMultiSelect_FixedHeight(t *testing.T) {
 	}
 }
 
+// TestViewRunWorkflowSteps_ShowsWorkdir checks each step keeps the
+// context the workflow list already showed: the same command means
+// something different per directory, so the workdir travels into the
+// picker — resolved for {$vars}, left literal for run-time slots, and
+// absent when the command has none.
+func TestViewRunWorkflowSteps_ShowsWorkdir(t *testing.T) {
+	m := Model{width: 96, height: 24}
+	m.vars = map[string]string{"root": `C:\work`}
+	m.config = mdl.Config{Base: []mdl.Command{
+		{Name: "build", Cmd: "make build", Dir: "{workdir}"},
+		{Name: "pack", Cmd: "zip -r out.zip .", Dir: `{$root}\dist`},
+		{Name: "hello", Cmd: "echo hi"},
+	}}
+	m.workflows = []mdl.Workflow{{Name: "wf", Commands: []string{"build", "pack", "hello"}}}
+	m.gotoWorkflowStepPick(0)
+
+	view := m.viewRunWorkflowSteps(96)
+	for _, want := range []string{
+		"$ make build  (workdir: {workdir})",
+		`$ zip -r out.zip .  (workdir: C:\work\dist)`,
+		"$ echo hi",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view missing %q\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "echo hi  (workdir") {
+		t.Error("a command with no workdir must not show an empty one")
+	}
+}
+
+// TestViewRunWorkflowSteps_FixedHeight holds the step picker to the same
+// discipline as the other scrolling screens: it must fit the terminal and
+// keep one height as the cursor moves and steps get toggled.
+func TestViewRunWorkflowSteps_FixedHeight(t *testing.T) {
+	steps := make([]string, 30)
+	var cmds []mdl.Command
+	for i := range steps {
+		steps[i] = fmt.Sprintf("step-%02d", i)
+		cmds = append(cmds, mdl.Command{Name: steps[i], Cmd: "echo hi"})
+	}
+	steps = append(steps, "ghost") // a step whose command is gone
+
+	m := Model{width: 80, height: 20}
+	m.config = mdl.Config{Base: cmds}
+	m.workflows = []mdl.Workflow{{Name: "long", Commands: steps}}
+	m.gotoWorkflowStepPick(0)
+
+	lines := func(s string) int { return strings.Count(s, "\n") }
+	first := lines(m.viewRunWorkflowSteps(80))
+	if first > m.height {
+		t.Fatalf("view is %d lines for a %d-line terminal — overflow scrolls the terminal on every repaint", first, m.height)
+	}
+	for c := range steps {
+		m.wfp.cursor = c
+		if got := lines(m.viewRunWorkflowSteps(80)); got != first {
+			t.Fatalf("cursor=%d: view height %d != %d — layout must not shift while scrolling", c, got, first)
+		}
+	}
+
+	// The selection summary replaces the hint line rather than adding one.
+	m.wfp.cursor = 0
+	m.wfp.picked[0] = true
+	if got := lines(m.viewRunWorkflowSteps(80)); got != first {
+		t.Fatalf("with a selection: height %d != %d — the summary must not add a line", got, first)
+	}
+}
+
 // TestViewMainMenu_StableHeight checks the two-pane menu keeps a constant
 // frame height while the cursor moves: the right pane's shortcut list
 // varies per item and must be padded, or the footer bounces around.

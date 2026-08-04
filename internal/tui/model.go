@@ -58,6 +58,7 @@ const (
 	ScreenCommandForm
 	ScreenDeleteCommand
 	ScreenRenameRepair
+	ScreenRunWorkflowSteps
 )
 
 type nameInputMode int
@@ -223,6 +224,26 @@ func (s *varRebaseState) checkedCount() int {
 	return n
 }
 
+// wfStepPickState holds a per-run step selection for one workflow.
+// Only which steps run is chosen here: they always execute in the
+// workflow's own order, since encoding that order is what makes a
+// workflow more than a set of commands.
+type wfStepPickState struct {
+	wfIdx  int
+	cursor int
+	picked []bool // parallel to the workflow's steps
+}
+
+func (s *wfStepPickState) count() int {
+	n := 0
+	for _, p := range s.picked {
+		if p {
+			n++
+		}
+	}
+	return n
+}
+
 // resolveFlowState tracks multi-command slot resolution.
 type resolveFlowState struct {
 	purpose       resolveFlowPurpose
@@ -369,6 +390,9 @@ type Model struct {
 
 	// Resolve flow (Run commands / Run workflow)
 	resolve *resolveFlowState
+
+	// Run workflow: per-run step selection (→ on the workflow list)
+	wfp *wfStepPickState
 
 	// Create workflow: command names picked, waiting for the name input
 	pendingWorkflowCmds []string

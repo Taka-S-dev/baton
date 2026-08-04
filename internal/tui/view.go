@@ -27,6 +27,8 @@ func (m Model) View() string {
 		view = m.viewMainMenu(w)
 	case ScreenRunWorkflow:
 		view = m.viewRunWorkflow(w)
+	case ScreenRunWorkflowSteps:
+		view = m.viewRunWorkflowSteps(w)
 	case ScreenRunCommands, ScreenCreateWorkflow, ScreenEditWorkflowCommands:
 		view = m.viewMultiSelect(w)
 	case ScreenWorkflowMgmt:
@@ -390,7 +392,7 @@ func (m Model) viewRunWorkflow(w int) string {
 	b.WriteString(m.stepsVP.View() + "\n")
 
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab: focus steps") + "\n")
+	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab: focus steps  →: pick steps") + "\n")
 	return b.String()
 }
 
@@ -780,6 +782,20 @@ func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string
 	} else {
 		b.WriteString("\n")
 	}
+}
+
+// truncate shortens s to at most maxLen display runes, marking the cut
+// with an ellipsis. Counting runes keeps multi-byte text from being cut
+// mid-character.
+func truncate(s string, maxLen int) string {
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return string(r[:max(0, maxLen)])
+	}
+	return string(r[:maxLen-3]) + "..."
 }
 
 // writePadded appends s, then blank lines until it spans exactly h lines.
@@ -1388,6 +1404,65 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 	} else {
 		b.WriteString("  " + gray("↑↓ Tab: toggle   Enter: confirm   Esc: back") + "\n")
 	}
+	return b.String()
+}
+
+// ── Run workflow: per-run step selection ──────────────────────────────────────
+
+func (m Model) viewRunWorkflowSteps(w int) string {
+	var b strings.Builder
+	p := m.wfp
+	if p == nil || p.wfIdx >= len(m.workflows) {
+		return ""
+	}
+	wf := m.workflows[p.wfIdx]
+	n := len(wf.Commands)
+
+	b.WriteString("\n" + header("Run workflow: "+wf.Name, w) + "\n")
+	b.WriteString("  " + gray("Pick the steps to run — they always run in the order below.") + "\n")
+
+	viewH := m.listBudget(&b, 4)
+	writeWindowedList(&b, viewH, n, p.cursor, "(no steps)", func(i int) string {
+		name := wf.Commands[i]
+		box := "[ ]"
+		if p.picked[i] {
+			box = accent("[x]")
+		}
+		note := ""
+		if cmd, ok := m.workflowStepCommand(name); ok {
+			// Same one-line shape as the step preview on the workflow
+			// list: the directory decides what "make build" even means,
+			// so it must not disappear on the way into this screen.
+			text := "$ " + cmd.Cmd
+			if cmd.Dir != "" {
+				text += "  (workdir: " + cmd.Dir + ")"
+			}
+			note = gray(truncate(text, max(8, w-len(name)-24)))
+		} else {
+			box = dim("[-]")
+			note = warn("(not found)")
+		}
+		row := fmt.Sprintf("%s %d. %-16s %s", box, i+1, name, note)
+		if i == p.cursor {
+			return "  " + accentBold("▶") + " " + row
+		}
+		return "    " + row
+	})
+
+	b.WriteString("\n" + hline(w) + "\n")
+	if c := p.count(); c > 0 {
+		var picked []string
+		for i, name := range wf.Commands {
+			if p.picked[i] {
+				picked = append(picked, name)
+			}
+		}
+		b.WriteString("  " + success(fmt.Sprintf("Selected(%d)", c)) + ": " +
+			truncate(strings.Join(picked, " → "), max(8, w-20)) + "\n")
+	} else {
+		b.WriteString("  " + gray("Nothing selected — Enter runs the highlighted step") + "\n")
+	}
+	b.WriteString("  " + gray("↑↓ Tab: toggle   Enter: run   Esc ←: back") + "\n")
 	return b.String()
 }
 

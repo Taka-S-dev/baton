@@ -144,6 +144,144 @@ func TestUpdateRunWorkflow_RefusesMissingSteps(t *testing.T) {
 	}
 }
 
+// TestWorkflowStepPick_RunsSubsetInWorkflowOrder checks the partial-run
+// path: → opens the step picker, toggling picks steps, and Enter runs
+// them in the workflow's own order regardless of the toggle order.
+func TestWorkflowStepPick_RunsSubsetInWorkflowOrder(t *testing.T) {
+	m := wfModel()
+	m.projectDir = t.TempDir()
+	m.screen = ScreenRunWorkflow
+	m.workflows[0].Commands = []string{"build", "test", "deploy"}
+
+	nm, _ := m.updateRunWorkflow(tea.KeyMsg{Type: tea.KeyRight})
+	m = nm.(Model)
+	if m.screen != ScreenRunWorkflowSteps || m.wfp == nil {
+		t.Fatalf("→ must open the step picker, screen=%v wfp=%v", m.screen, m.wfp)
+	}
+
+	// Toggle the last step first, then the first one: the run order must
+	// still follow the workflow, not the order they were picked.
+	down := tea.KeyMsg{Type: tea.KeyDown}
+	tab := tea.KeyMsg{Type: tea.KeyTab}
+	for i := 0; i < 2; i++ {
+		nm, _ = m.updateRunWorkflowSteps(down)
+		m = nm.(Model)
+	}
+	nm, _ = m.updateRunWorkflowSteps(tab) // deploy (index 2)
+	m = nm.(Model)
+	nm, _ = m.updateRunWorkflowSteps(down) // wraps to index 0
+	m = nm.(Model)
+	nm, _ = m.updateRunWorkflowSteps(tab) // build (index 0)
+	m = nm.(Model)
+	if m.wfp.count() != 2 {
+		t.Fatalf("selected = %d, want 2", m.wfp.count())
+	}
+	// Tab is the toggle everywhere in baton; Space stays unbound here so
+	// it can go to a filter if this list ever gains one.
+	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+	m = nm.(Model)
+	if m.wfp.count() != 2 {
+		t.Fatalf("Space must not toggle, selected = %d", m.wfp.count())
+	}
+
+	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.resolve == nil {
+		t.Fatalf("Enter must start the resolve flow, screen=%v err=%q", m.screen, m.errMsg)
+	}
+	if got := m.resolve.itemNames; len(got) != 2 || got[0] != "build" || got[1] != "deploy" {
+		t.Fatalf("run steps = %v, want [build deploy] in workflow order", got)
+	}
+	if !strings.Contains(m.resolve.workflowLabel, "2/3") {
+		t.Fatalf("label = %q, want it to show the partial step count", m.resolve.workflowLabel)
+	}
+	if m.lastWorkflow != "release" {
+		t.Fatalf("a partial run must still record the workflow, got %q", m.lastWorkflow)
+	}
+}
+
+// TestWorkflowStepPick_HoverFallbackAndMissingSteps checks Enter with
+// nothing toggled runs the hovered step, and that a step whose command
+// is gone can neither be toggled nor run while the rest stay usable.
+func TestWorkflowStepPick_HoverFallbackAndMissingSteps(t *testing.T) {
+	m := wfModel()
+	m.projectDir = t.TempDir()
+	m.workflows[0].Commands = []string{"ghost", "build"}
+	m.gotoWorkflowStepPick(0)
+
+	// Cursor starts on the missing step: it cannot be toggled or run.
+	nm, _ := m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyTab})
+	m = nm.(Model)
+	if m.wfp.count() != 0 {
+		t.Fatal("a missing step must not be selectable")
+	}
+	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.resolve != nil || !strings.Contains(m.errMsg, "ghost") {
+		t.Fatalf("running a missing step must fail with a named error, err=%q", m.errMsg)
+	}
+
+	// The intact step still runs via the hover fallback, no toggle needed.
+	// It has no slots, so resolution completes and lands on the confirm
+	// screen in one step.
+	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyDown})
+	m = nm.(Model)
+	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	if m.screen != ScreenConfirmRun {
+		t.Fatalf("Enter with nothing toggled must run the hovered step, screen=%v err=%q", m.screen, m.errMsg)
+	}
+	if len(m.confirmRunItems) != 1 || m.confirmRunItems[0].Name != "build" {
+		t.Fatalf("run items = %+v, want just the hovered step", m.confirmRunItems)
+	}
+}
+
+// TestWorkflowStepPick_EmptyWorkflow checks a workflow with no steps —
+// reachable by hand-editing workflows.json — leaves every key a no-op
+// instead of indexing past the end of the step list.
+func TestWorkflowStepPick_EmptyWorkflow(t *testing.T) {
+	m := wfModel()
+	m.projectDir = t.TempDir()
+	m.workflows[0].Commands = nil
+	m.gotoWorkflowStepPick(0)
+
+	for _, k := range []tea.KeyMsg{
+		{Type: tea.KeyUp}, {Type: tea.KeyDown}, {Type: tea.KeyTab}, {Type: tea.KeyEnter},
+	} {
+		nm, _ := m.updateRunWorkflowSteps(k)
+		m = nm.(Model)
+	}
+	if m.screen != ScreenRunWorkflowSteps || m.resolve != nil {
+		t.Fatalf("an empty workflow must stay put and run nothing: screen=%v resolve=%v", m.screen, m.resolve)
+	}
+	if strings.Count(m.viewRunWorkflowSteps(80), "\n") == 0 {
+		t.Fatal("the picker must still render for an empty workflow")
+	}
+}
+
+// TestUpdateRunWorkflow_SpaceStillTypesIntoSearch guards the key budget
+// on the workflow list: Space belongs to the search field, so the step
+// picker is opened with → instead.
+func TestUpdateRunWorkflow_SpaceStillTypesIntoSearch(t *testing.T) {
+	m := wfModel()
+	m.screen = ScreenRunWorkflow
+	m.wfSearchTI.Focus()
+	for _, k := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'a'}},
+		{Type: tea.KeySpace, Runes: []rune{' '}},
+		{Type: tea.KeyRunes, Runes: []rune{'b'}},
+	} {
+		nm, _ := m.updateRunWorkflow(k)
+		m = nm.(Model)
+	}
+	if got := m.wfSearchTI.Value(); got != "a b" {
+		t.Fatalf("search value = %q, want %q", got, "a b")
+	}
+	if m.screen != ScreenRunWorkflow {
+		t.Fatalf("Space must not leave the list, screen=%v", m.screen)
+	}
+}
+
 // TestUpdateConfirmRun_ScrollClampsToLastPage checks ↑↓ scroll the item
 // window and stop at the edges: Up at the top and Down past the last
 // page must both be no-ops, so the counter can never drift off-screen.

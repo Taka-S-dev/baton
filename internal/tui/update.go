@@ -74,6 +74,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateMainMenu(msg)
 		case ScreenRunWorkflow:
 			return m.updateRunWorkflow(msg)
+		case ScreenRunWorkflowSteps:
+			return m.updateRunWorkflowSteps(msg)
 		case ScreenRunCommands, ScreenCreateWorkflow, ScreenEditWorkflowCommands:
 			return m.updateMultiSelect(msg)
 		case ScreenSlotPick:
