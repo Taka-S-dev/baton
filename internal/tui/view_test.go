@@ -79,6 +79,34 @@ func TestViewMultiSelect_FixedHeight(t *testing.T) {
 	}
 }
 
+// TestTruncate checks the shared shortener every view uses: text that
+// fits is untouched, longer text is cut to the limit including the
+// ellipsis, and multi-byte text is cut on rune boundaries — the reason
+// this replaced the byte slicing each view used to do.
+func TestTruncate(t *testing.T) {
+	cases := []struct {
+		in     string
+		maxLen int
+		want   string
+	}{
+		{"go build ./...", 20, "go build ./..."},
+		{"go build ./...", 14, "go build ./..."},
+		{"go build ./cmd/baton", 14, "go build ./..."},
+		{"日本語のパスを含むコマンド", 6, "日本語..."},
+		{"abcdef", 3, "abc"},
+		{"abcdef", 0, ""},
+	}
+	for _, c := range cases {
+		got := truncate(c.in, c.maxLen)
+		if got != c.want {
+			t.Errorf("truncate(%q, %d) = %q, want %q", c.in, c.maxLen, got, c.want)
+		}
+		if len([]rune(got)) > c.maxLen {
+			t.Errorf("truncate(%q, %d) = %q — longer than the limit", c.in, c.maxLen, got)
+		}
+	}
+}
+
 // TestViewRunWorkflowSteps_ShowsWorkdir checks each step keeps the
 // context the workflow list already showed: the same command means
 // something different per directory, so the workdir travels into the

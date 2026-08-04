@@ -268,10 +268,7 @@ func (m Model) viewMainMenu(w int) string {
 	}
 
 	if info, ok := menuItemInfos[selected]; ok {
-		desc := info.desc
-		if maxLen := max(10, rightW-2); len(desc) > maxLen {
-			desc = desc[:maxLen-3] + "..."
-		}
+		desc := truncate(info.desc, max(10, rightW-2))
 		rightLines = append(rightLines, white(selected))
 		rightLines = append(rightLines, gray(strings.Repeat("─", min(rightW-2, 24))))
 		rightLines = append(rightLines, dim(desc))
@@ -487,10 +484,7 @@ func (m Model) viewMultiSelect(w int) string {
 	}
 	// Keep the Selected line to one row: a wrapped line would grow the
 	// frame past the terminal height and bring the jitter back.
-	joined := strings.Join(selNames, ", ")
-	if maxSel := max(10, w-40); len([]rune(joined)) > maxSel {
-		joined = string([]rune(joined)[:maxSel-3]) + "..."
-	}
+	joined := truncate(strings.Join(selNames, ", "), max(10, w-40))
 	b.WriteString("\n  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
 	b.WriteString(hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Move  Tab Select  Enter Confirm  Esc Back") + "\n")
@@ -559,9 +553,8 @@ func (m Model) viewSlotPick(w int) string {
 				if isDone {
 					marker = success("✓ ")
 					note := sp.contextNotes[i]
-					maxNote := w - len(name) - 14
-					if maxNote > 10 && len(note) > maxNote {
-						note = note[:maxNote-3] + "..."
+					if maxNote := w - len(name) - 14; maxNote > 10 {
+						note = truncate(note, maxNote)
 					}
 					nameStr = gray(fmt.Sprintf("  %2d. %-14s", i+1, name)) + dim(note)
 				}
@@ -853,14 +846,7 @@ func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
 		return
 	}
 	b.WriteString(hlineLabel(w, "command preview") + "\n")
-	cmdStr := slot.ApplyVars(cmd.Cmd, m.vars)
-	maxLen := w - 10
-	if maxLen < 10 {
-		maxLen = 10
-	}
-	if len(cmdStr) > maxLen {
-		cmdStr = cmdStr[:maxLen-3] + "..."
-	}
+	cmdStr := truncate(slot.ApplyVars(cmd.Cmd, m.vars), max(10, w-10))
 	b.WriteString("  " + gray("$ "+cmdStr) + "\n")
 	workdir := cmd.Dir
 	if workdir == "" {

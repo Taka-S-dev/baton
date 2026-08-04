@@ -650,24 +650,10 @@ func (m *Model) updateStepsViewport() {
 		prefix := fmt.Sprintf("  %d. %-16s", j+1, cmdName)
 		indent := strings.Repeat(" ", len(prefix)+2)
 		if cmdStr != "" {
-			maxLen := w - len(prefix) - 8
-			if maxLen < 8 {
-				maxLen = 8
-			}
-			short := cmdStr
-			if len(short) > maxLen {
-				short = short[:maxLen-3] + "..."
-			}
+			short := truncate(cmdStr, max(8, w-len(prefix)-8))
 			lines = append(lines, prefix+"  "+gray("$ "+short))
 			if dirStr != "" {
-				maxDirLen := w - len(indent) - 8
-				if maxDirLen < 8 {
-					maxDirLen = 8
-				}
-				shortDir := dirStr
-				if len(shortDir) > maxDirLen {
-					shortDir = shortDir[:maxDirLen-3] + "..."
-				}
+				shortDir := truncate(dirStr, max(8, w-len(indent)-8))
 				lines = append(lines, indent+gray("workdir: "+shortDir))
 			}
 		} else {
