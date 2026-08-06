@@ -345,6 +345,37 @@ func (m Model) viewSingleSelect(title string, w int) string {
 
 // ── Run workflow ─────────────────────────────────────────────────────────────
 
+// workflowNameIsGenerated reports whether the workflow's name is exactly
+// the one baton would build from its steps. It is the difference between
+// knowing and guessing: a matching name provably decomposes into step
+// names, so its "+" are joiners, while a name the user typed is left
+// alone even if it happens to contain one.
+func (m Model) workflowNameIsGenerated(idx int) bool {
+	if idx < 0 || idx >= len(m.workflows) {
+		return false
+	}
+	wf := m.workflows[idx]
+	return wf.Name != "" && wf.Name == m.suggestWorkflowNameFor(wf.Commands, idx)
+}
+
+// workflowLabel renders a workflow's name for a list row, fading the
+// joiners of a generated name so the step names read as separate chunks.
+func (m Model) workflowLabel(idx int, hovered bool) string {
+	style := func(s string) string { return s }
+	if hovered {
+		style = bold
+	}
+	name := m.workflows[idx].Name
+	if !m.workflowNameIsGenerated(idx) {
+		return style(name)
+	}
+	parts := strings.Split(name, "+")
+	for i, p := range parts {
+		parts[i] = style(p)
+	}
+	return strings.Join(parts, dim("+"))
+}
+
 func (m Model) viewRunWorkflow(w int) string {
 	var b strings.Builder
 	b.WriteString("\n" + header("Run workflow", w) + "\n")
@@ -375,9 +406,9 @@ func (m Model) viewRunWorkflow(w int) string {
 			suffix = "  " + gray("(last)")
 		}
 		if i == cur {
-			return "  " + accentBold("▶") + " " + bold(wf.Name) + suffix
+			return "  " + accentBold("▶") + " " + m.workflowLabel(filtered[i], true) + suffix
 		}
-		return "    " + wf.Name + suffix
+		return "    " + m.workflowLabel(filtered[i], false) + suffix
 	})
 
 	// Step preview for hovered workflow (scrollable viewport)

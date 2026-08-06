@@ -175,6 +175,41 @@ func TestViewRunWorkflowSteps_FixedHeight(t *testing.T) {
 	}
 }
 
+// TestWorkflowNameIsGenerated checks the test that decides whether a
+// workflow name may be shown as composed of step names. It must rest on
+// rebuilding the name from the steps, never on spotting a "+": a name
+// the user typed is not baton's to reinterpret, and the rendered text
+// stays byte-for-byte the name either way.
+func TestWorkflowNameIsGenerated(t *testing.T) {
+	m := Model{}
+	m.workflows = []mdl.Workflow{
+		{Name: "build+test", Commands: []string{"build", "test"}},   // generated
+		{Name: "build+test-2", Commands: []string{"build", "test"}}, // generated, collision suffix
+		{Name: "C++ build", Commands: []string{"compile", "link"}},  // typed, contains "+"
+		{Name: "nightly", Commands: []string{"clean", "build"}},     // typed
+		{Name: "deploy+extra", Commands: []string{"deploy"}},        // typed, has a "+" of its own
+	}
+	want := []bool{true, true, false, false, false}
+	for i, w := range want {
+		if got := m.workflowNameIsGenerated(i); got != w {
+			t.Errorf("workflow %q (steps %v): generated = %v, want %v",
+				m.workflows[i].Name, m.workflows[i].Commands, got, w)
+		}
+	}
+	if m.workflowNameIsGenerated(len(m.workflows)) || m.workflowNameIsGenerated(-1) {
+		t.Error("an out-of-range index must not report a generated name")
+	}
+
+	// Styling never edits the text: what is displayed is the name.
+	for i := range m.workflows {
+		for _, hovered := range []bool{false, true} {
+			if got := m.workflowLabel(i, hovered); got != m.workflows[i].Name {
+				t.Errorf("label(%d, %v) = %q, want the name unchanged", i, hovered, got)
+			}
+		}
+	}
+}
+
 // TestViewMainMenu_StableHeight checks the two-pane menu keeps a constant
 // frame height while the cursor moves: the right pane's shortcut list
 // varies per item and must be padded, or the footer bounces around.
