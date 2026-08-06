@@ -45,10 +45,10 @@ func workflowNameSegments(cmds []string) (shown []string, tail string) {
 	return shown, tail
 }
 
-// suggestWorkflowName proposes "cmd1+cmd2+cmd3" (a "+n" tail counts any
-// step that did not fit) from the picked commands, so workflow names
-// show what they run. A numeric suffix resolves collisions with existing
-// workflow names.
+// suggestWorkflowName proposes a name listing the picked commands joined
+// with "+", so workflow names show what they run. A "+n" tail counts any
+// step that did not fit the budget, and a numeric suffix resolves
+// collisions with existing workflow names.
 func (m Model) suggestWorkflowName() string {
 	return m.suggestWorkflowNameFor(m.pendingWorkflowCmds, -1)
 }
