@@ -32,8 +32,34 @@ func (m Model) openNameInput(mode nameInputMode) (tea.Model, tea.Cmd) {
 	return m, m.nameInput.Focus()
 }
 
+// nameSuggestion returns the canonical name for whatever this input is
+// naming, or "" when nothing can be derived. Tab inserts it: the rules
+// behind these names — path segments, collision handling — are not ones
+// a user can reproduce by hand, which is exactly why renaming an entry
+// into line with them needs a key rather than typing.
+func (m Model) nameSuggestion() string {
+	switch m.nameInputMode {
+	case nameInputWorkflow:
+		return m.suggestWorkflowNameFor(m.pendingWorkflowCmds, -1)
+	case nameInputEditWorkflow:
+		if m.editTargetIdx >= 0 && m.editTargetIdx < len(m.workflows) {
+			return m.suggestWorkflowNameFor(m.workflows[m.editTargetIdx].Commands, m.editTargetIdx)
+		}
+	case nameInputRenameCommand:
+		return m.suggestRenameForCommand()
+	}
+	return ""
+}
+
 func (m Model) updateNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab":
+		if s := m.nameSuggestion(); s != "" {
+			m.nameInput.SetValue(s)
+			m.nameInput.CursorEnd()
+			m.nameInputErr = ""
+		}
+		return m, nil
 	case "enter":
 		name := strings.TrimSpace(m.nameInput.Value())
 		if name == "" {

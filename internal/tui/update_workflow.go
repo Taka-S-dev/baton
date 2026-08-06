@@ -16,7 +16,13 @@ import (
 // rest) from the picked commands, so workflow names show what they run.
 // A numeric suffix resolves collisions with existing workflow names.
 func (m Model) suggestWorkflowName() string {
-	cmds := m.pendingWorkflowCmds
+	return m.suggestWorkflowNameFor(m.pendingWorkflowCmds, -1)
+}
+
+// suggestWorkflowNameFor builds the name for the given steps.
+// excludeIdx is the workflow being renamed, which does not collide with
+// itself.
+func (m Model) suggestWorkflowNameFor(cmds []string, excludeIdx int) string {
 	if len(cmds) == 0 {
 		return ""
 	}
@@ -32,8 +38,8 @@ func (m Model) suggestWorkflowName() string {
 		base = strings.TrimRight(string(r[:48]), "+-")
 	}
 	taken := func(n string) bool {
-		for _, wf := range m.workflows {
-			if wf.Name == n {
+		for i, wf := range m.workflows {
+			if i != excludeIdx && wf.Name == n {
 				return true
 			}
 		}

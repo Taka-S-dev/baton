@@ -1013,9 +1013,13 @@ func (m Model) viewNameInput(w int) string {
 	case nameInputNewList:
 		title = "New list"
 	}
+	hint := "Esc: cancel"
+	if m.nameSuggestion() != "" {
+		hint = "Tab: suggest name   " + hint
+	}
 	var b strings.Builder
 	b.WriteString("\n" + header(title, w) + "\n")
-	b.WriteString("  " + gray("Esc: cancel") + "\n\n")
+	b.WriteString("  " + gray(hint) + "\n\n")
 	b.WriteString("  " + m.nameInput.View() + "\n")
 	if m.nameInputErr != "" {
 		b.WriteString("\n  " + errorText(m.nameInputErr) + "\n")
@@ -1547,7 +1551,11 @@ func (m Model) viewCommandNameInput(title string, w int, sce *commandEditState) 
 		}
 	}
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("Enter: confirm   Esc: back") + "\n")
+	hint := "Enter: confirm   Esc: back"
+	if m.suggestCommandName() != "" {
+		hint = "Tab: suggest name   " + hint
+	}
+	b.WriteString("  " + gray(hint) + "\n")
 	return b.String()
 }
 

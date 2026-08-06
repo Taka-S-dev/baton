@@ -624,6 +624,12 @@ func (m *Model) updateCreateCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// ScreenCreateCommandName (name input after slots)
 	switch msg.String() {
+	case "tab":
+		if s := m.suggestCommandName(); s != "" {
+			m.nameInput.SetValue(s)
+			m.nameInput.CursorEnd()
+		}
+		return m, nil
 	case "enter":
 		name := m.nameInput.Value()
 		if name == "" {
@@ -694,6 +700,12 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// ScreenEditCommandName (name input after slots)
 	switch msg.String() {
+	case "tab":
+		if s := m.suggestCommandName(); s != "" {
+			m.nameInput.SetValue(s)
+			m.nameInput.CursorEnd()
+		}
+		return m, nil
 	case "enter":
 		name := m.nameInput.Value()
 		if name == "" {
@@ -853,20 +865,20 @@ func (m *Model) gotoCommandNameInput() (tea.Model, tea.Cmd) {
 	return m, m.nameInput.Focus()
 }
 
-// suggestCommandName proposes "<template>-<value>-..." from the picked
-// slot values (in slot order, skipped slots omitted), so saved commands
-// get distinguishable names without inventing a scheme each time.
+// suggestName proposes "<template>-<value>-..." from slot values (in
+// slot order, slots without a value omitted), so saved commands get
+// distinguishable names without inventing a scheme each time.
 //
 // On a collision with an existing name the values are rebuilt with their
 // parent path segment first — two workdirs like app1/src and app2/src
 // usually differ there, not in the basename — and only when that still
-// collides does a numeric suffix step in.
-func (m *Model) suggestCommandName() string {
-	sce := m.sce
+// collides does a numeric suffix step in. excludeIdx is the command the
+// name is being chosen for, which does not collide with itself.
+func (m *Model) suggestName(tplName string, slots []slot.Def, values map[string]string, excludeIdx int) string {
 	build := func(segments int) string {
-		parts := []string{m.templateCandidates()[sce.templateRefIdx].Name}
-		for _, s := range sce.currentSlots {
-			if v, ok := sce.currentValues[s.Name]; ok {
+		parts := []string{tplName}
+		for _, s := range slots {
+			if v, ok := values[s.Name]; ok {
 				if p := sanitizeNamePart(v, segments); p != "" {
 					parts = append(parts, p)
 				}
@@ -879,20 +891,52 @@ func (m *Model) suggestCommandName() string {
 		return base
 	}
 	name := build(1)
-	if !m.commandNameTaken(name, -1) {
+	if !m.commandNameTaken(name, excludeIdx) {
 		return name
 	}
 	if deep := build(2); deep != name {
 		name = deep
-		if !m.commandNameTaken(name, -1) {
+		if !m.commandNameTaken(name, excludeIdx) {
 			return name
 		}
 	}
 	base := name
-	for i := 2; m.commandNameTaken(name, -1); i++ {
+	for i := 2; m.commandNameTaken(name, excludeIdx); i++ {
 		name = fmt.Sprintf("%s-%d", base, i)
 	}
 	return name
+}
+
+// suggestCommandName names the command being created or edited from the
+// slot values picked during the flow.
+func (m *Model) suggestCommandName() string {
+	sce := m.sce
+	cands := m.templateCandidates()
+	if sce == nil || sce.templateRefIdx < 0 || sce.templateRefIdx >= len(cands) {
+		return ""
+	}
+	exclude := -1
+	if sce.mode == 1 {
+		exclude = sce.editIdx
+	}
+	return m.suggestName(cands[sce.templateRefIdx].Name, sce.currentSlots, sce.currentValues, exclude)
+}
+
+// suggestRenameForCommand names the command being renamed. Rename skips
+// the slot pickers, so the values come from the command itself rather
+// than from the flow — which is the point: it re-derives the canonical
+// name for an entry that was named before the rule existed.
+func (m *Model) suggestRenameForCommand() string {
+	sce := m.sce
+	cands := m.templateCandidates()
+	if sce == nil || sce.templateRefIdx < 0 || sce.templateRefIdx >= len(cands) {
+		return ""
+	}
+	if sce.editIdx < 0 || sce.editIdx >= len(m.config.Commands) {
+		return ""
+	}
+	tpl := cands[sce.templateRefIdx]
+	return m.suggestName(tpl.Name, slot.GetSlots(tpl), m.config.Commands[sce.editIdx].Values, sce.editIdx)
 }
 
 // sanitizeNamePart reduces a slot value to a short name fragment: its

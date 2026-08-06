@@ -277,6 +277,87 @@ func TestTSVEdit_RenameWithoutRefsWritesNothingExtra(t *testing.T) {
 	}
 }
 
+// TestRenameCommand_TabInsertsSuggestion checks Tab on the rename input
+// rebuilds the canonical name from the command's own stored values —
+// the point being to pull an entry named before the rule existed into
+// line with it — and that a name already canonical stays put instead of
+// colliding with itself into a "-2" suffix.
+func TestRenameCommand_TabInsertsSuggestion(t *testing.T) {
+	newModel := func(name string) *Model {
+		m := &Model{}
+		m.nameInput = textinput.New()
+		m.config.Base = []mdl.Command{{Name: "build", Cmd: "make {mode}", Dir: "{workdir}"}}
+		m.config.Commands = []mdl.Command{{
+			Name: name, Template: "build",
+			Values: map[string]string{"workdir": "./src", "mode": "Fast Build"},
+		}}
+		m.screen = ScreenEditCommandPick
+		names, refs := m.editableCommands()
+		m.listItems, m.editRefs = names, refs
+		m.listCursor = 0
+		m.updateEditCommandPick(tea.KeyMsg{Type: tea.KeyEnter})
+		m.updateEditCommandMode(tea.KeyMsg{Type: tea.KeyEnter}) // cursor 0 = Rename
+		return m
+	}
+	tab := tea.KeyMsg{Type: tea.KeyTab}
+
+	m := newModel("legacy-name")
+	if m.nameInput.Value() != "legacy-name" {
+		t.Fatalf("rename must open on the current name, got %q", m.nameInput.Value())
+	}
+	nm, _ := m.updateNameInput(tab)
+	got := nm.(Model)
+	if v := got.nameInput.Value(); v != "build-fast-build-src" {
+		t.Fatalf("Tab inserted %q, want the canonical name", v)
+	}
+	if got.screen != ScreenNameInput {
+		t.Fatalf("Tab must stay on the input, screen=%v", got.screen)
+	}
+
+	// Already canonical: Tab is a no-op, not a rename to "...-2".
+	m2 := newModel("build-fast-build-src")
+	nm, _ = m2.updateNameInput(tab)
+	if v := nm.(Model).nameInput.Value(); v != "build-fast-build-src" {
+		t.Fatalf("Tab on an already-canonical name gave %q", v)
+	}
+}
+
+// TestNameSuggestion_ScopePerMode checks Tab only offers a name where
+// one can be derived: workflows from their steps (excluding the workflow
+// being renamed), and nothing at all for a new list.
+func TestNameSuggestion_ScopePerMode(t *testing.T) {
+	m := Model{}
+	m.workflows = []mdl.Workflow{
+		{Name: "old-name", Commands: []string{"build", "test"}},
+		{Name: "other", Commands: []string{"deploy"}},
+	}
+
+	m.nameInputMode = nameInputEditWorkflow
+	m.editTargetIdx = 0
+	if got := m.nameSuggestion(); got != "build+test" {
+		t.Fatalf("workflow rename suggestion = %q, want build+test", got)
+	}
+
+	// A workflow already named after its steps must not suggest "-2".
+	m.workflows[0].Name = "build+test"
+	if got := m.nameSuggestion(); got != "build+test" {
+		t.Fatalf("suggestion = %q, a workflow must not collide with itself", got)
+	}
+
+	m.nameInputMode = nameInputNewList
+	if got := m.nameSuggestion(); got != "" {
+		t.Fatalf("a new list has nothing to derive a name from, got %q", got)
+	}
+
+	// Nothing to suggest means Tab leaves the field alone.
+	m.nameInput = textinput.New()
+	m.nameInput.SetValue("typed")
+	nm, _ := m.updateNameInput(tea.KeyMsg{Type: tea.KeyTab})
+	if v := nm.(Model).nameInput.Value(); v != "typed" {
+		t.Fatalf("Tab must not clear the field when there is no suggestion, got %q", v)
+	}
+}
+
 // TestEditCommandMode_ValuesVsTemplate checks the two edit paths:
 // Change values goes straight to the slot picker (skipping the template
 // screen) and Esc from the first slot returns to the menu; Change

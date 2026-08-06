@@ -230,6 +230,8 @@ build-api	projCmd	Z:\api
 
 The actual command line is recomputed from `template` + `vars.tsv` on every load, so editing either propagates immediately. Deleting the template breaks its derived commands, which the startup warning points out.
 
+**Naming.** Saving one pre-fills a name built from the template and the values picked — `build` on `./src` in fast mode becomes `build-fast-build-src` — so saved commands stay distinguishable without inventing a scheme each time. `Tab` inserts that name in any name input, which is what brings an entry named before the rule existed back in line with it: **Edit command → Rename**, then `Tab`. Renaming a workflow works the same way, offering the `step1+step2` name built from its steps.
+
 ### Renaming commands
 
 Command names are the reference key everywhere — workflow steps, the `template` field of derived commands, and per-command `vars.tsv` rows all point at them. Renames keep those references intact from either direction:
