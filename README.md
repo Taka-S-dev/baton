@@ -417,7 +417,7 @@ lives in [AGENTS.md](AGENTS.md).
 
 Workflows are saved sequences of commands. Creating one is just picking commands and naming them (**Manage workflows → Create workflow**); remaining `{slots}` are prompted at run time, and fixed values belong to the saved commands the workflow contains.
 
-Run one from **Run workflow** — the list is searchable like the command selector: the workflow name, its step names, and the step command bodies all match. A name still the generated `step1+step2` one has its joiners faded in the list, so the step names read as separate chunks; baton only does this after rebuilding the name from the workflow's own steps and finding it identical, so a name you typed is shown exactly as typed even when it contains a `+`.
+Run one from **Run workflow** — the list is searchable like the command selector: the workflow name, its step names, and the step command bodies all match. A name still the generated `step1+step2` one has its joiners picked out in gold, so the step names read as separate chunks; baton only does this after rebuilding the name from the workflow's own steps and finding it identical, so a name you typed is shown exactly as typed even when it contains a `+`.
 
 **Running part of a workflow.** `Enter` runs every step; `→` opens the step picker for the highlighted workflow, where `Tab` toggles individual steps and `Enter` runs the chosen ones. Selected steps always execute in the workflow's own order — the picker chooses *which* steps run, never the order — so a fixed sequence you deliberately advance a few steps at a time stays one workflow instead of a search each time. With nothing toggled, `Enter` runs just the highlighted step, and steps whose command no longer exists are shown but cannot be selected.
 

@@ -358,8 +358,14 @@ func (m Model) workflowNameIsGenerated(idx int) bool {
 	return wf.Name != "" && wf.Name == m.suggestWorkflowNameFor(wf.Commands, idx)
 }
 
-// workflowLabel renders a workflow's name for a list row, fading the
+// workflowLabel renders a workflow's name for a list row, colouring the
 // joiners of a generated name so the step names read as separate chunks.
+//
+// The joiner has to outrank the hyphens inside step names — build-src
+// carries one of its own — so it is marked rather than faded: fading put
+// the boundary that matters below the one that does not. Gold is the
+// emphasis colour here and, unlike the accent, is not already spoken for
+// by the cursor on this screen.
 func (m Model) workflowLabel(idx int, hovered bool) string {
 	style := func(s string) string { return s }
 	if hovered {
@@ -373,7 +379,7 @@ func (m Model) workflowLabel(idx int, hovered bool) string {
 	for i, p := range parts {
 		parts[i] = style(p)
 	}
-	return strings.Join(parts, dim("+"))
+	return strings.Join(parts, highlight("+"))
 }
 
 func (m Model) viewRunWorkflow(w int) string {
