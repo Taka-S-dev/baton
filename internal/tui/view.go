@@ -358,28 +358,55 @@ func (m Model) workflowNameIsGenerated(idx int) bool {
 	return wf.Name != "" && wf.Name == m.suggestWorkflowNameFor(wf.Commands, idx)
 }
 
+// workflowNameParts decomposes a generated workflow name into the step
+// names it shows and its "+N more" tail, or reports ok=false when the
+// name is not one baton built or no longer decomposes into its steps —
+// the 48-rune cap can cut a generated name mid-step.
+//
+// The pieces come from rebuilding the name out of the workflow's steps,
+// never from splitting on "+": the tail's "+" joins a count rather than
+// a step, and a "+" the user typed joins nothing at all.
+func (m Model) workflowNameParts(idx int) (parts []string, tail string, ok bool) {
+	if !m.workflowNameIsGenerated(idx) {
+		return nil, "", false
+	}
+	wf := m.workflows[idx]
+	shown := wf.Commands
+	if len(shown) > 3 {
+		shown = shown[:3]
+	}
+	if rest := len(wf.Commands) - len(shown); rest > 0 {
+		tail = fmt.Sprintf("+%d", rest)
+	}
+	if strings.Join(shown, "+")+tail != wf.Name {
+		return nil, "", false
+	}
+	return shown, tail, true
+}
+
 // workflowLabel renders a workflow's name for a list row, colouring the
-// joiners of a generated name so the step names read as separate chunks.
+// joiners between step names so the names read as separate chunks.
 //
 // The joiner has to outrank the hyphens inside step names — build-src
 // carries one of its own — so it is marked rather than faded: fading put
 // the boundary that matters below the one that does not. Gold is the
 // emphasis colour here and, unlike the accent, is not already spoken for
-// by the cursor on this screen.
+// by the cursor on this screen. The "+N" tail stays grey, since it
+// counts steps rather than naming one.
 func (m Model) workflowLabel(idx int, hovered bool) string {
 	style := func(s string) string { return s }
 	if hovered {
 		style = bold
 	}
-	name := m.workflows[idx].Name
-	if !m.workflowNameIsGenerated(idx) {
-		return style(name)
+	parts, tail, ok := m.workflowNameParts(idx)
+	if !ok {
+		return style(m.workflows[idx].Name)
 	}
-	parts := strings.Split(name, "+")
+	styled := make([]string, len(parts))
 	for i, p := range parts {
-		parts[i] = style(p)
+		styled[i] = style(p)
 	}
-	return strings.Join(parts, highlight("+"))
+	return strings.Join(styled, highlight("+")) + gray(tail)
 }
 
 func (m Model) viewRunWorkflow(w int) string {

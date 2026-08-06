@@ -200,6 +200,31 @@ func TestWorkflowNameIsGenerated(t *testing.T) {
 		t.Error("an out-of-range index must not report a generated name")
 	}
 
+	// Only step names are marked as steps. A generated name for four or
+	// more steps ends in a "+N more" count, whose "+" joins a number
+	// rather than another step.
+	m2 := Model{workflows: []mdl.Workflow{
+		{Name: "a+b+c+2", Commands: []string{"a", "b", "c", "d", "e"}},
+		{Name: "a+b", Commands: []string{"a", "b"}},
+		{Name: "typed+name", Commands: []string{"x"}},
+	}}
+	cases := []struct {
+		parts []string
+		tail  string
+		ok    bool
+	}{
+		{[]string{"a", "b", "c"}, "+2", true},
+		{[]string{"a", "b"}, "", true},
+		{nil, "", false},
+	}
+	for i, c := range cases {
+		parts, tail, ok := m2.workflowNameParts(i)
+		if ok != c.ok || tail != c.tail || strings.Join(parts, ",") != strings.Join(c.parts, ",") {
+			t.Errorf("parts(%q) = %v/%q/%v, want %v/%q/%v",
+				m2.workflows[i].Name, parts, tail, ok, c.parts, c.tail, c.ok)
+		}
+	}
+
 	// Styling never edits the text: what is displayed is the name.
 	for i := range m.workflows {
 		for _, hovered := range []bool{false, true} {
