@@ -9,6 +9,16 @@ import (
 type runReadyMsg struct{}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// A resize is every screen's business, so it is handled before the
+	// forwarding below — which returns early and would otherwise leave
+	// the layout stale on any screen holding a text input.
+	if ws, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = ws.Width
+		m.height = ws.Height
+		m.updateStepsViewport()
+		return m, nil
+	}
+
 	// Always forward to spinner so TickMsg animates it.
 	{
 		s, c := m.spinner.Update(msg)
@@ -51,11 +61,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.updateStepsViewport()
-		return m, nil
 	case runReadyMsg:
 		if m.running != nil {
 			m.running.starting = false
