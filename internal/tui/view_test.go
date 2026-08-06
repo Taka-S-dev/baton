@@ -204,7 +204,10 @@ func TestWorkflowNameIsGenerated(t *testing.T) {
 	// more steps ends in a "+N more" count, whose "+" joins a number
 	// rather than another step.
 	m2 := Model{workflows: []mdl.Workflow{
-		{Name: "a+b+c+2", Commands: []string{"a", "b", "c", "d", "e"}},
+		{
+			Name:     "provision-infra+migrate-database+2",
+			Commands: []string{"provision-infra", "migrate-database", "deploy-services", "smoke-test"},
+		},
 		{Name: "a+b", Commands: []string{"a", "b"}},
 		{Name: "typed+name", Commands: []string{"x"}},
 	}}
@@ -213,7 +216,7 @@ func TestWorkflowNameIsGenerated(t *testing.T) {
 		tail  string
 		ok    bool
 	}{
-		{[]string{"a", "b", "c"}, "+2", true},
+		{[]string{"provision-infra", "migrate-database"}, "+2", true},
 		{[]string{"a", "b"}, "", true},
 		{nil, "", false},
 	}

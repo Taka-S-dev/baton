@@ -12,9 +12,43 @@ import (
 
 // ── Workflow management ───────────────────────────────────────────────────────
 
-// suggestWorkflowName proposes "cmd1+cmd2+cmd3" (a "+n" tail counts the
-// rest) from the picked commands, so workflow names show what they run.
-// A numeric suffix resolves collisions with existing workflow names.
+// maxWorkflowNameLen bounds a suggested name so it stays readable in the
+// workflow list.
+const maxWorkflowNameLen = 48
+
+// workflowNameSegments splits steps into the names a suggested workflow
+// name spells out and the "+N" tail counting whatever did not fit.
+//
+// The budget is length, not a step count: capping at three steps named a
+// four-step workflow "build+clean+build-src+1" while the fourth name
+// would have fit with room to spare, and that "+1" reads as a step
+// called 1. Names are only ever dropped whole, so a name never carries
+// half a step.
+func workflowNameSegments(cmds []string) (shown []string, tail string) {
+	for i, c := range cmds {
+		next := c
+		if len(shown) > 0 {
+			next = strings.Join(shown, "+") + "+" + c
+		}
+		room := ""
+		if rest := len(cmds) - i - 1; rest > 0 {
+			room = fmt.Sprintf("+%d", rest)
+		}
+		if len(shown) > 0 && len([]rune(next+room)) > maxWorkflowNameLen {
+			break
+		}
+		shown = append(shown, c)
+	}
+	if rest := len(cmds) - len(shown); rest > 0 {
+		tail = fmt.Sprintf("+%d", rest)
+	}
+	return shown, tail
+}
+
+// suggestWorkflowName proposes "cmd1+cmd2+cmd3" (a "+n" tail counts any
+// step that did not fit) from the picked commands, so workflow names
+// show what they run. A numeric suffix resolves collisions with existing
+// workflow names.
 func (m Model) suggestWorkflowName() string {
 	return m.suggestWorkflowNameFor(m.pendingWorkflowCmds, -1)
 }
@@ -26,17 +60,11 @@ func (m Model) suggestWorkflowNameFor(cmds []string, excludeIdx int) string {
 	if len(cmds) == 0 {
 		return ""
 	}
-	shown := cmds
-	if len(shown) > 3 {
-		shown = shown[:3]
-	}
-	base := strings.Join(shown, "+")
-	if rest := len(cmds) - len(shown); rest > 0 {
-		base += fmt.Sprintf("+%d", rest)
-	}
-	if r := []rune(base); len(r) > 48 {
-		base = strings.TrimRight(string(r[:48]), "+-")
-	}
+	shown, tail := workflowNameSegments(cmds)
+	base := strings.Join(shown, "+") + tail
+	// A single step whose own name blows the budget is the one case
+	// where dropping whole names cannot help.
+	base = truncate(base, maxWorkflowNameLen)
 	taken := func(n string) bool {
 		for i, wf := range m.workflows {
 			if i != excludeIdx && wf.Name == n {

@@ -169,12 +169,25 @@ func TestEditWorkflowPick_FilterMapsTarget(t *testing.T) {
 }
 
 // TestSuggestWorkflowName checks the pre-filled workflow name lists the
-// picked commands, counts the overflow, and dodges existing names.
+// picked commands, counts only what genuinely did not fit, and dodges
+// existing names.
 func TestSuggestWorkflowName(t *testing.T) {
 	m := Model{}
+	// Short names: every step fits, so nothing is summarised away. A
+	// count-based cut used to abbreviate these needlessly.
 	m.pendingWorkflowCmds = []string{"build", "test", "deploy", "smoke", "notify"}
-	if got := m.suggestWorkflowName(); got != "build+test+deploy+2" {
-		t.Fatalf("suggested = %q, want %q", got, "build+test+deploy+2")
+	if got := m.suggestWorkflowName(); got != "build+test+deploy+smoke+notify" {
+		t.Fatalf("suggested = %q, want every step spelled out", got)
+	}
+
+	// Long names: the budget runs out, and the rest is counted. Names are
+	// dropped whole, so the result never ends mid-step.
+	m.pendingWorkflowCmds = []string{"provision-infra", "migrate-database", "deploy-services", "smoke-test"}
+	if got := m.suggestWorkflowName(); got != "provision-infra+migrate-database+2" {
+		t.Fatalf("suggested = %q, want the fitting steps plus a count", got)
+	}
+	if got := m.suggestWorkflowName(); len([]rune(got)) > maxWorkflowNameLen {
+		t.Fatalf("suggested = %q, longer than the budget", got)
 	}
 
 	m.pendingWorkflowCmds = []string{"build", "deploy"}

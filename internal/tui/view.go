@@ -371,13 +371,7 @@ func (m Model) workflowNameParts(idx int) (parts []string, tail string, ok bool)
 		return nil, "", false
 	}
 	wf := m.workflows[idx]
-	shown := wf.Commands
-	if len(shown) > 3 {
-		shown = shown[:3]
-	}
-	if rest := len(wf.Commands) - len(shown); rest > 0 {
-		tail = fmt.Sprintf("+%d", rest)
-	}
+	shown, tail := workflowNameSegments(wf.Commands)
 	if strings.Join(shown, "+")+tail != wf.Name {
 		return nil, "", false
 	}
