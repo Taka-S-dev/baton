@@ -990,8 +990,12 @@ func (m Model) viewConfirmRun(w int) string {
 		item := m.confirmRunItems[i]
 		b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
 		if item.Cmd != nil {
-			b.WriteString("       " + gray("$ "+item.Cmd.Cmd) + "\n")
-			workdir := item.Cmd.Dir
+			// Resolve {$vars} here as every other preview does, and as
+			// the runner will: this screen answers "what is about to
+			// run", so it must not show something else.
+			cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
+			b.WriteString("       " + gray("$ "+cmd.Cmd) + "\n")
+			workdir := cmd.Dir
 			if workdir == "" {
 				workdir = "."
 			}

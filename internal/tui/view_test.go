@@ -9,6 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/runner"
+	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 // TestViewMultiSelect_StableValueOrder guards against map-iteration-order
@@ -235,6 +237,33 @@ func TestWorkflowNameIsGenerated(t *testing.T) {
 				t.Errorf("label(%d, %v) = %q, want the name unchanged", i, hovered, got)
 			}
 		}
+	}
+}
+
+// TestViewConfirmRun_ShowsWhatWillRun checks the confirm screen resolves
+// {$vars} the way the runner does. It is the screen that answers "what
+// is about to run", so showing the unresolved reference there would
+// describe something other than what Enter executes.
+func TestViewConfirmRun_ShowsWhatWillRun(t *testing.T) {
+	cmd := mdl.Command{Name: "test", Cmd: "go test {$pkgdir}/slot/", Dir: "{$root}/api"}
+	m := Model{width: 100, height: 30, screen: ScreenConfirmRun}
+	m.vars = map[string]string{"pkgdir": "./internal", "root": "/srv"}
+	m.confirmRunItems = []mdl.RunItem{{Name: "test", Cmd: &cmd}}
+
+	view := m.viewConfirmRun(100)
+	for _, want := range []string{"$ go test ./internal/slot/", "workdir: /srv/api"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("confirm view missing %q\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "{$") {
+		t.Errorf("confirm view still shows an unresolved reference\n%s", view)
+	}
+
+	// What it printed is what the runner builds from the same command.
+	resolved := runner.BuildExecForTest(slot.ApplyVarsToCommand(cmd, m.vars))
+	if !strings.Contains(strings.Join(resolved.Args, " "), "go test ./internal/slot/") {
+		t.Fatalf("runner would execute %v, which the screen no longer matches", resolved.Args)
 	}
 }
 
