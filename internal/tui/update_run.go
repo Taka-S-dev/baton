@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -62,6 +63,7 @@ func (m Model) startRunningRetry(items []mdl.RunItem, startIdx int, label string
 		starting:   true,
 		label:      label,
 		retryCount: retryCount,
+		runStart:   time.Now(),
 	}
 	m.screen = ScreenRunning
 	return m, tea.Sequence(
@@ -87,6 +89,7 @@ func (m Model) runNext() tea.Cmd {
 		return nil
 	}
 	item := r.items[r.current]
+	r.stepStart = time.Now()
 	cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
 	header := stepHeader(r.current+1, len(r.items), item.Name, cmd)
 	prefix := ""
@@ -115,10 +118,16 @@ func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	r.current++
-	bar := progressBar(r.current, len(r.items), 24)
+	bar := progressBar(r.current, len(r.items), 24) + "  " + gray(formatDuration(time.Since(r.stepStart)))
 	if r.current >= len(r.items) {
 		r.completed = true
-		return m, tea.Sequence(tea.Println(bar), tea.ExitAltScreen)
+		r.total = time.Since(r.runStart)
+		// The closing line is what stays in the scrollback: a run is
+		// often left unattended, and "when did it end" is only
+		// answerable from the clock, not from a duration.
+		done := fmt.Sprintf("  done in %s   finished at %s",
+			formatDuration(r.total), time.Now().Format("15:04:05"))
+		return m, tea.Sequence(tea.Println(bar), tea.Println(gray(done)), tea.ExitAltScreen)
 	}
 	return m, tea.Sequence(tea.Println(bar), m.runNext())
 }

@@ -1031,7 +1031,8 @@ func (m Model) viewRunning(w int) string {
 	}
 	var b strings.Builder
 	n := len(r.items)
-	b.WriteString("\n" + successBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) + "\n\n")
+	b.WriteString("\n" + successBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) +
+		"  " + gray("in "+formatDuration(r.total)) + "\n\n")
 	b.WriteString("  " + gray("Press any key to return to menu...") + "\n")
 	return b.String()
 }

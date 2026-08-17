@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -83,6 +84,16 @@ func hlineLabelBright(width int, label string) string {
 
 func header(title string, width int) string {
 	return accentBold("  [ "+title+" ]") + "\n" + hline(width) + "\n"
+}
+
+// formatDuration renders an elapsed time at a precision that suits its
+// length: hundredths below a minute, whole seconds above it. Go's own
+// formatting would print 1.170448s next to 4m12.003s.
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return d.Round(10 * time.Millisecond).String()
+	}
+	return d.Round(time.Second).String()
 }
 
 func progressBar(done, total, barWidth int) string {

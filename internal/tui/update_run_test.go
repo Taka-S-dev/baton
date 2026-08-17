@@ -3,11 +3,13 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/runner"
 )
 
 func wfModel() Model {
@@ -279,6 +281,54 @@ func TestUpdateRunWorkflow_SpaceStillTypesIntoSearch(t *testing.T) {
 	}
 	if m.screen != ScreenRunWorkflow {
 		t.Fatalf("Space must not leave the list, screen=%v", m.screen)
+	}
+}
+
+// TestFormatDuration checks the elapsed times printed after each step
+// read at a precision that suits their length, instead of Go's default
+// which puts 1.170448s next to 4m12.003s.
+func TestFormatDuration(t *testing.T) {
+	cases := map[time.Duration]string{
+		120 * time.Millisecond:                              "120ms",
+		1234 * time.Millisecond:                             "1.23s",
+		time.Minute + 12*time.Second:                        "1m12s",
+		4*time.Minute + 12*time.Second + 3*time.Millisecond: "4m12s",
+	}
+	for in, want := range cases {
+		if got := formatDuration(in); got != want {
+			t.Errorf("formatDuration(%v) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestRunCompletion_FreezesTheTotal checks the done screen reports the
+// time the run took, not the time since it finished: the screen redraws
+// on every tick, so a total computed at render would keep climbing while
+// the user reads it.
+func TestRunCompletion_FreezesTheTotal(t *testing.T) {
+	cmd := mdl.Command{Name: "a", Cmd: "echo hi"}
+	m := Model{width: 80, height: 24, screen: ScreenRunning}
+	m.running = &runningState{
+		items:    []mdl.RunItem{{Name: "a", Cmd: &cmd}},
+		runStart: time.Now().Add(-3 * time.Second),
+	}
+
+	nm, _ := m.handleRunnerDone(runner.DoneMsg{Index: 0})
+	got := nm.(Model)
+	if !got.running.completed {
+		t.Fatal("the last step finishing must complete the run")
+	}
+	if got.running.total < 3*time.Second {
+		t.Fatalf("total = %v, want the elapsed run time", got.running.total)
+	}
+
+	first := got.viewRunning(80)
+	time.Sleep(20 * time.Millisecond)
+	if second := got.viewRunning(80); second != first {
+		t.Fatalf("the done screen changed between renders:\n%q\n%q", first, second)
+	}
+	if !strings.Contains(first, "in 3") {
+		t.Fatalf("done screen = %q, want it to report how long the run took", first)
 	}
 }
 

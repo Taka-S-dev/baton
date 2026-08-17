@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -289,6 +290,16 @@ type runningState struct {
 	starting   bool // true while waiting for alt screen to exit
 	label      string
 	retryCount int
+
+	// When the run and the step in flight began. A run is often started
+	// and walked away from, so the scrollback has to answer how long it
+	// took and when it ended.
+	runStart  time.Time
+	stepStart time.Time
+	// Frozen when the last step finishes: the done screen redraws on
+	// every tick, and a running total would keep climbing after the run
+	// had stopped.
+	total time.Duration
 }
 
 // listEditState holds state for list editing.
