@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -329,6 +330,42 @@ func TestRunCompletion_FreezesTheTotal(t *testing.T) {
 	}
 	if !strings.Contains(first, "in 3") {
 		t.Fatalf("done screen = %q, want it to report how long the run took", first)
+	}
+}
+
+// TestRunCompletion_IgnoresTheKeyBurst checks the done screen drops the
+// keys that arrive with it. While a command runs the terminal belongs to
+// that command, so anything typed then reaches baton all at once when it
+// returns — and each of those keys would otherwise walk a menu step
+// closer to starting the same run again.
+func TestRunCompletion_IgnoresTheKeyBurst(t *testing.T) {
+	cmd := mdl.Command{Name: "a", Cmd: "echo hi"}
+	newDone := func(age time.Duration) Model {
+		m := Model{width: 80, height: 24, screen: ScreenRunning}
+		m.spinner = spinner.New()
+		m.running = &runningState{
+			items:       []mdl.RunItem{{Name: "a", Cmd: &cmd}},
+			completed:   true,
+			completedAt: time.Now().Add(-age),
+		}
+		return m
+	}
+	enter := tea.KeyMsg{Type: tea.KeyEnter}
+
+	m := newDone(0)
+	for i := 0; i < 5; i++ { // the burst
+		nm, _ := m.Update(enter)
+		m = nm.(Model)
+	}
+	if m.screen != ScreenRunning {
+		t.Fatalf("the burst left the done screen for %v — it would keep walking the menu", m.screen)
+	}
+
+	// Once it has settled, a real keypress returns to the menu.
+	m = newDone(settleAfterRun + 10*time.Millisecond)
+	nm, _ := m.Update(enter)
+	if got := nm.(Model); got.screen != ScreenMainMenu || got.running != nil {
+		t.Fatalf("after settling a key must return to the menu, screen=%v running=%v", got.screen, got.running)
 	}
 }
 

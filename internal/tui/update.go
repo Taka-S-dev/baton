@@ -1,12 +1,20 @@
 package tui
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Taka-S-dev/baton/internal/runner"
 )
 
 type runReadyMsg struct{}
+
+// settleAfterRun is how long the done screen ignores input. It only has
+// to outlast the burst the terminal delivers when it comes back, not a
+// deliberate keypress, so it stays short enough to go unnoticed by
+// someone reading the screen.
+const settleAfterRun = 500 * time.Millisecond
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// A resize is every screen's business, so it is handled before the
@@ -89,6 +97,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateConfirmRun(msg)
 		case ScreenRunning:
 			if m.running != nil && m.running.completed {
+				// Keys pressed while a command was running went to that
+				// command, not here, and arrive in a burst the moment
+				// the terminal comes back. Dropping the burst is what
+				// stops a run the user is still tapping Enter over from
+				// walking the menu and starting itself again.
+				if time.Since(m.running.completedAt) < settleAfterRun {
+					return m, nil
+				}
 				m.running = nil
 				m.gotoMainMenu()
 				return m, tea.EnterAltScreen

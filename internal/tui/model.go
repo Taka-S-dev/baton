@@ -299,7 +299,8 @@ type runningState struct {
 	// Frozen when the last step finishes: the done screen redraws on
 	// every tick, and a running total would keep climbing after the run
 	// had stopped.
-	total time.Duration
+	total       time.Duration
+	completedAt time.Time
 }
 
 // listEditState holds state for list editing.

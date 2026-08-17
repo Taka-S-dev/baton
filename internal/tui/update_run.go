@@ -122,6 +122,7 @@ func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {
 	if r.current >= len(r.items) {
 		r.completed = true
 		r.total = time.Since(r.runStart)
+		r.completedAt = time.Now()
 		// The closing line is what stays in the scrollback: a run is
 		// often left unattended, and "when did it end" is only
 		// answerable from the clock, not from a duration.
