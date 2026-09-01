@@ -832,3 +832,32 @@ func TestEditCommandPick_FilterMapsSelection(t *testing.T) {
 		t.Fatalf("first Esc must only clear the filter, screen=%v search=%q", got.screen, got.pickSearch)
 	}
 }
+
+// TestCommandForm_CreatedCommandIsEditable checks a command written in
+// the form shows up in the Edit and Delete pickers straight away. Those
+// pickers list the hand-written layer by source, so a row appended
+// without one was written to commands.tsv, ran fine, and stayed
+// invisible to editing until the project was reloaded.
+func TestCommandForm_CreatedCommandIsEditable(t *testing.T) {
+	m := &Model{}
+	m.nameInput = textinput.New()
+	m.projectDir = t.TempDir()
+	m.openCommandForm(-1)
+
+	enter := tea.KeyMsg{Type: tea.KeyEnter}
+	for _, v := range []string{"deploy-api", "make deploy", "", "", ""} {
+		m.nameInput.SetValue(v)
+		m.updateCommandForm(enter)
+	}
+	if m.cf != nil {
+		t.Fatalf("form must close after a valid save, errMsg=%q", m.errMsg)
+	}
+
+	names, refs := m.editableCommands()
+	if len(refs) != 1 || names[0] != "deploy-api" || !refs[0].tsv {
+		t.Fatalf("editable commands = %v (%+v), want the command just created", names, refs)
+	}
+	if got := m.editRefCommand(refs[0]); got.Name != "deploy-api" {
+		t.Fatalf("the picker entry points at %+v", got)
+	}
+}

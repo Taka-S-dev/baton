@@ -218,6 +218,10 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		Dir:   cf.fields[2],
 		Group: cf.fields[3],
 		Shell: shell,
+		// The pickers list the hand-written layer by source, so without
+		// one this row would be written and run yet stay uneditable until
+		// the next load set it.
+		Source: "tsv",
 	}
 	if file, err := config.AppendCommandTSV(m.projectDir, newCmd); err != nil {
 		m.errMsg = "failed to save: " + err.Error()
