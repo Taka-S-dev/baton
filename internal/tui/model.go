@@ -471,6 +471,7 @@ type Model struct {
 	errMsg         string
 	successMsg     string   // transient "it worked" note, cleared on the next keypress
 	loadWarnings   []string // diagnostics; recomputed on every return to the main menu
+	bannerRows     int      // rows the messages above take; View sets it before building the frame
 	deleteConfirm  bool
 	deleteSelected []int
 	deleteBtn      int // 0=No (default), 1=Yes

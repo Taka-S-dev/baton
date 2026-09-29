@@ -19,6 +19,51 @@ func (m Model) View() string {
 	if w == 0 {
 		w = 80
 	}
+	// Messages and load warnings sit under the frame, so the frame is
+	// built against a terminal that much shorter. Appending them to a
+	// frame that already fills the terminal would scroll it, and what
+	// scrolls away is the top of the frame — the screen you are reading.
+	//
+	// Where the two still do not fit, the banner is what gives way: every
+	// screen has a floor it cannot shrink past, and a screen you cannot
+	// read is worse than a message you cannot. Trimming from the end
+	// keeps the error, which is the line worth keeping.
+	banner := m.bannerLines()
+	var view string
+	for {
+		m.bannerRows = len(banner)
+		// No trailing newline: it would carry the cursor onto a further
+		// line and cost the frame the bottom row of the terminal, which
+		// the list can have instead.
+		view = strings.TrimRight(m.renderScreen(w), "\n")
+		over := strings.Count(view, "\n") + 1 + len(banner) - m.rows()
+		if over <= 0 || len(banner) == 0 {
+			break
+		}
+		banner = trimBanner(banner, len(banner)-over)
+	}
+	if len(banner) > 0 {
+		view += "\n" + strings.Join(banner, "\n")
+	}
+	return view
+}
+
+// trimBanner shortens the banner to n lines, dropping it altogether when
+// what is left is only the blank line that set it off from the frame.
+func trimBanner(banner []string, n int) []string {
+	if n < 0 {
+		n = 0
+	}
+	banner = banner[:n]
+	if len(banner) == 1 && banner[0] == "" {
+		return nil
+	}
+	return banner
+}
+
+// renderScreen draws the active screen. The frame it returns is budgeted
+// against m.termHeight, which is the terminal less the banner rows.
+func (m Model) renderScreen(w int) string {
 	var view string
 	switch m.screen {
 	case ScreenProjectSelect:
@@ -88,30 +133,7 @@ func (m Model) View() string {
 	case ScreenRenameRepair:
 		view = m.viewRenameRepair(w)
 	}
-	if m.errMsg != "" {
-		view += "\n" + errorText("  Error: "+m.errMsg) + "\n"
-	}
-	if m.successMsg != "" {
-		view += "\n" + success("  ✓ "+m.successMsg) + "\n"
-	}
-	if len(m.loadWarnings) > 0 && m.screen == ScreenMainMenu {
-		const maxShown = 4
-		shown := m.loadWarnings
-		if len(shown) > maxShown {
-			shown = shown[:maxShown]
-		}
-		view += "\n"
-		for _, wmsg := range shown {
-			view += warn("  Warning: "+wmsg) + "\n"
-		}
-		if rest := len(m.loadWarnings) - maxShown; rest > 0 {
-			view += warn(fmt.Sprintf("  ... and %d more (run: baton check)", rest)) + "\n"
-		}
-	}
-	// No trailing newline: it would carry the cursor onto a further line
-	// and cost the frame the bottom row of the terminal, which the list
-	// can have instead.
-	return strings.TrimRight(view, "\n")
+	return view
 }
 
 // ── Project select / main menu ───────────────────────────────────────────────
@@ -926,13 +948,61 @@ func (m Model) listBudget(b *strings.Builder, reservedBelow int) int {
 	return max(1, m.termHeight()-strings.Count(b.String(), "\n")-1-reservedBelow)
 }
 
-// termHeight is the terminal height, or a conventional 24 before the
-// first size message arrives.
-func (m Model) termHeight() int {
+// rows is the terminal height, or a conventional 24 before the first
+// size message arrives.
+func (m Model) rows() int {
 	if m.height == 0 {
 		return 24
 	}
 	return m.height
+}
+
+// termHeight is what the frame may occupy: the terminal less the rows
+// the banner takes under it.
+func (m Model) termHeight() int {
+	return max(1, m.rows()-m.bannerRows)
+}
+
+// bannerLines renders what goes under the frame: an error, a success
+// note, and the warnings the main menu carries from load. They are
+// returned rather than written so the frame can be budgeted against the
+// height they leave — see View.
+func (m Model) bannerLines() []string {
+	var out []string
+	if m.errMsg != "" {
+		out = append(out, errorText("  Error: "+m.errMsg))
+	}
+	if m.successMsg != "" {
+		out = append(out, success("  ✓ "+m.successMsg))
+	}
+	if len(m.loadWarnings) > 0 && m.screen == ScreenMainMenu {
+		// The warnings are a pointer to `baton check`, not the report
+		// itself, so they never take more of the terminal than the menu
+		// they are pointing away from.
+		maxShown := 4
+		if m.height > 0 {
+			maxShown = min(maxShown, max(1, m.height/3))
+		}
+		shown := m.loadWarnings
+		if len(shown) > maxShown {
+			shown = shown[:maxShown]
+		}
+		for _, wmsg := range shown {
+			out = append(out, warn("  Warning: "+wmsg))
+		}
+		if rest := len(m.loadWarnings) - len(shown); rest > 0 {
+			out = append(out, warn(fmt.Sprintf("  ... and %d more (run: baton check)", rest)))
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	// A blank line sets the banner off from the frame. A short terminal
+	// has no line to spare for spacing, here as everywhere else.
+	if m.height == 0 || m.height >= 12 {
+		out = append([]string{""}, out...)
+	}
+	return out
 }
 
 // previewBudget caps a hover preview at what the frame can still spare

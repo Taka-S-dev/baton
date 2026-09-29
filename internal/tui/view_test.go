@@ -756,3 +756,58 @@ func TestMainMenuKeepsCursorVisible(t *testing.T) {
 func frameLines(s string) int {
 	return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1
 }
+
+// TestBannersStayInsideTheTerminal checks the messages under the frame.
+// They used to be appended after the frame had been built to the full
+// terminal height, so the first error pushed the frame past the last row
+// and the terminal scrolled the top of it away — worst on the main menu,
+// where the load warnings can run to several lines.
+func TestBannersStayInsideTheTerminal(t *testing.T) {
+	screens := map[string]Screen{
+		"project select": ScreenProjectSelect,
+		"main menu":      ScreenMainMenu,
+		"run commands":   ScreenRunCommands,
+		"run workflow":   ScreenRunWorkflow,
+		"edit pick":      ScreenEditCommandPick,
+	}
+	cmds := make([]mdl.Command, 8)
+	var items []msItem
+	for i := range cmds {
+		cmds[i] = mdl.Command{Name: fmt.Sprintf("cmd-%d", i), Cmd: "echo hi", Source: "tsv"}
+		items = append(items, msItem{cmd: &cmds[i]})
+	}
+	for h := 7; h <= 40; h++ {
+		for name, sc := range screens {
+			m := Model{width: 120, height: h, screen: sc, projectDir: "p", configFile: "commands.tsv"}
+			m.projects = []string{"a", "b", "c", "d", "e", "f"}
+			m.msItems = items
+			m.msSearchTI = textinput.New()
+			m.wfSearchTI = textinput.New()
+			m.config = mdl.Config{Base: cmds}
+			m.workflows = []mdl.Workflow{{Name: "wf", Commands: []string{"cmd-0"}}}
+			names, refs := m.editableCommands()
+			m.editRefs = refs
+			m.setPickBase(names, m.commandPickTexts(refs))
+			if sc == ScreenProjectSelect || sc == ScreenMainMenu {
+				m.listItems = m.projects
+			}
+			m.updateStepsViewport()
+			m.errMsg = "something went wrong"
+			m.successMsg = "saved"
+			for i := 0; i < 9; i++ {
+				m.loadWarnings = append(m.loadWarnings, fmt.Sprintf("warning %d", i))
+			}
+			view := m.View()
+			if got := frameLines(view); got > h {
+				t.Errorf("%s at height %d renders %d lines with a banner\n%s", name, h, got, view)
+			}
+			// The banner is trimmed to what is left over, so on a
+			// terminal at a screen's own floor there is nothing left
+			// and the message is dropped rather than shown over the
+			// screen it belongs to. One row above that floor is enough.
+			if h >= 8 && !strings.Contains(view, "something went wrong") {
+				t.Errorf("%s at height %d: the error is not on screen\n%s", name, h, view)
+			}
+		}
+	}
+}
