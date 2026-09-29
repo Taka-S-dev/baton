@@ -25,7 +25,7 @@ example-tsv/
 - Being a template is a per-row property, not a file: rows containing
   `{slot}` placeholders become sources for
   **Create command → From template**
-- Rows without slots (`pwd`, `list-files`) run as-is
+- Rows without slots (`hello`, `where`) run as-is
 - Excel-style quoting is supported: cells like
   `"message=messages,env=environments"` are unquoted on load
 - Write ownership: humans edit commands.tsv freely; the TUI can also

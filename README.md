@@ -112,7 +112,8 @@ baton looks for a `projects/` directory in this order:
 
 1. `$BATON_PROJECTS_DIR` environment variable
 2. `projects/` folder adjacent to the executable
-3. `~/.config/baton/projects/` (Linux / macOS)
+3. `~/.config/baton/projects/` — searched on every platform, and the
+   usual home for a system install on Linux / macOS
 
 Create a subfolder for each project and add `commands.json` or `commands.tsv` inside it:
 
@@ -230,7 +231,7 @@ build-api	projCmd	Z:\api
 
 The actual command line is recomputed from `template` + `vars.tsv` on every load, so editing either propagates immediately. Deleting the template breaks its derived commands, which the startup warning points out.
 
-**Naming.** Saving one pre-fills a name built from the template and the values picked — `build` on `./src` in fast mode becomes `build-fast-build-src` — so saved commands stay distinguishable without inventing a scheme each time. `Tab` inserts that name in any name input, which is what brings an entry named before the rule existed back in line with it: **Edit command → Rename**, then `Tab`. Renaming a workflow works the same way, offering the `step1+step2` name built from its steps.
+**Naming.** Saving one pre-fills a name built from the template and the values picked in slot order — `build` with `workdir=./src` and `mode=Fast Build` becomes `build-src-fast-build` — so saved commands stay distinguishable without inventing a scheme each time. `Tab` inserts that name in any name input, which is what brings an entry named before the rule existed back in line with it: **Edit command → Rename**, then `Tab`. Renaming a workflow works the same way, offering the `step1+step2` name built from its steps.
 
 ### Renaming commands
 
@@ -391,16 +392,31 @@ in CI, or as the verification loop when generating project files with an
 AI agent — the complete file spec, shared by hand-editors and agents,
 lives in [AGENTS.md](AGENTS.md).
 
-```
-  [ baton ]
+The main menu groups the entries and explains the highlighted one beside
+them. On a short terminal it drops the logo, then the group headings, and
+finally scrolls its own entries, so it stays usable in an editor panel:
 
-  ▶ Run workflow
-    Run commands
-    Manage workflows
-    Manage commands
-    Manage lists
-    Switch config
-    Exit
+```
+  ┌─────────────┐               │
+  │  B A T O N  │               │
+  └─────────────┘               │
+  project: myproject            │ Run workflow
+                                │ ────────────────────────
+  RUN                           │ Run a saved workflow.
+  ▶   Run workflow              │
+      Run commands              │ Keys
+                                │   Enter    Run
+  MANAGE                        │   Esc      Back
+      Manage workflows          │
+      Manage commands           │
+      Manage lists              │
+      Manage vars               │
+                                │
+      Switch config             │
+      Exit                      │
+                                │
+  ────────────────────────────────────────────────────────────────────────
+  ↑↓ Move  Enter Select  Esc Quit
 ```
 
 ### Selecting commands
