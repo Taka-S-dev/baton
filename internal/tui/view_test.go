@@ -61,7 +61,7 @@ func TestViewMultiSelect_FixedHeight(t *testing.T) {
 	m.msItems = items
 	m.msSearchTI = textinput.New()
 
-	lines := func(s string) int { return strings.Count(s, "\n") }
+	lines := frameLines
 	first := lines(m.viewMultiSelect(80))
 	if first > m.height {
 		t.Fatalf("view is %d lines for a %d-line terminal — overflow scrolls the terminal on every repaint", first, m.height)
@@ -157,7 +157,7 @@ func TestViewRunWorkflowSteps_FixedHeight(t *testing.T) {
 	m.workflows = []mdl.Workflow{{Name: "long", Commands: steps}}
 	m.gotoWorkflowStepPick(0)
 
-	lines := func(s string) int { return strings.Count(s, "\n") }
+	lines := frameLines
 	first := lines(m.viewRunWorkflowSteps(80))
 	if first > m.height {
 		t.Fatalf("view is %d lines for a %d-line terminal — overflow scrolls the terminal on every repaint", first, m.height)
@@ -272,7 +272,7 @@ func TestViewConfirmRun_ShowsWhatWillRun(t *testing.T) {
 // varies per item and must be padded, or the footer bounces around.
 func TestViewMainMenu_StableHeight(t *testing.T) {
 	m := Model{width: 100, height: 30, projectDir: "proj"}
-	lines := func(s string) int { return strings.Count(s, "\n") }
+	lines := frameLines
 	first := lines(m.viewMainMenu(100))
 	for i := range mainMenuItems() {
 		m.listCursor = i
@@ -419,7 +419,7 @@ func TestViewPickScreens_FixedHeight(t *testing.T) {
 	names, refs := m.editableCommands()
 	m.listItems, m.editRefs = names, refs
 
-	lines := func(s string) int { return strings.Count(s, "\n") }
+	lines := frameLines
 	views := map[string]func() string{
 		"edit pick":   func() string { return m.viewEditCommandPick(80) },
 		"delete list": func() string { return m.viewDeleteList("Delete commands", m.listItems, 80) },
@@ -455,7 +455,7 @@ func TestViewSlotPick_FixedHeight(t *testing.T) {
 	}
 	m.sp.applyFilter()
 
-	lines := func(s string) int { return strings.Count(s, "\n") }
+	lines := frameLines
 	first := lines(m.viewSlotPick(80))
 	if first > m.height {
 		t.Fatalf("view is %d lines for a %d-line terminal", first, m.height)
@@ -482,7 +482,7 @@ func TestViewRunWorkflow_FixedHeight(t *testing.T) {
 	m.wfSearchTI = textinput.New()
 	m.updateStepsViewport()
 
-	lines := func(s string) int { return strings.Count(s, "\n") }
+	lines := frameLines
 	first := lines(m.viewRunWorkflow(80))
 	if first > m.height {
 		t.Fatalf("view is %d lines for a %d-line terminal", first, m.height)
@@ -634,4 +634,125 @@ func TestViewCommandNameInput_StableValueOrder(t *testing.T) {
 			t.Fatalf("render %d differs from first render — map iteration order is leaking into the view", i)
 		}
 	}
+}
+
+// TestViewsFitShortTerminals holds the frame inside the terminal when the
+// terminal is short — an editor panel opens at well under ten lines, and
+// a frame taller than the terminal scrolls it on every repaint, which
+// takes the top of the frame with it. The menus shed the logo, their
+// headings and finally their own entries; the list screens shed their
+// spacing, their hover preview and the rule under their title. Seven
+// lines hold every screen, and the main menu goes lower still.
+func TestViewsFitShortTerminals(t *testing.T) {
+	cmds := make([]mdl.Command, 8)
+	var items []msItem
+	for i := range cmds {
+		cmds[i] = mdl.Command{Name: fmt.Sprintf("cmd-%d", i), Cmd: "echo hi", Source: "tsv"}
+		items = append(items, msItem{cmd: &cmds[i]})
+	}
+	build := func(h int, sc Screen) Model {
+		m := Model{width: 120, height: h, screen: sc, projectDir: "p", configFile: "commands.tsv"}
+		m.projects = []string{"a", "b", "c", "d", "e", "f"}
+		m.msItems = items
+		m.msSearchTI = textinput.New()
+		m.wfSearchTI = textinput.New()
+		m.config = mdl.Config{Base: cmds}
+		m.workflows = []mdl.Workflow{{Name: "wf", Commands: []string{"cmd-0"}}}
+		names, refs := m.editableCommands()
+		m.editRefs = refs
+		m.setPickBase(names, m.commandPickTexts(refs))
+		if sc == ScreenProjectSelect || sc == ScreenMainMenu {
+			m.listItems = m.projects
+		}
+		m.updateStepsViewport()
+		return m
+	}
+	check := func(from int, screens map[string]Screen) {
+		for h := from; h <= 40; h++ {
+			for name, sc := range screens {
+				if got := frameLines(build(h, sc).View()); got > h {
+					t.Errorf("%s at height %d renders %d lines — the frame must not outgrow the terminal", name, h, got)
+				}
+			}
+		}
+	}
+	check(7, map[string]Screen{
+		"project select": ScreenProjectSelect,
+		"main menu":      ScreenMainMenu,
+		"run commands":   ScreenRunCommands,
+		"run workflow":   ScreenRunWorkflow,
+		"edit pick":      ScreenEditCommandPick,
+	})
+	// The main menu scrolls its own entries, so it has no floor of its
+	// own: it was the screen that lost its top rows in a four-line panel.
+	check(4, map[string]Screen{"main menu": ScreenMainMenu})
+
+	// Fitting is not enough: a scrolling screen that stops one row short
+	// wastes the bottom line of the terminal on nothing, which is what a
+	// list row is worth most on a short one. The menus are exempt — they
+	// have a fixed number of choices and nothing to fill with.
+	for h := 7; h <= 40; h++ {
+		for name, sc := range map[string]Screen{
+			"project select": ScreenProjectSelect,
+			"run commands":   ScreenRunCommands,
+			"run workflow":   ScreenRunWorkflow,
+			"edit pick":      ScreenEditCommandPick,
+		} {
+			if got := frameLines(build(h, sc).View()); got != h {
+				t.Errorf("%s at height %d renders %d lines — the frame should fill the terminal", name, h, got)
+			}
+		}
+	}
+}
+
+// TestSubmenusShowEveryChoice checks a submenu is shown whole rather
+// than scrolled. Windowing a list of three fixed choices left one of
+// them on screen between two "1 more" counts, which is not a menu.
+func TestSubmenusShowEveryChoice(t *testing.T) {
+	items := []string{"Create variable", "Edit variable", "Delete variable"}
+	for h := 7; h <= 40; h++ {
+		m := Model{width: 90, height: h, screen: ScreenManageVars}
+		m.listItems = items
+		m.listCursor = 1
+		view := m.View()
+		for _, it := range items {
+			if !strings.Contains(view, it) {
+				t.Fatalf("height %d: %q is missing from the submenu\n%s", h, it, view)
+			}
+		}
+		if got := frameLines(view); got > h {
+			t.Errorf("height %d: the submenu renders %d lines", h, got)
+		}
+	}
+}
+
+// TestMainMenuKeepsCursorVisible checks the scrolled main menu. A panel
+// too short for eight entries used to render all of them and let the
+// terminal scroll the top ones away — including, at four lines, every
+// entry above the cursor.
+func TestMainMenuKeepsCursorVisible(t *testing.T) {
+	entries := mainMenuItems()
+	for h := 4; h <= 20; h++ {
+		for cur := range entries {
+			m := Model{width: 110, height: h, screen: ScreenMainMenu, projectDir: "p"}
+			m.listItems = entries
+			m.listCursor = cur
+			view := m.View()
+			if !strings.Contains(view, entries[cur]) {
+				t.Fatalf("height %d: the cursor is on %q, which is not on screen\n%s", h, entries[cur], view)
+			}
+			if got := frameLines(view); got > h {
+				t.Errorf("height %d: the menu renders %d lines", h, got)
+			}
+		}
+	}
+}
+
+// frameLines is how many terminal lines a view occupies. View trims the
+// frame's trailing newline — it would carry the cursor onto a further
+// line and cost the frame the bottom row of the terminal — so the last
+// line is not counted by the separators. A sub-view is measured the same
+// way, since View is what finally trims it.
+func frameLines(s string) int {
+	return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1
 }

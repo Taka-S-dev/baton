@@ -108,7 +108,10 @@ func (m Model) View() string {
 			view += warn(fmt.Sprintf("  ... and %d more (run: baton check)", rest)) + "\n"
 		}
 	}
-	return view
+	// No trailing newline: it would carry the cursor onto a further line
+	// and cost the frame the bottom row of the terminal, which the list
+	// can have instead.
+	return strings.TrimRight(view, "\n")
 }
 
 // ── Project select / main menu ───────────────────────────────────────────────
@@ -137,13 +140,22 @@ func logoBox() []string {
 
 func (m Model) viewProjectSelect(w int) string {
 	var b strings.Builder
-	b.WriteString("\n")
-	for _, line := range logoBox() {
-		b.WriteString(line + "\n")
+	if m.roomForLogo() {
+		b.WriteString("\n")
+		for _, line := range logoBox() {
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("  " + gray("Command Runner") + "\n")
 	}
-	b.WriteString("  " + gray("Command Runner") + "\n\n")
-	b.WriteString(hlineLabel(w, "Projects") + "\n\n")
-	viewH := m.listBudget(&b, 3)
+	// The blank lines framing the list are the first thing to go: on a
+	// ten-line terminal three of them were spacing while the list itself
+	// was down to a single row.
+	gap, below := "\n", 3
+	if m.compact() {
+		gap, below = "", 2
+	}
+	b.WriteString(gap + hlineLabel(w, "Projects") + "\n" + gap)
+	viewH := m.listBudget(&b, below)
 	writeWindowedList(&b, viewH, len(m.projects), m.listCursor, "(no projects)", func(i int) string {
 		p := m.projects[i]
 		count := fmt.Sprintf("%d commands", m.projectCmdCounts[p])
@@ -152,7 +164,7 @@ func (m Model) viewProjectSelect(w int) string {
 		}
 		return "    " + p + "   " + gray(count)
 	})
-	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString(gap + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ move   Enter select   q quit") + "\n")
 	return b.String()
 }
@@ -201,31 +213,91 @@ func (m Model) viewMainMenu(w int) string {
 	leftW := 32
 	showRight := w >= leftW+30
 
+	// The menu items are the one part that cannot go, so the frame is
+	// built from the height they leave: the logo, then the group
+	// headings, then the panel's lower sections drop out as the terminal
+	// gets shorter. Without this the frame stayed 21 lines tall and an
+	// editor panel scrolled it on every repaint.
+	items, labels := 0, 0
+	for _, g := range groups {
+		items += len(g.items)
+		if g.label != "" {
+			labels++
+		}
+	}
+	maxShortcuts := 0
+	for _, info := range menuItemInfos {
+		if len(info.shortcuts) > maxShortcuts {
+			maxShortcuts = len(info.shortcuts)
+		}
+	}
+	const logoRows, extrasRows = 4, 8
+	groupRows := labels + len(groups) + 2 // headings, a blank per group, the project line and its blank
+	panelRows := 5 + maxShortcuts         // heading, rule, description, blank, "Keys", the keys
+
+	avail := m.termHeight() - 2 // the rule and the key line below
+	need := max(items, panelRows)
+	withGroups := avail >= max(items+groupRows, panelRows)
+	if withGroups {
+		need = max(items+groupRows, panelRows)
+	}
+	withLogo := m.roomForLogo() && avail >= need+logoRows
+	if withLogo {
+		need += logoRows
+	}
+	withPanelExtras := avail >= need+extrasRows
+
+	// Below a certain height not even the items fit, and the frame used
+	// to grow past the terminal and lose its top rows to the scroll. The
+	// menu scrolls instead, like every other list: a window around the
+	// cursor and one line counting what is off it.
+	first, shown := 0, items
+	if avail < items {
+		shown = max(1, avail-1)
+		first = min(max(0, m.listCursor-shown/2), items-shown)
+	}
+	// The panel keeps its keys; the description is what it gives up.
+	withPanelDesc := avail >= panelRows
+
 	// Build left pane lines
 	var leftLines []string
-	leftLines = append(leftLines, "")
-	leftLines = append(leftLines, logoBox()...)
-	if m.projectDir != "" {
+	if withLogo {
+		leftLines = append(leftLines, "")
+		leftLines = append(leftLines, logoBox()...)
+	}
+	if m.projectDir != "" && withGroups {
 		leftLines = append(leftLines, "  "+gray("project: ")+white(filepath.Base(m.projectDir)))
-	} else {
 		leftLines = append(leftLines, "")
 	}
-	leftLines = append(leftLines, "")
 
 	idx := 0
 	for _, g := range groups {
-		if g.label != "" {
+		if g.label != "" && withGroups {
 			leftLines = append(leftLines, "  "+gray(strings.ToUpper(g.label)))
 		}
 		for _, item := range g.items {
-			if idx == m.listCursor {
-				leftLines = append(leftLines, "    "+sMenuSelect.Render(" "+item))
-			} else {
-				leftLines = append(leftLines, "      "+item)
+			if idx >= first && idx < first+shown {
+				if idx == m.listCursor {
+					leftLines = append(leftLines, "    "+sMenuSelect.Render(" "+item))
+				} else {
+					leftLines = append(leftLines, "      "+item)
+				}
 			}
 			idx++
 		}
-		leftLines = append(leftLines, "")
+		if withGroups {
+			leftLines = append(leftLines, "")
+		}
+	}
+	if shown < items {
+		var marks []string
+		if first > 0 {
+			marks = append(marks, fmt.Sprintf("↑ %d more", first))
+		}
+		if first+shown < items {
+			marks = append(marks, fmt.Sprintf("↓ %d more", items-first-shown))
+		}
+		leftLines = append(leftLines, "  "+dim(strings.Join(marks, "   ")))
 	}
 
 	if !showRight {
@@ -241,10 +313,10 @@ func (m Model) viewMainMenu(w int) string {
 	// Build right pane lines
 	rightW := w - leftW - 2
 	var rightLines []string
-	rightLines = append(rightLines, "")
-	rightLines = append(rightLines, "")
-	rightLines = append(rightLines, "")
-	rightLines = append(rightLines, "")
+	if withLogo {
+		// Align the panel with the menu, which the logo has pushed down.
+		rightLines = append(rightLines, "", "", "", "")
+	}
 
 	selected := ""
 	flatIdx := 0
@@ -257,22 +329,16 @@ func (m Model) viewMainMenu(w int) string {
 		}
 	}
 
-	// The pane is padded to the same height for every item (longest
-	// description and shortcut list win), so moving the cursor never
-	// changes the frame height and the footer stays put.
-	maxShortcuts := 0
-	for _, info := range menuItemInfos {
-		if len(info.shortcuts) > maxShortcuts {
-			maxShortcuts = len(info.shortcuts)
-		}
-	}
-
+	// The pane is padded to maxShortcuts for every item, so moving the
+	// cursor never changes the frame height and the footer stays put.
 	if info, ok := menuItemInfos[selected]; ok {
-		desc := truncate(info.desc, max(10, rightW-2))
 		rightLines = append(rightLines, white(selected))
-		rightLines = append(rightLines, gray(strings.Repeat("─", min(rightW-2, 24))))
-		rightLines = append(rightLines, dim(desc))
-		rightLines = append(rightLines, "")
+		if withPanelDesc {
+			desc := truncate(info.desc, max(10, rightW-2))
+			rightLines = append(rightLines, gray(strings.Repeat("─", min(rightW-2, 24))))
+			rightLines = append(rightLines, dim(desc))
+			rightLines = append(rightLines, "")
+		}
 		rightLines = append(rightLines, gray("Keys"))
 		for _, sc := range info.shortcuts {
 			rightLines = append(rightLines, fmt.Sprintf("  %-8s %s", white(sc[0]), gray(sc[1])))
@@ -280,20 +346,24 @@ func (m Model) viewMainMenu(w int) string {
 		for i := len(info.shortcuts); i < maxShortcuts; i++ {
 			rightLines = append(rightLines, "")
 		}
-		rightLines = append(rightLines, "")
-		rightLines = append(rightLines, gray("Config"))
-		rightLines = append(rightLines, "  "+gray("project: ")+white(filepath.Base(m.projectDir)))
-		if m.configFile != "" {
-			rightLines = append(rightLines, "  "+gray("file:    ")+white(m.configFile))
+		if withPanelExtras {
+			rightLines = append(rightLines, "")
+			rightLines = append(rightLines, gray("Config"))
+			rightLines = append(rightLines, "  "+gray("project: ")+white(filepath.Base(m.projectDir)))
+			if m.configFile != "" {
+				rightLines = append(rightLines, "  "+gray("file:    ")+white(m.configFile))
+			}
+			rightLines = append(rightLines, "")
+			rightLines = append(rightLines, gray("Stats"))
+			rightLines = append(rightLines, fmt.Sprintf("  "+gray("workflows: ")+white("%d"), len(m.workflows)))
+			rightLines = append(rightLines, fmt.Sprintf("  "+gray("lists:     ")+white("%d"), len(m.lists)))
 		}
-		rightLines = append(rightLines, "")
-		rightLines = append(rightLines, gray("Stats"))
-		rightLines = append(rightLines, fmt.Sprintf("  "+gray("workflows: ")+white("%d"), len(m.workflows)))
-		rightLines = append(rightLines, fmt.Sprintf("  "+gray("lists:     ")+white("%d"), len(m.lists)))
 	}
 
-	// Merge left + right
-	n := max(len(leftLines), len(rightLines))
+	// Merge left + right. The panel is padded to a constant height, so on
+	// a terminal too short even for that it is cut rather than allowed to
+	// push the frame past the last row — the menu is what must be seen.
+	n := min(max(len(leftLines), len(rightLines)), max(1, avail))
 	var b strings.Builder
 	dividerCol := leftW
 	for i := 0; i < n; i++ {
@@ -319,15 +389,27 @@ func (m Model) viewMainMenu(w int) string {
 
 func (m Model) viewSingleSelect(title string, w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header(title, w) + "\n")
+	m.writeHeading(&b, title, w)
 	if m.screen == ScreenEditWorkflow {
 		m.writePickFilter(&b)
 	}
-	reserved := 3
+	// Spacing above the footer gives way to list rows on a short terminal.
+	gap, reserved := "\n", 3
+	if m.compact() {
+		gap, reserved = "", 2
+	}
 	if m.screen == ScreenEditWorkflow {
 		reserved += 2 + m.stepsVP.Height
 	}
 	viewH := m.listBudget(&b, reserved)
+	// A submenu is a handful of fixed choices, and windowing it defeats
+	// its purpose: on a short terminal "Manage vars" showed one of its
+	// three items between two "1 more" counts. Few enough entries are
+	// shown whole even when that carries the frame past the terminal,
+	// because a menu you cannot see is worse than one that scrolls.
+	if n := len(m.listItems); n <= shortMenu && n > viewH {
+		viewH = n
+	}
 	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "(empty)", func(i int) string {
 		if i == m.listCursor {
 			return "  " + accentBold("▶") + " " + m.listItems[i]
@@ -338,7 +420,7 @@ func (m Model) viewSingleSelect(title string, w int) string {
 		b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
 		b.WriteString(m.stepsVP.View() + "\n")
 	}
-	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString(gap + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter Esc") + "\n")
 	return b.String()
 }
@@ -405,7 +487,7 @@ func (m Model) workflowLabel(idx int, hovered bool) string {
 
 func (m Model) viewRunWorkflow(w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header("Run workflow", w) + "\n")
+	m.writeHeading(&b, "Run workflow", w)
 
 	if len(m.workflows) == 0 {
 		b.WriteString("  " + gray("(no workflows saved)") + "\n")
@@ -416,7 +498,12 @@ func (m Model) viewRunWorkflow(w int) string {
 
 	filtered := m.wfFiltered()
 	n := len(filtered)
-	b.WriteString("  " + m.wfSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n\n")
+	// Spacing gives way to list rows on a short terminal.
+	gap, below := "\n", 5
+	if m.compact() {
+		gap, below = "", 4
+	}
+	b.WriteString("  " + m.wfSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n" + gap)
 	cur := m.listCursor
 	if cur >= n {
 		cur = max(0, n-1)
@@ -425,7 +512,13 @@ func (m Model) viewRunWorkflow(w int) string {
 	// The steps viewport below has a fixed height, so budget against it
 	// instead of the hovered workflow's step count — a per-item budget
 	// makes the list grow and shrink as the cursor moves.
-	viewH := m.listBudget(&b, m.stepsVP.Height+5)
+	stepsH := m.previewBudget(&b, m.stepsVP.Height, below, 3)
+	if stepsH == 0 {
+		// below counts the blank line and the "steps" rule the preview
+		// opens with; without the preview the list gets both rows.
+		below -= 2
+	}
+	viewH := m.listBudget(&b, stepsH+below)
 	writeWindowedList(&b, viewH, n, cur, "No results.", func(i int) string {
 		wf := m.workflows[filtered[i]]
 		suffix := ""
@@ -438,15 +531,18 @@ func (m Model) viewRunWorkflow(w int) string {
 		return "    " + m.workflowLabel(filtered[i], false) + suffix
 	})
 
-	// Step preview for hovered workflow (scrollable viewport)
-	if m.stepsFocused {
-		b.WriteString("\n" + hlineLabel(w, "steps ↑↓") + "\n")
-	} else {
-		b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
+	// Step preview for hovered workflow (scrollable viewport), left out
+	// when the terminal cannot hold it and the list at once.
+	if stepsH > 0 {
+		if m.stepsFocused {
+			b.WriteString("\n" + hlineLabel(w, "steps ↑↓") + "\n")
+		} else {
+			b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
+		}
+		b.WriteString(m.stepsVP.View() + "\n")
 	}
-	b.WriteString(m.stepsVP.View() + "\n")
 
-	b.WriteString("\n" + hline(w) + "\n")
+	b.WriteString(gap + hline(w) + "\n")
 	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab: focus steps  →: pick steps") + "\n")
 	return b.String()
 }
@@ -472,11 +568,23 @@ func (m Model) viewMultiSelect(w int) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("\n" + header(title, w) + "\n")
+	m.writeHeading(&b, title, w)
 
-	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))) + "\n\n")
+	// On a short terminal the blank lines around the list become list
+	// rows: spacing is the cheapest thing in the frame to give up.
+	gap, below := "\n", 5
+	if m.compact() {
+		gap, below = "", 4
+	}
+	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))) + "\n" + gap)
 
-	viewH := m.listBudget(&b, previewH+5)
+	previewH = m.previewBudget(&b, previewH, below, 3)
+	if previewH == 0 {
+		// below counts the blank line the preview opens with. Dropped
+		// preview, dropped blank line — the list gets the row.
+		below--
+	}
+	viewH := m.listBudget(&b, previewH+below)
 	writeWindowedList(&b, viewH, n, cursor, "No results.", func(i int) string {
 		origIdx := filtered[i]
 		item := m.msItems[origIdx]
@@ -519,18 +627,21 @@ func (m Model) viewMultiSelect(w int) string {
 	})
 
 	// Hover preview, padded to previewH so the footer below never moves.
-	b.WriteString("\n")
-	var pv strings.Builder
-	if n > 0 && cursor >= 0 && cursor < n {
-		hovered := m.msItems[filtered[cursor]]
-		if hovered.cmd != nil {
-			m.writeCommandHover(&pv, hovered.cmd, w)
+	// A terminal with no room for it gets the list instead.
+	if previewH > 0 {
+		b.WriteString("\n")
+		var pv strings.Builder
+		if n > 0 && cursor >= 0 && cursor < n {
+			hovered := m.msItems[filtered[cursor]]
+			if hovered.cmd != nil {
+				m.writeCommandHover(&pv, hovered.cmd, w)
+			}
 		}
+		if pv.Len() == 0 {
+			pv.WriteString(hline(w) + "\n")
+		}
+		writePadded(&b, pv.String(), previewH)
 	}
-	if pv.Len() == 0 {
-		pv.WriteString(hline(w) + "\n")
-	}
-	writePadded(&b, pv.String(), previewH)
 
 	var selNames []string
 	for _, idx := range m.msSelected {
@@ -543,7 +654,7 @@ func (m Model) viewMultiSelect(w int) string {
 	// Keep the Selected line to one row: a wrapped line would grow the
 	// frame past the terminal height and bring the jitter back.
 	joined := truncate(strings.Join(selNames, ", "), max(10, w-40))
-	b.WriteString("\n  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
+	b.WriteString(gap + "  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
 	b.WriteString(hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Move  Tab Select  Enter Confirm  Esc Back") + "\n")
 
@@ -781,15 +892,21 @@ func (m Model) viewSlotPick(w int) string {
 // writePickFilter renders the type-to-filter line for the management
 // pick screens (Edit/Delete of commands, workflows and lists).
 func (m Model) writePickFilter(b *strings.Builder) {
+	// The blank line under the field is spacing, and on a short terminal
+	// spacing is the cheapest thing in the frame to give up.
+	gap := "\n"
+	if m.compact() {
+		gap = ""
+	}
 	if m.pickSearch == "" {
-		b.WriteString("  " + dim("/ type to filter...") + "\n\n")
+		b.WriteString("  " + dim("/ type to filter...") + "\n" + gap)
 		return
 	}
 	count := dim(fmt.Sprintf("%d results", len(m.listItems)))
 	if len(m.listItems) == 0 {
 		count = warn("no match")
 	}
-	b.WriteString("  " + accent("/") + " " + white(m.pickSearch) + dim("_") + "  " + count + "\n\n")
+	b.WriteString("  " + accent("/") + " " + white(m.pickSearch) + dim("_") + "  " + count + "\n" + gap)
 }
 
 // ── Fixed-height windowed lists ──────────────────────────────────────────────
@@ -801,28 +918,80 @@ func (m Model) writePickFilter(b *strings.Builder) {
 // cursor moves.
 
 // listBudget returns the row budget for a windowed list: the terminal
-// height minus what the frame already holds, the two scroll-marker lines,
-// what is still to come below the list, and one spare line.
+// height minus what the frame already holds, the one scroll-marker line
+// the list writes under itself, and what is still to come below it.
+// Nothing is held back beyond that — the view carries no trailing
+// newline, so a frame of exactly termHeight rows fits.
 func (m Model) listBudget(b *strings.Builder, reservedBelow int) int {
-	h := m.height
-	if h == 0 {
-		h = 24
-	}
-	return max(1, h-strings.Count(b.String(), "\n")-2-reservedBelow-1)
+	return max(1, m.termHeight()-strings.Count(b.String(), "\n")-1-reservedBelow)
 }
 
-// writeWindowedList renders a cursor-following window over n rows framed
-// by count-aware scroll markers, padded to exactly viewH+2 lines.
-// render(i) returns row i without a trailing newline; emptyMsg is shown
-// when the list is empty.
+// termHeight is the terminal height, or a conventional 24 before the
+// first size message arrives.
+func (m Model) termHeight() int {
+	if m.height == 0 {
+		return 24
+	}
+	return m.height
+}
+
+// previewBudget caps a hover preview at what the frame can still spare
+// once the list has minRows to itself. want is the height the preview
+// would like; the result is 0 when there is no room at all, and the
+// caller then leaves the preview out entirely. Shrinking the list alone
+// could not keep the frame inside a ten-line terminal, because the list
+// is already floored at one row while the preview kept its full height.
+// It is all or nothing: the preview is written at its natural height by
+// a writer that does not truncate, so capping it lower would not shrink
+// the frame — it would only hand the list a budget the preview then
+// overran.
+func (m Model) previewBudget(b *strings.Builder, want, reservedBelow, minRows int) int {
+	spare := m.termHeight() - strings.Count(b.String(), "\n") - 1 - reservedBelow - 1 - (minRows + 1)
+	if spare >= want {
+		return want
+	}
+	return 0
+}
+
+// writeHeading writes a scrolling screen's heading. On a terminal too
+// short to spend four lines naming the screen, it shrinks to the title
+// alone — the blank lines around it and the rule under it are worth less
+// than the three list rows they cost.
+func (m Model) writeHeading(b *strings.Builder, title string, w int) {
+	if m.termHeight() < 12 {
+		b.WriteString(accentBold("  [ "+title+" ]") + "\n")
+		return
+	}
+	b.WriteString("\n" + header(title, w) + "\n")
+}
+
+// shortMenu is how many entries a list may hold and still be treated as
+// a menu — shown whole rather than scrolled through.
+const shortMenu = 6
+
+// compact reports whether the frame is tight enough that the blank lines
+// between sections have to become list rows instead. Spacing is the
+// cheapest thing to give up: it carries no information.
+func (m Model) compact() bool { return m.termHeight() < 20 }
+
+// roomForLogo reports whether the frame can spare the five lines the
+// logo and its tagline occupy. A short terminal — the editor panel is
+// usually about ten lines — has to spend them on the list instead, or
+// the frame grows past the terminal and every repaint scrolls it.
+func (m Model) roomForLogo() bool { return m.termHeight() >= 20 }
+
+// writeWindowedList renders a cursor-following window over n rows above
+// one line carrying what is hidden in either direction, padded to
+// exactly viewH+1 lines. render(i) returns row i without a trailing
+// newline; emptyMsg is shown when the list is empty.
+//
+// Both counts share a line because a slot above and a slot below cost
+// two rows whatever is in them, and on a ten-line terminal that was two
+// of the four the list had to itself. The line is always written, empty
+// or not, so the frame keeps one height as the window scrolls.
 func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string, render func(i int) string) {
 	viewStart := max(0, min(cursor-viewH/2, n-viewH))
 	viewEnd := min(viewStart+viewH, n)
-	if viewStart > 0 {
-		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", viewStart)) + "\n")
-	} else {
-		b.WriteString("\n")
-	}
 	rows := 0
 	if n == 0 && emptyMsg != "" {
 		b.WriteString("  " + gray(emptyMsg) + "\n")
@@ -835,8 +1004,15 @@ func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string
 	for ; rows < viewH; rows++ {
 		b.WriteString("\n")
 	}
+	var marks []string
+	if viewStart > 0 {
+		marks = append(marks, fmt.Sprintf("↑ %d more", viewStart))
+	}
 	if viewEnd < n {
-		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-viewEnd)) + "\n")
+		marks = append(marks, fmt.Sprintf("↓ %d more", n-viewEnd))
+	}
+	if len(marks) > 0 {
+		b.WriteString("  " + dim(strings.Join(marks, "   ")) + "\n")
 	} else {
 		b.WriteString("\n")
 	}
@@ -927,7 +1103,7 @@ func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
 // selector, so you can see what a command does before opening it.
 func (m Model) viewEditCommandPick(w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header("Edit command", w) + "\n")
+	m.writeHeading(&b, "Edit command", w)
 	if len(m.editRefs) == 0 {
 		b.WriteString("  " + gray("(no commands yet)") + "\n")
 		b.WriteString("\n" + hline(w) + "\n")
@@ -938,7 +1114,14 @@ func (m Model) viewEditCommandPick(w int) string {
 	previewH := maxLines(len(m.editRefs), 3, func(i int, tb *strings.Builder) {
 		m.writeCommandHover(tb, m.editRefCommand(m.editRefs[i]), w)
 	})
-	viewH := m.listBudget(&b, previewH+4)
+	previewH = m.previewBudget(&b, previewH, 4, 3)
+	// 4 counts the blank line the preview opens with; without the
+	// preview that line is a list row instead.
+	below := 4
+	if previewH == 0 {
+		below = 3
+	}
+	viewH := m.listBudget(&b, previewH+below)
 	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "", func(i int) string {
 		label := m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
 		if i == m.listCursor {
@@ -946,14 +1129,16 @@ func (m Model) viewEditCommandPick(w int) string {
 		}
 		return "    " + label
 	})
-	b.WriteString("\n")
-	var pv strings.Builder
-	if m.listCursor >= 0 && m.listCursor < len(m.listItems) {
-		m.writeCommandHover(&pv, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
-	} else {
-		pv.WriteString(hline(w) + "\n")
+	if previewH > 0 {
+		b.WriteString("\n")
+		var pv strings.Builder
+		if m.listCursor >= 0 && m.listCursor < len(m.listItems) {
+			m.writeCommandHover(&pv, m.editRefCommand(m.editRefs[m.pickOrig(m.listCursor)]), w)
+		} else {
+			pv.WriteString(hline(w) + "\n")
+		}
+		writePadded(&b, pv.String(), previewH)
 	}
-	writePadded(&b, pv.String(), previewH)
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter Esc") + "\n")
 	return b.String()
@@ -1181,12 +1366,13 @@ func (m Model) writeListEntriesPreview(b *strings.Builder, listName string, w in
 
 func (m Model) viewEditListPick(w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header("Edit list", w) + "\n")
+	m.writeHeading(&b, "Edit list", w)
 	m.writePickFilter(&b)
 	names := m.sortedListNames()
 	previewH := maxLines(len(names), 3, func(i int, tb *strings.Builder) {
 		m.writeListEntriesPreview(tb, names[i], w)
 	})
+	previewH = m.previewBudget(&b, previewH, 3, 3)
 	viewH := m.listBudget(&b, previewH+3)
 	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "(no lists)", func(i int) string {
 		if i == m.listCursor {
@@ -1194,13 +1380,15 @@ func (m Model) viewEditListPick(w int) string {
 		}
 		return "    " + m.listItems[i]
 	})
-	var pv strings.Builder
-	if len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
-		m.writeListEntriesPreview(&pv, m.listItems[m.listCursor], w)
-	} else {
-		pv.WriteString("\n" + hline(w) + "\n")
+	if previewH > 0 {
+		var pv strings.Builder
+		if len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
+			m.writeListEntriesPreview(&pv, m.listItems[m.listCursor], w)
+		} else {
+			pv.WriteString("\n" + hline(w) + "\n")
+		}
+		writePadded(&b, pv.String(), previewH)
 	}
-	writePadded(&b, pv.String(), previewH)
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter: edit   Esc: back") + "\n")
 	return b.String()
@@ -1243,7 +1431,7 @@ func (m Model) writeVarRefsPreview(b *strings.Builder, name string, w int) {
 
 func (m Model) viewEditVarPick(w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header("Edit variable", w) + "\n")
+	m.writeHeading(&b, "Edit variable", w)
 	m.writePickFilter(&b)
 	previewH := maxLines(len(m.varPickNames), 3, func(i int, tb *strings.Builder) {
 		m.writeVarHover(tb, m.varPickNames[i], w)
@@ -1380,7 +1568,7 @@ func (m Model) viewVarRebase(w int) string {
 
 func (m Model) viewDeleteList(title string, items []string, w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header(title, w) + "\n")
+	m.writeHeading(&b, title, w)
 	if !m.deleteConfirm {
 		m.writePickFilter(&b)
 	}
@@ -1478,7 +1666,7 @@ func (m Model) viewRunWorkflowSteps(w int) string {
 	wf := m.workflows[p.wfIdx]
 	n := len(wf.Commands)
 
-	b.WriteString("\n" + header("Run workflow: "+wf.Name, w) + "\n")
+	m.writeHeading(&b, "Run workflow: "+wf.Name, w)
 	b.WriteString("  " + gray("Pick the steps to run — they always run in the order below.") + "\n")
 
 	viewH := m.listBudget(&b, 4)
