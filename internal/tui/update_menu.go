@@ -73,7 +73,9 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "Exit":
 			return m, tea.Quit
 		}
-	case "esc":
+	// q quits from the project list, which is the screen baton opens on,
+	// so it quits from the menu behind it too.
+	case "esc", "q":
 		return m, tea.Quit
 	}
 	return m, nil

@@ -78,6 +78,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case runner.DoneMsg:
 		return m.handleRunnerDone(msg)
 	case tea.KeyMsg:
+		// Ctrl+C is not a signal here: the terminal is in raw mode, so it
+		// arrives as an ordinary keystroke, and a program that ignores it
+		// cannot be left at all from a text field. A run is the one place
+		// it does not reach — the command owns the terminal and takes it.
+		if msg.Type == tea.KeyCtrlC {
+			return m, tea.Quit
+		}
 		m.errMsg = ""
 		m.successMsg = ""
 		switch m.screen {

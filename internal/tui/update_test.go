@@ -65,3 +65,26 @@ func TestUpdate_ResizeResizesStepsPreview(t *testing.T) {
 		t.Fatalf("steps preview width = %d, want the new terminal width less its frame", got.stepsVP.Width)
 	}
 }
+
+// TestUpdate_CtrlCQuitsEveryScreen checks the one key every terminal user
+// reaches for. The terminal is in raw mode, so Ctrl+C is delivered as a
+// keystroke rather than a signal; baton ignored it, which left no way out
+// of a text field except walking back with Esc.
+func TestUpdate_CtrlCQuitsEveryScreen(t *testing.T) {
+	for sc := ScreenProjectSelect; sc <= ScreenRunWorkflowSteps; sc++ {
+		m := Model{screen: sc, width: 80, height: 24}
+		m.spinner = spinner.New()
+		m.nameInput = textinput.New()
+		m.msSearchTI = textinput.New()
+		m.wfSearchTI = textinput.New()
+
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+		if cmd == nil {
+			t.Errorf("screen %v: Ctrl+C did nothing", sc)
+			continue
+		}
+		if _, ok := cmd().(tea.QuitMsg); !ok {
+			t.Errorf("screen %v: Ctrl+C did not quit", sc)
+		}
+	}
+}
