@@ -1023,12 +1023,19 @@ func (m Model) previewBudget(b *strings.Builder, want, reservedBelow, minRows in
 	return 0
 }
 
-// writeHeading writes a scrolling screen's heading. On a terminal too
-// short to spend four lines naming the screen, it shrinks to the title
-// alone — the blank lines around it and the rule under it are worth less
-// than the three list rows they cost.
+// writeHeading writes a scrolling screen's heading, shrinking it to the
+// title alone on a terminal too short to spend four lines naming the
+// screen — the blank lines around it and the rule under it are worth
+// less than the three list rows they cost.
 func (m Model) writeHeading(b *strings.Builder, title string, w int) {
-	if m.termHeight() < 12 {
+	m.writeHeadingUnder(b, title, w, 12)
+}
+
+// writeHeadingUnder is writeHeading with the height it gives way at. A
+// screen whose rows come in threes reaches that point sooner: three
+// lines of heading is a whole item.
+func (m Model) writeHeadingUnder(b *strings.Builder, title string, w, minRows int) {
+	if m.termHeight() < minRows {
 		b.WriteString(accentBold("  [ "+title+" ]") + "\n")
 		return
 	}
@@ -1221,13 +1228,37 @@ func (m Model) viewEditCommandPick(w int) string {
 // at the last page.
 func (m Model) confirmRunPerPage() int {
 	var b strings.Builder
-	b.WriteString("\n" + header("Confirm", m.width) + "\n")
-	return max(1, m.listBudget(&b, 6)/3)
+	m.writeHeadingUnder(&b, "Confirm", m.width, 20)
+	// Below the items: the "n more" line, a blank, the rule, a blank, the
+	// three rows of the button box, a blank and the key line. The box was
+	// counted as one row, which is why the screen ran past the terminal
+	// on a terminal of any size.
+	return max(1, m.listBudget(&b, m.confirmRunBelow())/3)
+}
+
+// confirmRunBelow is how many rows the confirm screen holds under its
+// item list: the "n more" line, the rule, the three rows of the button
+// box, the key line, and the three blank lines that set them apart on a
+// terminal with room for spacing.
+func (m Model) confirmRunBelow() int {
+	if m.compact() {
+		return 6
+	}
+	return 9
+}
+
+// confirmGap is the blank line between the confirm screen's lower
+// sections, which a short terminal spends on an item instead.
+func confirmGap(m Model) string {
+	if m.compact() {
+		return ""
+	}
+	return "\n"
 }
 
 func (m Model) viewConfirmRun(w int) string {
 	var b strings.Builder
-	b.WriteString("\n" + header("Confirm", w) + "\n")
+	m.writeHeadingUnder(&b, "Confirm", w, 20)
 
 	// Every item spans three lines, so the window scrolls whole items.
 	// There is no row cursor here — ↑↓ move the window directly.
@@ -1268,9 +1299,9 @@ func (m Model) viewConfirmRun(w int) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n" + hline(w) + "\n\n")
+	b.WriteString(confirmGap(m) + hline(w) + "\n" + confirmGap(m))
 	b.WriteString(renderBtns(m.confirmRunBtn, "  Run  ", "  Cancel  ") + "\n")
-	b.WriteString("\n  " + gray("↑↓: scroll   Tab: switch   Enter: confirm   Esc: back") + "\n")
+	b.WriteString(confirmGap(m) + "  " + gray("↑↓: scroll   Tab: switch   Enter: confirm   Esc: back") + "\n")
 	return b.String()
 }
 

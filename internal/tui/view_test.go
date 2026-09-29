@@ -811,3 +811,31 @@ func TestBannersStayInsideTheTerminal(t *testing.T) {
 		}
 	}
 }
+
+// TestConfirmRunFitsTheTerminal checks the screen shown before every run.
+// It reserved one row for the button box, which is three rows drawn by
+// lipgloss, so it ran past the bottom of the terminal at every size — 26
+// lines on a standard 24-line one — and the terminal scrolled away the
+// commands it exists to show.
+func TestConfirmRunFitsTheTerminal(t *testing.T) {
+	cmds := make([]mdl.Command, 6)
+	for i := range cmds {
+		cmds[i] = mdl.Command{Name: fmt.Sprintf("cmd-%d", i), Cmd: "echo hi", Source: "tsv"}
+	}
+	for h := 11; h <= 40; h++ {
+		m := Model{width: 100, height: h, screen: ScreenConfirmRun, projectDir: "p"}
+		m.config = mdl.Config{Base: cmds}
+		for i := range cmds {
+			m.confirmRunItems = append(m.confirmRunItems, mdl.RunItem{Name: cmds[i].Name, Cmd: &cmds[i]})
+		}
+		view := m.View()
+		if got := frameLines(view); got > h {
+			t.Errorf("height %d: the confirm screen renders %d lines\n%s", h, got, view)
+		}
+		// An item is worth showing only whole, so the screen shows as
+		// many whole items as fit and no more.
+		if !strings.Contains(view, "cmd-0") || !strings.Contains(view, "$ echo hi") {
+			t.Errorf("height %d: the first command is not on screen\n%s", h, view)
+		}
+	}
+}
