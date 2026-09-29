@@ -420,10 +420,14 @@ func (m Model) viewSingleSelect(title string, w int) string {
 	if m.compact() {
 		gap, reserved = "", 2
 	}
+	// The steps preview is budgeted like every other hover panel: all of
+	// it or none, so a short terminal spends the rows on the list rather
+	// than on a preview it has no room for.
+	stepsH := 0
 	if m.screen == ScreenEditWorkflow {
-		reserved += 2 + m.stepsVP.Height
+		stepsH = m.previewBudget(&b, 2+m.stepsVP.Height, reserved, 3)
 	}
-	viewH := m.listBudget(&b, reserved)
+	viewH := m.listBudget(&b, reserved+stepsH)
 	// A submenu is a handful of fixed choices, and windowing it defeats
 	// its purpose: on a short terminal "Manage vars" showed one of its
 	// three items between two "1 more" counts. Few enough entries are
@@ -438,7 +442,7 @@ func (m Model) viewSingleSelect(title string, w int) string {
 		}
 		return "    " + m.listItems[i]
 	})
-	if m.screen == ScreenEditWorkflow {
+	if stepsH > 0 {
 		b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
 		b.WriteString(m.stepsVP.View() + "\n")
 	}
@@ -714,23 +718,63 @@ func (m Model) viewDiscardWindow(w int, selNames []string) string {
 
 // ── Slot pick ────────────────────────────────────────────────────────────────
 
+// viewSlotPick draws the slot picker, tightening it when it does not
+// fit. How tall this screen wants to be depends on the run — the context
+// panel grows with the steps still to resolve — so no fixed height can
+// say when it has to give its spacing up. It asks the frame instead.
 func (m Model) viewSlotPick(w int) string {
+	if !m.compact() {
+		if view := m.slotPickFrame(w, false, 3); frameRows(view) <= m.termHeight() {
+			return view
+		}
+	}
+	// Spacing goes first, then the context panel narrows a step at a
+	// time, down to the step being resolved on its own with the counts
+	// either side of it.
+	for around := 3; around > 0; around-- {
+		if view := m.slotPickFrame(w, true, around); frameRows(view) <= m.termHeight() {
+			return view
+		}
+	}
+	return m.slotPickFrame(w, true, 0)
+}
+
+// frameRows is how many terminal lines a frame occupies once View has
+// trimmed the trailing newline off it.
+func frameRows(s string) int {
+	return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1
+}
+
+func (m Model) slotPickFrame(w int, tight bool, around int) string {
 	sp := m.sp
 	var b strings.Builder
 	title := "  [ Select value for " + sp.placeholder() + " ]"
 	if sp.variadic {
 		title = "  [ Select values for " + sp.placeholder() + " ]"
 	}
-	b.WriteString("\n" + accentBold(title) + "\n" + hline(w) + "\n\n")
+	// This screen carries more fixed furniture than any other — a context
+	// panel, a command preview, two labelled rules — so on a short
+	// terminal it gives up the spacing between them and narrows the
+	// context to the steps either side of the current one. It sits on the
+	// run path, so it has to work in the panel the rest works in.
+	gap := "\n"
+	if tight {
+		gap = ""
+	}
+	b.WriteString(gap + accentBold(title) + "\n" + hline(w) + "\n" + gap)
 
-	// Context panel — windowed: show up to 3 before current, current, up to 2 after
+	// Context panel — windowed around the step being resolved.
 	if sp.contextNames != nil {
 		cur := sp.contextIdx
 		n := len(sp.contextNames)
-		start := max(0, cur-3)
-		end := min(n, cur+3)
+		// around is how far either side of the current step is shown;
+		// at zero the current step stands alone between the counts.
+		start := max(0, cur-around)
+		end := min(n, cur+max(1, around))
 
-		if start > 0 {
+		// At the tightest the step stands alone: its own row carries its
+		// number, so the counts either side are what goes last.
+		if start > 0 && around > 0 {
 			b.WriteString("  " + dim(fmt.Sprintf("  ↑ %d more", start)) + "\n")
 		}
 		for i := start; i < end; i++ {
@@ -752,13 +796,13 @@ func (m Model) viewSlotPick(w int) string {
 				b.WriteString("  " + marker + nameStr + "\n")
 			}
 		}
-		if end < n {
+		if end < n && around > 0 {
 			b.WriteString("  " + dim(fmt.Sprintf("    ↓ %d more", n-end)) + "\n")
 		}
 
 		// Command preview — separated from the list
 		if sp.currentCmd != nil {
-			b.WriteString("\n" + hlineLabelBright(w, "command preview  "+highlight(sp.placeholder())) + "\n\n")
+			b.WriteString(gap + hlineLabelBright(w, "command preview  "+highlight(sp.placeholder())) + "\n" + gap)
 
 			// Hovered value (from list cursor or custom search input)
 			hoveredVal := ""
@@ -802,12 +846,12 @@ func (m Model) viewSlotPick(w int) string {
 		if sp.reuseFrom != "" {
 			selectLabel += "  ·  same as " + sp.reuseFrom + " — Enter keeps it"
 		}
-		b.WriteString("\n\n" + hlineLabelBright(w, selectLabel) + "\n\n")
+		b.WriteString(gap + gap + hlineLabelBright(w, selectLabel) + "\n" + gap)
 	}
 
 	// Search field
 	if sp.search == "" {
-		b.WriteString("  " + dim("/ type to filter...") + "\n\n")
+		b.WriteString("  " + dim("/ type to filter...") + "\n" + gap)
 	} else {
 		countStr := ""
 		if len(sp.filtered) == 0 {
@@ -816,7 +860,7 @@ func (m Model) viewSlotPick(w int) string {
 			countStr = dim(fmt.Sprintf("%d results", len(sp.filtered)))
 		}
 		b.WriteString("  " + accent("/") + " " + white(sp.search) + dim("_") +
-			"  " + countStr + "\n\n")
+			"  " + countStr + "\n" + gap)
 	}
 
 	// List
@@ -1537,6 +1581,8 @@ func (m Model) viewEditVarPick(w int) string {
 	previewH := maxLines(len(m.varPickNames), 3, func(i int, tb *strings.Builder) {
 		m.writeVarHover(tb, m.varPickNames[i], w)
 	})
+	// All of the preview or none of it, as on every other pick screen.
+	previewH = m.previewBudget(&b, previewH, 3, 3)
 	viewH := m.listBudget(&b, previewH+3)
 	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor,
 		"(vars.tsv is empty — create a global, or save a command with fixed values)", func(i int) string {
@@ -1545,13 +1591,15 @@ func (m Model) viewEditVarPick(w int) string {
 			}
 			return "    " + m.listItems[i]
 		})
-	var pv strings.Builder
-	if len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
-		m.writeVarHover(&pv, m.varPickNames[m.pickOrig(m.listCursor)], w)
-	} else {
-		pv.WriteString("\n" + hline(w) + "\n")
+	if previewH > 0 {
+		var pv strings.Builder
+		if len(m.listItems) > 0 && m.listCursor < len(m.listItems) {
+			m.writeVarHover(&pv, m.varPickNames[m.pickOrig(m.listCursor)], w)
+		} else {
+			pv.WriteString("\n" + hline(w) + "\n")
+		}
+		writePadded(&b, pv.String(), previewH)
 	}
-	writePadded(&b, pv.String(), previewH)
 	b.WriteString("\n" + hline(w) + "\n")
 	b.WriteString("  " + gray("↑↓ Enter: edit   Esc: back") + "\n")
 	return b.String()
@@ -1673,7 +1721,15 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 	if !m.deleteConfirm {
 		m.writePickFilter(&b)
 	}
+	footer := 3
+	if m.deleteConfirm {
+		footer = 7
+	}
+
 	// Preview region height per screen (previews hide while confirming).
+	// The steps of a workflow alone run to ten rows, and unlike every
+	// other pick screen these kept them whatever the terminal had left,
+	// which is what made the delete screens the tallest in the app.
 	previewH := 0
 	if !m.deleteConfirm {
 		switch m.screen {
@@ -1694,10 +1750,7 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 			})
 		}
 	}
-	footer := 3
-	if m.deleteConfirm {
-		footer = 7
-	}
+	previewH = m.previewBudget(&b, previewH, footer, 3)
 
 	selectedSet := make(map[int]bool, len(m.deleteSelected))
 	for _, s := range m.deleteSelected {
