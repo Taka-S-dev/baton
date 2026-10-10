@@ -51,20 +51,13 @@ baton/
 │   ├── slot/                 # {placeholder} and {$var} resolution, lists and vars.tsv
 │   ├── store/                # App-managed state (workflows, saved commands, last workflow)
 │   ├── runner/               # Command execution via tea.ExecProcess (suspends TUI)
-│   └── tui/                  # Bubbletea Model / Update / View
-│       ├── model.go                  # Model struct, screen enum, sub-states, New()
-│       ├── update.go                 # Update() entry point, message dispatch
-│       ├── update_menu.go            # Project select, main menu, config switch
-│       ├── update_run.go             # Run workflow, per-run step selection, confirm, retry
-│       ├── update_resolve.go         # Multi-select, slot resolution and answer reuse
-│       ├── update_workflow.go        # Workflow CRUD
-│       ├── update_manage_commands.go # Command CRUD (direct input / from template)
-│       ├── update_vars.go            # Project variable CRUD, reference rebase offer
-│       ├── update_rename.go          # Hand-edited rename detection and reference repair
-│       ├── update_list.go            # Selection lists and name-input screens
-│       ├── update_helpers.go         # Cursor, pick-filter and delete-flow helpers
-│       ├── view.go                   # All rendering functions
-│       └── styles.go                 # Lipgloss styles and helper render functions
+│   └── tui/                  # Bubbletea Model / Update / View, one file group per screen
+│       ├── model.go, update.go, view.go, styles.go # Model struct, message dispatch, shared rendering
+│       ├── update_*.go                             # Menu, run, slot resolution, command/variable/list editing, rename repair
+│       ├── explore_*.go, view_explore.go           # Edit project: tabs, in-place editors, action popup, leave prompt
+│       ├── run_*.go                                # Run commands / Run workflow: queue, step review, mouse
+│       ├── projects.go, main_menu_*.go             # Project picker and main menu
+│       └── help.go, syntax.go, search_highlight.go # Help overlay, placeholder colouring, match highlighting
 └── projects.example/         # Sample projects (JSON and TSV) to copy as a starting point
 ```
 
@@ -147,7 +140,7 @@ A project starts as one file with one line, and every feature is an optional upg
 2. **Ask at run time.** Write `make {target}` and baton prompts for `{target}` on each run (free-text for now).
 3. **Pick from a list.** Add `lists/target.tsv`, one value per line — the prompt becomes a searchable picker.
 4. **Extract machine-specific paths.** Move `C:\work\...` into a `*` row of `vars.tsv` and write `{$root}` instead — relocating the project becomes a one-line change.
-5. **Save filled-in variants.** In the TUI, **Create command → From template** turns any slotted command plus concrete values into a new named command. Its files are app-managed — nothing for you to edit.
+5. **Save filled-in variants.** In the TUI, **Edit project → Commands → Add → From template** turns any slotted command plus concrete values into a new named command. Its files are app-managed — nothing for you to edit.
 6. **Chain into workflows.** **Edit project → Workflows** strings commands into a sequence that runs on one Enter.
 
 Steps 1–4 are plain file edits; 5–6 live in the TUI. The complete file spec — every column, what may be left empty, what references what by name — is [AGENTS.md](AGENTS.md), written for hand-editors and AI agents alike: point an agent at that file and `baton check`, and it can generate or refactor a whole project for you.
@@ -161,7 +154,7 @@ One kind of data, one editable home. Everything on the left column can be edited
 | Command definitions — name, cmd, workdir, group, shell, slots | `commands.tsv` / `commands.json` (or **Edit project → Commands**) |
 | A command's name only | the `name` column alone — references are repaired on the next start (see [Renaming commands](#renaming-commands)) |
 | Project variables — `{$name}` values | the `*` rows of `vars.tsv` (or **Edit project → Variables**) |
-| A saved command's fixed slot values | its rows in `vars.tsv` (or **Edit command → Change values**) |
+| A saved command's fixed slot values | its rows in `vars.tsv` (or **Edit project → Commands → Edit → Change values**) |
 | Selection-list entries | `lists/<name>.tsv` (or **Edit project → Lists**) |
 | Workflows — steps, order, names | the TUI (**Edit project → Workflows**) — `workflows.json` is app-managed |
 | A saved command's identity or template | the TUI (**Edit project → Commands**) — `commands.local.json` is app-managed |
@@ -173,7 +166,7 @@ A project has two command layers:
 | File | Written by | Contents |
 |------|-----------|----------|
 | `commands.json` / `commands.tsv` | Shared: you edit freely, and the TUI appends new rows (**Write directly**) or rewrites/deletes **exactly the row you target** via Edit/Delete command. Lines you didn't touch are preserved byte-for-byte, and every write re-reads the file first | Command definitions — plain ones, and slotted ones that double as templates |
-| `commands.local.json` | baton (via **Create command → From template**) | Template-derived commands (identity only; values live in vars.tsv) |
+| `commands.local.json` | baton (via **Edit project → Commands → Add → From template**) | Template-derived commands (identity only; values live in vars.tsv) |
 
 Both layers can coexist; names in `commands.local.json` take priority.
 
@@ -231,7 +224,7 @@ build-api	projCmd	Z:\api
 
 The actual command line is recomputed from `template` + `vars.tsv` on every load, so editing either propagates immediately. Deleting the template breaks its derived commands, which the startup warning points out.
 
-**Naming.** Saving one pre-fills a name built from the template and the values picked in slot order — `build` with `workdir=./src` and `mode=Fast Build` becomes `build-src-fast-build` — so saved commands stay distinguishable without inventing a scheme each time. `Tab` inserts that name in any name input, which is what brings an entry named before the rule existed back in line with it: **Edit command → Rename**, then `Tab`. Renaming a workflow works the same way, offering the `step1+step2` name built from its steps.
+**Naming.** Saving one pre-fills a name built from the template and the values picked in slot order — `build` with `workdir=./src` and `mode=Fast Build` becomes `build-src-fast-build` — so saved commands stay distinguishable without inventing a scheme each time. `Tab` inserts that name in any name input, which is what brings an entry named before the rule existed back in line with it: **Edit project → Commands → Rename**, then `Tab`. Renaming a workflow works the same way, offering the `step1+step2` name built from its steps.
 
 ### Renaming commands
 
