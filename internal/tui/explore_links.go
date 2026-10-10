@@ -2,8 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"github.com/Taka-S-dev/baton/internal/slot"
 	"strings"
+
+	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 type exploreLocation struct {
@@ -12,6 +13,7 @@ type exploreLocation struct {
 	search   string
 	workflow *workflowEditState
 }
+
 type exploreLink struct {
 	tab         int
 	name, label string
@@ -37,6 +39,7 @@ func (m Model) commandLinks(name string) []exploreLink {
 	}
 	return links
 }
+
 func (m *Model) openExploreLink(tab int, name string) {
 	m.exploreHistory = append(m.exploreHistory, exploreLocation{m.exploreTab, m.exploreCursor, m.exploreSearch, m.wfe})
 	m.wfe = nil
@@ -50,6 +53,7 @@ func (m *Model) openExploreLink(tab int, name string) {
 		}
 	}
 }
+
 func (m *Model) backExploreLink() bool {
 	n := len(m.exploreHistory)
 	if n == 0 {
@@ -60,4 +64,5 @@ func (m *Model) backExploreLink() bool {
 	m.exploreTab, m.exploreCursor, m.exploreSearch, m.wfe = p.tab, p.cursor, p.search, p.workflow
 	return true
 }
+
 func linkKey(i int) string { return fmt.Sprintf("go%d", i+1) }

@@ -1,11 +1,12 @@
 package tui
 
 import (
+	"regexp"
+	"strings"
+
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"regexp"
-	"strings"
 )
 
 var syntaxToken = regexp.MustCompile(`\{(?:\$\w+|\w+(?:\.\.\.)?)\}`)

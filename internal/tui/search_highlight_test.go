@@ -1,10 +1,11 @@
 package tui
 
 import (
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 	"reflect"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestSearchMatchMaskPreservesRunePositions(t *testing.T) {
@@ -23,6 +24,7 @@ func TestSearchMatchMaskPreservesRunePositions(t *testing.T) {
 		}
 	}
 }
+
 func TestHighlightDoesNotChangeTextOrWidth(t *testing.T) {
 	for _, selected := range []bool{false, true} {
 		text := " ▶ 日本語 Sample  12 commands"

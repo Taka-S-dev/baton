@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestDiscardOverlayKeepsListBehindIt(t *testing.T) {

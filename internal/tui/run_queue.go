@@ -2,9 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
 )
 
 func (m Model) discardOptions() string {
@@ -13,6 +14,7 @@ func (m Model) discardOptions() string {
 	}
 	return "▶ Keep selecting\n  Discard and go back"
 }
+
 func (m Model) viewMultiSelect(w int) string {
 	if m.msEscArmed && len(m.msSelected) > 0 {
 		names := []string{}
@@ -44,6 +46,7 @@ func (m Model) viewMultiSelect(w int) string {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(leftLines[:rows], "\n"), " ", strings.Join(rightLines[:rows], "\n"))
 	return body + "\n" + hline(w) + "\n" + gray(truncate(m.runSelectKeys(), w))
 }
+
 func (m Model) viewRunQueue(w int) string {
 	h := m.termHeight()
 	queueH := max(5, h/2)

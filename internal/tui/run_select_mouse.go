@@ -1,10 +1,11 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
 )
 
 func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {

@@ -1,10 +1,11 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestWorkflowStepMouse(t *testing.T) {
@@ -47,6 +48,7 @@ func TestWorkflowStepMouse(t *testing.T) {
 		}
 	}
 }
+
 func TestWorkflowStepCompactRows(t *testing.T) {
 	m := wfModel()
 	m.height = 24

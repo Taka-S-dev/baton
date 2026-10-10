@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestValueDeleteKeysOpenConfirmation(t *testing.T) {
@@ -35,6 +36,7 @@ func TestValueDeleteKeysOpenConfirmation(t *testing.T) {
 		}
 	}
 }
+
 func TestValueDeleteDoesNotActWhileSearchingOrEditing(t *testing.T) {
 	for _, tab := range []int{tabLists, tabVars} {
 		m := exploreProject()

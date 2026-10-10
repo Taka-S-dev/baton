@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
 )
 
 func (m Model) listValueDetailBox(l exploreLayout) string {

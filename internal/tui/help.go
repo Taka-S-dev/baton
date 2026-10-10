@@ -1,16 +1,19 @@
 package tui
 
 import (
-	"github.com/charmbracelet/x/ansi"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func (m Model) helpHint() string {
 	return "F1 Help"
 }
+
 func (m Model) helpGeometry(w int) actionPopupLayout {
 	return actionPopupLayout{w: min(72, w), h: min(24, max(3, m.termHeight())), x: max(0, (w-min(72, w))/2), y: max(0, (m.termHeight()-min(24, max(3, m.termHeight())))/2)}
 }
+
 func (m Model) helpLines(w int) []string {
 	lines := []string{"Current screen"}
 	if m.screen == ScreenProjectSelect {
@@ -68,10 +71,12 @@ func (m Model) helpLines(w int) []string {
 	}
 	return wrapped
 }
+
 func (m *Model) clampHelpOffset() {
 	p := m.helpGeometry(m.viewWidth())
 	m.helpOffset = min(max(0, m.helpOffset), max(0, len(m.helpLines(p.w))-max(1, p.h-4)))
 }
+
 func (m Model) overlayHelp(bg string, w int) string {
 	p := m.helpGeometry(w)
 	lines := m.helpLines(p.w)

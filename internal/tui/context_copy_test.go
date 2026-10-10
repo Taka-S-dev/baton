@@ -2,8 +2,9 @@ package tui
 
 import (
 	"errors"
-	tea "github.com/charmbracelet/bubbletea"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestCopyValueSnapshotsInput(t *testing.T) {

@@ -1,10 +1,11 @@
 package tui
 
 import (
-	mdl "github.com/Taka-S-dev/baton/internal/model"
-	tea "github.com/charmbracelet/bubbletea"
 	"reflect"
 	"testing"
+
+	mdl "github.com/Taka-S-dev/baton/internal/model"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestRunQueueOrderReachesReview(t *testing.T) {

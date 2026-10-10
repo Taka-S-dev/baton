@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"testing"
+
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	tea "github.com/charmbracelet/bubbletea"
-	"testing"
 )
 
 func TestListAddShortcutFromAnyRow(t *testing.T) {

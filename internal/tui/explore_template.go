@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
-	"strings"
 )
 
 func (m Model) exploreTemplateFlow() bool {

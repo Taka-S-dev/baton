@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"runtime"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func shellChoiceLabel(value string) string {

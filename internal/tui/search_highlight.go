@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
 )
 
 // Match rune ranges, preserving the original spelling and display width.
@@ -25,6 +26,7 @@ func searchMatchMask(text string, terms []string) []bool {
 	}
 	return mask
 }
+
 func searchHighlight(line string, terms []string, selected, focused bool) string {
 	text := ansi.Strip(line)
 	runes := []rune(text)

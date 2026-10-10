@@ -1,11 +1,12 @@
 package tui
 
 import (
+	"strings"
+
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
 )
 
 func commandKind(c mdl.Command) string {

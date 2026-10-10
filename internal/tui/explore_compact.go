@@ -2,8 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"github.com/charmbracelet/lipgloss"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Draw and hit-test from the same labels, spacing and cell widths.
@@ -33,6 +34,7 @@ func (m Model) tabPresentation(w int) ([]string, string) {
 	}
 	return labels, " "
 }
+
 func (m Model) compactFooter(w int) string {
 	full := m.exploreKeys() + "  " + m.helpHint()
 	if lipgloss.Width(full)+2 <= w {

@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestUnifiedEditorMenu(t *testing.T) {
@@ -12,6 +13,7 @@ func TestUnifiedEditorMenu(t *testing.T) {
 		t.Fatal(items)
 	}
 }
+
 func TestNarrowWorkflowDetailsPreserveDraft(t *testing.T) {
 	m := exploreProject()
 	m.width = 60
@@ -28,6 +30,7 @@ func TestNarrowWorkflowDetailsPreserveDraft(t *testing.T) {
 		t.Fatal("lost draft")
 	}
 }
+
 func TestCommandResizeKeepsDraft(t *testing.T) {
 	m := exploreProject()
 	m = createKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})

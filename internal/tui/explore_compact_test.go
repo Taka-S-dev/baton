@@ -1,8 +1,9 @@
 package tui
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestCompactTabsAndFooterFitAndRemainClickable(t *testing.T) {

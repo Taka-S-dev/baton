@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
 )
 
 // Only explain matches absent from the visible label. Keep the explanation

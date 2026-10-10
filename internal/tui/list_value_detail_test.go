@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestListDetailFollowsSelectionAndDraft(t *testing.T) {
@@ -30,6 +31,7 @@ func TestListDetailFollowsSelectionAndDraft(t *testing.T) {
 		t.Fatal("preview saved draft")
 	}
 }
+
 func TestListDetailAddDoesNotShowPreviousValue(t *testing.T) {
 	m := exploreProject()
 	m.exploreTab = tabLists

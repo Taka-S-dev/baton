@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestHelpPreservesDraftAndQuestionInput(t *testing.T) {
@@ -25,6 +26,7 @@ func TestHelpPreservesDraftAndQuestionInput(t *testing.T) {
 		t.Fatal("help changed draft")
 	}
 }
+
 func TestHelpUsesActionsAndDoesNotExecuteThem(t *testing.T) {
 	m := exploreProject()
 	m.exploreTab = tabLists

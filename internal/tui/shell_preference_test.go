@@ -1,10 +1,11 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"path/filepath"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestShellPreferencePersistsOnlyAfterSave(t *testing.T) {

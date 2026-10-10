@@ -1,11 +1,12 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func dirtyPopupModel(width int) Model {

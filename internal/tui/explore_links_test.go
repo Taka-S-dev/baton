@@ -1,9 +1,10 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestCommandRelatedNavigationReturnsToSelection(t *testing.T) {
@@ -27,6 +28,7 @@ func TestCommandRelatedNavigationReturnsToSelection(t *testing.T) {
 		t.Fatal("did not restore origin")
 	}
 }
+
 func TestSharedVariablesExcludeFixedValuesWithoutDeletingThem(t *testing.T) {
 	m := exploreProject()
 	for _, it := range m.exploreItems(tabVars) {

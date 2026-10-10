@@ -2,8 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"github.com/Taka-S-dev/baton/internal/slot"
 	"strings"
+
+	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 // Match saved answers against the template's slot-to-list mapping.

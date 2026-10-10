@@ -1,11 +1,12 @@
 package tui
 
 import (
-	"github.com/Taka-S-dev/baton/internal/config"
-	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/Taka-S-dev/baton/internal/config"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestProjectCreateAndRecoverableDelete(t *testing.T) {
@@ -38,6 +39,7 @@ func TestProjectCreateAndRecoverableDelete(t *testing.T) {
 		t.Fatal("settings not recoverable")
 	}
 }
+
 func TestProjectRejectsTraversalAndEmptySelection(t *testing.T) {
 	for _, name := range []string{"", "..", "../outside", "a/b", "a\\b", ".baton-trash"} {
 		if _, err := projectPath(t.TempDir(), name); err == nil {

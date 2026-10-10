@@ -2,8 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"github.com/charmbracelet/lipgloss"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) viewRunWorkflow(w int) string {
@@ -44,6 +45,7 @@ func (m Model) viewRunWorkflow(w int) string {
 	footer := "↑↓ Select · Tab/→ Steps · F2 Details · Enter Review · Esc Back · F1 Help"
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right) + "\n" + gray(truncate(footer, w)) + "\n"
 }
+
 func (m Model) workflowDetailsInline() bool { return m.viewWidth() >= 100 && m.termHeight() >= 20 }
 
 func (m Model) viewRunWorkflowSteps(w int) string {
@@ -59,6 +61,7 @@ func (m Model) viewRunWorkflowSteps(w int) string {
 	leftW := w / 2
 	return lipgloss.JoinHorizontal(lipgloss.Top, strings.TrimRight(m.viewRunWorkflowStepsList(leftW), "\n"), " ", m.workflowRunDetail(w-leftW-1))
 }
+
 func (m Model) workflowRunDetail(w int) string {
 	var b strings.Builder
 	p := m.wfp

@@ -1,9 +1,10 @@
 package tui
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestCommandTableExplainsTypes(t *testing.T) {

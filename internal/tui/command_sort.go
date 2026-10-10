@@ -17,6 +17,7 @@ func validCommandSort(value string) bool {
 	}
 	return false
 }
+
 func (m *Model) loadCommandSort() {
 	m.commandSort = "name"
 	if m.projectDir == "" {
@@ -27,6 +28,7 @@ func (m *Model) loadCommandSort() {
 		m.commandSort = strings.TrimSpace(string(data))
 	}
 }
+
 func (m Model) sortCommandIndices(indices []int) {
 	if m.commandSort == "" || m.commandSort == "definition" {
 		return
@@ -76,6 +78,7 @@ func (m Model) sortCommandIndices(indices []int) {
 		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 	})
 }
+
 func (m *Model) cycleCommandSort() {
 	next := 0
 	for i, mode := range commandSortModes {
@@ -86,6 +89,7 @@ func (m *Model) cycleCommandSort() {
 	}
 	m.setCommandSort(commandSortModes[next])
 }
+
 func (m *Model) setCommandSort(mode string) {
 	before := m.msFiltered()
 	selected := -1
@@ -120,6 +124,7 @@ func (m *Model) setCommandSort(mode string) {
 		m.errMsg = "Sort changed, but preference could not be saved: " + err.Error()
 	}
 }
+
 func (m Model) commandSortLabel() string {
 	mode := strings.TrimSuffix(m.commandSort, "-desc")
 	if mode == "" || mode == "definition" {
@@ -127,6 +132,7 @@ func (m Model) commandSortLabel() string {
 	}
 	return m.sortHeading(mode, strings.ToUpper(mode[:1])+mode[1:])
 }
+
 func (m Model) sortHeading(mode, label string) string {
 	if strings.TrimSuffix(m.commandSort, "-desc") != mode {
 		return label

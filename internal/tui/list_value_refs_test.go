@@ -1,9 +1,10 @@
 package tui
 
 import (
-	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"strings"
 	"testing"
+
+	mdl "github.com/Taka-S-dev/baton/internal/model"
 )
 
 func TestFixedValueReferencesRequireMatchingListAndValue(t *testing.T) {
@@ -26,6 +27,7 @@ func TestFixedValueReferencesRequireMatchingListAndValue(t *testing.T) {
 		t.Fatal("scoped override ignored")
 	}
 }
+
 func TestVariadicFixedValueMatchesWholeTokens(t *testing.T) {
 	m := exploreProject()
 	m.config.Base = append(m.config.Base, mdl.Command{Name: "multi", Cmd: "run {env...}"})

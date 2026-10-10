@@ -25,6 +25,7 @@ func (m Model) viewMainMenu(w int) string {
 	b.WriteString(hline(w) + "\n" + gray(truncate("  ↑↓ Move  Enter Open  Esc Quit  F1 Help", w)))
 	return b.String()
 }
+
 func (m Model) updateMainMenuMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return m, nil

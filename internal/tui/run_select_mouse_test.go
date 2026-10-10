@@ -1,13 +1,14 @@
 package tui
 
 import (
+	"reflect"
+	"strings"
+	"testing"
+
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"reflect"
-	"strings"
-	"testing"
 )
 
 func TestRunSelectClickFocusAndDetails(t *testing.T) {

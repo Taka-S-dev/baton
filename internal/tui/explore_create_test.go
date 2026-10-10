@@ -1,11 +1,12 @@
 package tui
 
 import (
-	mdl "github.com/Taka-S-dev/baton/internal/model"
-	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"path/filepath"
 	"testing"
+
+	mdl "github.com/Taka-S-dev/baton/internal/model"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func createKey(m Model, key tea.KeyMsg) Model { return exploreModel(exploreFirst(m.Update(key))) }

@@ -1,9 +1,10 @@
 package tui
 
 import (
-	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"strings"
 	"testing"
+
+	mdl "github.com/Taka-S-dev/baton/internal/model"
 )
 
 func TestCommandMatchReason(t *testing.T) {
@@ -20,6 +21,7 @@ func TestCommandMatchReason(t *testing.T) {
 		t.Fatal("visible match repeated")
 	}
 }
+
 func TestMultiSelectSearchRenderingKeepsSelection(t *testing.T) {
 	m := exploreProject()
 	m.setupMultiSelect()

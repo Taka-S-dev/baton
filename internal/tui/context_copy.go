@@ -1,17 +1,19 @@
 package tui
 
 import (
+	"strings"
+
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"strings"
 )
 
 type clipboardAction struct {
 	key, label, value string
 	paste             bool
 }
+
 type contextCopyMsg struct{ err error }
 
 func (m Model) contextInputValue() string {
@@ -29,6 +31,7 @@ func (m Model) contextInputValue() string {
 	}
 	return m.nameInput.Value()
 }
+
 func (m Model) commandCopyActions() []clipboardAction {
 	var c mdl.Command
 	ok := false
@@ -59,6 +62,7 @@ func (m Model) commandCopyActions() []clipboardAction {
 	c = slot.ApplyVarsToCommand(c, m.vars)
 	return []clipboardAction{{"c", "Copy command", c.Cmd, false}, {"w", "Copy workdir", displayOr(c.Dir, "."), false}}
 }
+
 func (m Model) clipboardMenuBody() string {
 	var b strings.Builder
 	for i, a := range m.contextActions {
@@ -71,6 +75,7 @@ func (m Model) clipboardMenuBody() string {
 	b.WriteString("\n Enter Confirm  Esc Close")
 	return b.String()
 }
+
 func (m Model) runClipboardAction(i int) (tea.Model, tea.Cmd) {
 	m.pasteMenu = false
 	if i < 0 || i >= len(m.contextActions) {
@@ -82,6 +87,7 @@ func (m Model) runClipboardAction(i int) (tea.Model, tea.Cmd) {
 	}
 	return m, func() tea.Msg { return contextCopyMsg{clipboard.WriteAll(a.value)} }
 }
+
 func (m Model) updateClipboardMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch input := msg.(type) {
 	case tea.KeyMsg:

@@ -16,6 +16,7 @@ func (m Model) viewNarrowWorkflow(w int) string {
 	b.WriteString("\n" + gray(m.exploreKeys()+"  v Details  F1 Help"))
 	return b.String()
 }
+
 func (m Model) viewNarrowDetails(w int) string {
 	var b strings.Builder
 	m.writeHeading(&b, m.exploreTitle(), w)

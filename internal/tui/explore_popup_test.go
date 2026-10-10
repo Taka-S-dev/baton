@@ -1,11 +1,12 @@
 package tui
 
 import (
+	"strings"
+	"testing"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"strings"
-	"testing"
 )
 
 func TestActionPopupPreservesBackground(t *testing.T) {

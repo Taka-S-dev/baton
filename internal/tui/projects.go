@@ -2,13 +2,14 @@ package tui
 
 import (
 	"fmt"
-	"github.com/charmbracelet/lipgloss"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Taka-S-dev/baton/internal/config"
 	"github.com/atotto/clipboard"
@@ -24,6 +25,7 @@ func (m Model) visibleProjects() []string {
 	}
 	return names
 }
+
 func (m *Model) refreshProjects() {
 	m.projects = config.ListProjects(m.projectsDir)
 	m.projectCmdCounts = map[string]int{}
@@ -37,6 +39,7 @@ func (m *Model) refreshProjects() {
 	}
 	m.listCursor = min(m.listCursor, max(0, len(m.visibleProjects())-1))
 }
+
 func projectPath(base, name string) (string, error) {
 	if name == "" || name == "." || name == ".." || strings.HasPrefix(name, ".") || strings.ContainsAny(name, "/\\<>:\"|?*\t\r\n") || strings.TrimSpace(name) != name || strings.HasSuffix(name, ".") {
 		return "", fmt.Errorf("use a plain project name without path separators")
@@ -51,6 +54,7 @@ func projectPath(base, name string) (string, error) {
 	}
 	return path, nil
 }
+
 func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	names := m.visibleProjects()
 	name := ""
@@ -246,6 +250,7 @@ type projectFolderMsg struct{ err error }
 func (m Model) projectRows(w int) (int, int) {
 	return 3, min(max(1, len(m.visibleProjects())), max(1, m.termHeight()-8))
 }
+
 func (m Model) projectAddY(w int) int { y, rows := m.projectRows(w); return y + rows + 1 }
 
 func (m Model) viewProjects(w int) string {

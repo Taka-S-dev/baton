@@ -1,9 +1,10 @@
 package tui
 
 import (
-	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"reflect"
 	"testing"
+
+	mdl "github.com/Taka-S-dev/baton/internal/model"
 )
 
 func TestCandidateSortPreservesQueueAndCursor(t *testing.T) {

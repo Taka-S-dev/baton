@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"strings"
 )
 
 type contextPasteMsg struct {
@@ -28,12 +29,14 @@ func (m Model) contextInputActive() bool {
 	}
 	return false
 }
+
 func (m Model) pastePopup(w int) actionPopupLayout {
 	p := actionPopupLayout{w: min(30, w), h: min(6, m.termHeight())}
 	p.x = min(max(0, m.contextX), max(0, w-p.w))
 	p.y = min(max(0, m.contextY), max(0, m.termHeight()-p.h))
 	return p
 }
+
 func (m Model) insertClipboard(s string) (tea.Model, tea.Cmd) {
 	if !m.contextInputActive() {
 		return m, nil

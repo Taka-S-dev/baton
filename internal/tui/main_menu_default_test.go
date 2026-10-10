@@ -1,8 +1,9 @@
 package tui
 
 import (
-	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"testing"
+
+	mdl "github.com/Taka-S-dev/baton/internal/model"
 )
 
 func TestMainMenuRunFirstAndContentDefault(t *testing.T) {

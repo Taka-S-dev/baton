@@ -1,11 +1,12 @@
 package tui
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
-	"strings"
-	"testing"
 )
 
 func TestSyntaxColorsAndLiteralPreservation(t *testing.T) {

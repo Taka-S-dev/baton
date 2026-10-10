@@ -1,9 +1,10 @@
 package tui
 
 import (
-	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestMainMenuKeepsLeftAnchorAndNameAlignment(t *testing.T) {
