@@ -6,9 +6,6 @@ import (
 )
 
 func (m Model) helpHint() string {
-	if m.exploreListFocused() && !m.exploreSearching {
-		return "? Help"
-	}
 	return "F1 Help"
 }
 func (m Model) helpGeometry(w int) actionPopupLayout {
@@ -63,7 +60,7 @@ func (m Model) helpLines(w int) []string {
 		"Command actions include links to referenced lists and variables.",
 		"Esc returns from a related item, preserving your previous selection.",
 		"a adds to the focused pane; n also creates a project item.",
-		"F1 opens help while typing; ? remains ordinary input.",
+		"F1 opens help, including while typing. Esc closes it; ? remains ordinary input while typing.",
 	)
 	var wrapped []string
 	for _, line := range lines {
@@ -81,7 +78,7 @@ func (m Model) overlayHelp(bg string, w int) string {
 	rows := max(1, p.h-4)
 	start := min(m.helpOffset, max(0, len(lines)-rows))
 	end := min(len(lines), start+rows)
-	body := " " + strings.Join(lines[start:end], "\n ") + "\n\n ↑↓ Scroll · Esc / ? / F1 Close"
+	body := " " + strings.Join(lines[start:end], "\n ") + "\n\n ↑↓ Scroll · Esc Close"
 	return overlayBox(bg, box("Help", body, p.w, p.h, true), p.x, p.y, w)
 }
 

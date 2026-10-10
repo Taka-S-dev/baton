@@ -38,7 +38,7 @@ func (m Model) compactFooter(w int) string {
 	if lipgloss.Width(full)+2 <= w {
 		return "  " + full
 	}
-	parts := []string{"Enter Open", "a Add", "? Help", "v Details", "Esc Back"}
+	parts := []string{"Enter Open", "a Add", "F1 Help", "v Details", "Esc Back"}
 	if !m.exploreListFocused() || m.exploreSearching {
 		parts = []string{"F1 Help"}
 		parts = append(parts, strings.Split(m.exploreKeys(), "  ")...)

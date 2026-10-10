@@ -52,3 +52,19 @@ func TestHelpUsesActionsAndDoesNotExecuteThem(t *testing.T) {
 		t.Fatal("outside click did not close")
 	}
 }
+
+func TestHelpHintConsistent(t *testing.T) {
+	m := exploreProject()
+	for _, searching := range []bool{false, true} {
+		m.exploreSearching = searching
+		if m.helpHint() != "F1 Help" {
+			t.Fatal("inconsistent help hint")
+		}
+		for _, w := range []int{40, 60, 120} {
+			footer := m.compactFooter(w)
+			if strings.Contains(footer, "? Help") || !strings.Contains(footer, "F1 Help") {
+				t.Fatalf("inconsistent footer: %q", footer)
+			}
+		}
+	}
+}
