@@ -135,7 +135,7 @@ any-folder/                  (Windows, or portable install)
         └── commands.tsv
 ```
 
-If multiple projects exist, baton shows a selection screen on startup. Use **Switch config** from the main menu to switch projects at any time.
+If multiple projects exist, baton shows a selection screen on startup. Use **Switch project** from the main menu to switch projects at any time.
 
 ## Configuration
 
@@ -148,7 +148,7 @@ A project starts as one file with one line, and every feature is an optional upg
 3. **Pick from a list.** Add `lists/target.tsv`, one value per line — the prompt becomes a searchable picker.
 4. **Extract machine-specific paths.** Move `C:\work\...` into a `*` row of `vars.tsv` and write `{$root}` instead — relocating the project becomes a one-line change.
 5. **Save filled-in variants.** In the TUI, **Create command → From template** turns any slotted command plus concrete values into a new named command. Its files are app-managed — nothing for you to edit.
-6. **Chain into workflows.** **Manage workflows** strings commands into a sequence that runs on one Enter.
+6. **Chain into workflows.** **Edit project → Workflows** strings commands into a sequence that runs on one Enter.
 
 Steps 1–4 are plain file edits; 5–6 live in the TUI. The complete file spec — every column, what may be left empty, what references what by name — is [AGENTS.md](AGENTS.md), written for hand-editors and AI agents alike: point an agent at that file and `baton check`, and it can generate or refactor a whole project for you.
 
@@ -158,15 +158,15 @@ One kind of data, one editable home. Everything on the left column can be edited
 
 | To change | Edit |
 |------|------|
-| Command definitions — name, cmd, workdir, group, shell, slots | `commands.tsv` / `commands.json` (or **Manage commands**) |
+| Command definitions — name, cmd, workdir, group, shell, slots | `commands.tsv` / `commands.json` (or **Edit project → Commands**) |
 | A command's name only | the `name` column alone — references are repaired on the next start (see [Renaming commands](#renaming-commands)) |
-| Project variables — `{$name}` values | the `*` rows of `vars.tsv` (or **Manage vars**) |
+| Project variables — `{$name}` values | the `*` rows of `vars.tsv` (or **Edit project → Variables**) |
 | A saved command's fixed slot values | its rows in `vars.tsv` (or **Edit command → Change values**) |
-| Selection-list entries | `lists/<name>.tsv` (or **Manage lists**) |
-| Workflows — steps, order, names | the TUI (**Manage workflows**) — `workflows.json` is app-managed |
-| A saved command's identity or template | the TUI (**Manage commands**) — `commands.local.json` is app-managed |
+| Selection-list entries | `lists/<name>.tsv` (or **Edit project → Lists**) |
+| Workflows — steps, order, names | the TUI (**Edit project → Workflows**) — `workflows.json` is app-managed |
+| A saved command's identity or template | the TUI (**Edit project → Commands**) — `commands.local.json` is app-managed |
 
-Hand edits are picked up on the next start or **Switch config**; `baton check` verifies everything still resolves.
+Hand edits are picked up on the next start or **Switch project**; `baton check` verifies everything still resolves.
 
 A project has two command layers:
 
@@ -217,7 +217,7 @@ deploy	deploy		echo deploying {env}
 
 ### Template-derived commands
 
-Any command containing `{slots}` can act as a template. **Manage commands → Create command → From template** picks one, fills its slots (each can be skipped to resolve at run time), and saves the result — the identity goes to `commands.local.json`, the chosen values to `vars.tsv` (see Project Variables):
+Any command containing `{slots}` can act as a template. **Edit project → Commands → Add → From template** picks one, fills its slots (each can be skipped to resolve at run time), and saves the result — the identity goes to `commands.local.json`, the chosen values to `vars.tsv` (see Project Variables):
 
 ```json
 { "name": "build-api", "template": "build" }
@@ -260,7 +260,7 @@ Use `{name}` placeholders in `cmd` or `workdir` to prompt for a value at runtime
 
 ### Selection lists
 
-Create lists via **Manage lists** from the main menu. Each list is stored as a `.tsv` file in `projects/<name>/lists/`:
+Create lists via **Edit project → Lists** from the main menu. Each list is stored as a `.tsv` file in `projects/<name>/lists/`:
 
 ```
 /home/user/api    api
@@ -303,8 +303,8 @@ Saved commands can fix a variadic slot the same way as any other — the stored 
 
 ### Writing a command directly
 
-**Manage commands → Create command → Write directly** (or `n` on the
-Overview) opens a form for name, cmd, workdir, group, and shell (leave
+**Edit project → Commands → Add → Write directly** (or `a` on the
+Commands tab) opens a form for name, cmd, workdir, group, and shell (leave
 empty for the platform default, or `ps` for PowerShell). The result is
 **appended to the project's TSV** — the form is a guided way to author a
 hand-editable row without remembering the column layout or placeholder
@@ -312,7 +312,8 @@ syntax.
 
 The keys mean one thing each: `Tab` / `Shift+Tab` move to the next and
 previous field, `Enter` moves on (and saves from the last field),
-`Ctrl+S` saves from anywhere, `Esc` steps back a field and then cancels.
+`Ctrl+S` saves the form. `Esc` closes an open picker or returns from editing;
+unsaved changes are protected by a leave confirmation.
 
 The form asks for the cmd first and the name second, because the name is
 the only part that takes thought. An empty name field shows the name the
@@ -356,13 +357,13 @@ deploy	deploy		deploy --env {env} --dir {$root}
 
 When the project moves — a new phase folder, another drive, someone else's machine — change `root` once and every command, saved value, and list entry that references it follows.
 
-### Manage vars
+### Editing variables and fixed values
 
-**Manage vars** in the TUI shows the whole table — globals first, then every saved command's fixed values — and edits it in place:
+**Edit project → Variables** edits shared globals. Saved command answers are edited through **Commands → Change values**:
 
 - **Globals**: create, change a value (with a "referenced by" preview), delete. Changing a value is not string replacement — everything written as `{$root}` follows automatically because it references the variable, so unrelated values that merely look similar can never be caught.
 - **Creating a global extracts literals**: if existing values match the new variable's value, baton offers to rewrite them into `{$name}` references on the spot (resolution unchanged). That is the intended way to make several values move together — two rows that merely hold the same string are never propagated into each other.
-- **Fixed values** (`command.slot` rows): edit the value directly — a shortcut past **Edit command → Change values** when you just want to fix a path or a typo. Deleting one **un-fixes the slot**: that placeholder is prompted at run time again. New rows are never created here; they appear when you save a template-derived command.
+- **Fixed values** (`command.slot` rows): use **Commands → Change values** to edit a saved answer. Deleting one **un-fixes the slot**: that placeholder is prompted at run time again. New rows are never created here; they appear when you save a template-derived command.
 - **Editing a fixed value whose old value other rows share** opens a "change matching values too?" offer — same prefix-anchored, checkbox-previewed mechanics as the rebase window, applied to the literals you check. Nothing is ever propagated silently; for values that should *always* move together, extract a global instead.
 
 Values that contain the old value as a **literal** (a hand-typed path in a saved value or a list entry) don't follow by themselves. After a change, baton scans for literals that *start with* the old value and offers to rewrite them into `{$name}` references:
@@ -382,13 +383,13 @@ Rules:
 - `{$name}` is substituted silently in previews and at run time; it never prompts. It is invisible to the interactive `{slot}` machinery — a plain `{root}` elsewhere is a normal slot and is never captured by a variable of the same name.
 - Undefined references stay literal and are reported as a startup warning.
 - Substitution is a single pass; values are never expanded recursively.
-- Edits are picked up on the next start or **Switch config**.
+- Edits are picked up on the next start or **Switch project**.
 
 ### Renames inside vars.tsv
 
 Unlike command renames, name changes inside `vars.tsv` are not auto-repaired — the columns of this file are the references themselves:
 
-- **Renaming a global** (`*` row): every `{$oldname}` reference stays literal, and the startup warning names each command and list still using it. Update the references yourself, or create the new name via **Manage vars** and let the rebase offer rewrite the values.
+- **Renaming a global** (`*` row): every `{$oldname}` reference stays literal, and the startup warning names each command and list still using it. Update the references yourself, or create the new name via **Edit project → Variables** and let the rebase offer rewrite the values.
 - **Changing the command column** of a fixed-value row detaches the value: that slot is prompted at run time again, the row is flagged as belonging to an unknown command, and the next TUI save removes it.
 - **Changing the name column** of a fixed-value row to something that isn't a slot of the template: the value stops applying, the slot is prompted at run time again, and the startup warning flags the row.
 
@@ -410,149 +411,90 @@ in CI, or as the verification loop when generating project files with an
 AI agent — the complete file spec, shared by hand-editors and agents,
 lives in [AGENTS.md](AGENTS.md).
 
-The main menu groups the entries and explains the highlighted one beside
-them. On a short terminal it drops the logo, then the group headings, and
-finally scrolls its own entries, so it stays usable in an editor panel:
+The main menu puts **Run workflow** and **Run commands** first. Use **Edit project** for definitions and **Switch project** to choose another project.
 
-```
-                                │
-  ┌─────────────┐               │
-  │  B A T O N  │               │
-  └─────────────┘               │
-  project: myproject            │ Overview
-                                │ ────────────────────────
-  ▶  Overview                   │ The project as a tree, and what points at what.
-                                │
-  RUN                           │ Keys
-      Run workflow              │   Enter    Open
-      Run commands              │   Esc      Back
-                                │
-  MANAGE                        │
-      Manage workflows          │
-      Manage commands           │
-      Manage lists              │
-      Manage vars               │
-                                │
-      Switch config             │
-      Exit                      │
-                                │
-  ──────────────────────────────────────────────────────────────────────────────────
-  ↑↓ Move  Enter Select  Esc Quit
+### Projects
+
+The project picker searches inline with `/`, highlighting matches without covering the results. `Enter` opens a project, `a` adds one, and `r` refreshes. `Space` or right-click opens actions; `o` opens the settings folder and `c` copies its path.
+
+`Del` / `x` asks to delete a project. This moves its baton settings into `.baton-trash` under the projects directory; command working directories are untouched. Restore an archived project by moving its folder back into the projects directory.
+
+### Project editor
+
+Open **Edit project** for the shared workspace:
+
+```text
+[1 Workflows] [2 Commands] | [3 Lists] [4 Variables]
+
+Left: items and search       Right: selected item / editor
+                            Below: preview and references
 ```
 
-### Overview
+Workflows reference commands in order. Commands reference shared lists through interactive slots and shared variables through `{$name}`. Fixed slot answers belong to a saved command; edit them through **Commands → Change values**. The Variables tab shows shared globals.
 
-**Overview** is a workspace in three parts: a tab picks what kind of
-thing is listed, the list on the left picks one, and the right side is
-where it is edited (above) and where what it will actually do is read
-back (below).
+Command rows use explicit types: **Direct**, **Template**, or **From: template-name**. Group is a label, not a tree level. Lists show their entries and references; while editing an entry, the detail pane describes that value.
 
-```
-  [1 Commands]  [2 Workflows]  [3 Lists]  [4 Variables]
+| Key / action | Effect |
+|---|---|
+| `1`–`4`, tab-label click | Switch category |
+| `↑↓` | Select an item |
+| `/` | Search the category |
+| `Enter` | Open or edit |
+| `a`, Add button | Add to the focused pane; `n` also creates a project item |
+| `Space`, right-click | Contextual actions |
+| `Del` / `x` in the item list | Request deletion |
+| `Ctrl+S` in an editor | Save changes |
+| `Esc`, Back | Return one level; unsaved changes prompt before leaving |
+| `F1` | Help, including while typing |
+| `?` in the item list | Help |
 
-╭─ Commands (5) ─────────────╮ ╭─ Command · build ─────────────────────────╮
-│ / search                   │ │ Cmd > make build                          │
-│   deploy  [deploy]  {...}  │ │ Name > build                              │
-│ ▶ build  [make]  $ make b..│ │ Workdir > {$root}\api                     │
-│   test  [make]  $ go test..│ │ Group > make                              │
-│   build-api  (build)       │ │ Shell > -                                 │
-│   hello  $ echo hello      │ ╰───────────────────────────────────────────╯
-│                            │ ╭─ Preview ─────────────────────────────────╮
-│                            │ │ workdir  C:\work\Phase1\api               │
-│                            │ │ $ make build                              │
-│                            │ │  ── used by ────────────────────────────  │
-│                            │ │  workflow "release" step 1                │
-│                            │ │  derived command "build-api"              │
-│                            │ │  ── defined in ─────────────────────────  │
-│                            │ │  commands.tsv  ·  editable here           │
-╰────────────────────────────╯ ╰───────────────────────────────────────────╯
-```
+**Commands.** Create directly or from a template. The form provides placeholder candidates and shell choices, with live preview and validation. The action menu links commands to referenced lists and variables. Clipboard operations are available from input context menus.
 
-Each tab holds one kind of thing, so a row in the list is always
-something you can act on — a `group` is a tag on the command's row, not
-a level of its own, and commands still sort together by group. The
-references between kinds are read in the preview rather than by seeing
-two lists at once: a command shows the workflow steps, derived commands
-and `vars.tsv` rows that name it; a list shows the commands whose
-placeholders draw on it; a variable shows what resolves through it. A
-workflow shows its steps above and what each will actually run below,
-with a step whose command is gone marked in place.
+**Workflows.** Open one to edit its steps. `a` inserts after the cursor, `J/K` reorder, and `x` removes the step reference. `Enter` opens its command. Removing a step does not delete that command. `Ctrl+S` saves the working copy; leaving with changes offers Save and leave, Discard changes, or Keep editing.
 
-`1`–`4` or `←` `→` switch tabs (a click on the label does too), `↑↓`
-move, `/` searches the open tab — the arrows still move through the
-matches, `Enter` keeps the filter, `Esc` clears it — and each tab keeps
-its own place, so coming back lands where you were. The selected row is
-a bar across the box; it dims while the editor beside it has the keys,
-and the box being driven has the bright edge. The column between the
-boxes can be dragged, or moved with `[` and `]`.
+**Lists and variables.** Add buttons remain available when empty. Lists can be edited in the right pane; `a` adds values without scrolling to the last row. Global variable edits show references.
 
-**Editing a workflow.** `Enter` on a workflow opens its steps in the box
-beside the list, as the ordered sequence it is: `J` / `K` move the step
-under the cursor down and up, `x` takes it out, `a` adds one — a picker
-of the commands, narrowed by typing, goes in after the cursor — and
-`Enter` opens the command a step names. Taking a step out and deleting
-the command it names are different things, and only the first happens
-here. The steps are a working copy until `Ctrl+S`; the preview below
-reads the copy, so a reorder shows the sequence it produces before it is
-saved, and `Esc` leaves the workflow as it was.
+On narrow terminals, the editor switches to list and detail screens with compact tabs. `Esc` returns from details. Confirmation dialogs retain the underlying screen.
 
-**What can be done to a row.** `Space` opens a menu of the actions for
-the thing under the cursor, each with its key — `e` edit, `d` duplicate,
-`r` rename, `x` delete for a command; edit steps, rename and delete for a
-workflow; edit and delete for a list or a variable. The arrows and
-`Enter` run one, and so does its key, with or without the menu: the menu
-is how the keys are learnt. Each action hands the row to the flow that
-already does that job, picked in advance — `x` is the confirmation and
-nothing before it — and a flow started here comes back here when it is
-done, where from the menu it would go back to the menu.
+### Run commands
 
-**Editing a command.** `Enter`, or a click on any field of the editor
-box, puts the caret in the form — the box shows the fields whether or
-not the caret is in them, so a click lands on the field it looks like
-it lands on. `n` starts a new command. The form asks for the `cmd` first
-and the name second, because the name is the only part that takes
-thought; an empty name field shows the one the cmd suggests, and `→`
-takes it. `Tab` and `Shift+Tab` move between fields, and `{` in the cmd
-or workdir opens the candidates for what can go there. As you type, the
-row appears in the list in gold, tagged with the group you give it, and
-the preview resolves what it will run. `Ctrl+S` saves, `Esc` backs out a
-field at a time and then cancels.
+Select commands on the left and review their execution order in **Run queue**. Selected rows have a check mark. Columns show Name, Group and Type; narrow panes omit Group. A separate Match column explains search hits in command text or fixed values when space permits.
 
-**What is unsaved, and what is wrong.** The editor box says `● unsaved`
-in its title once anything differs from what was opened, and marks each
-field that differs, so what `Ctrl+S` would change is readable before it
-is pressed. A field the form refuses — an empty name, one already in
-use, a shell that is not `ps` — says so directly under that field, and
-the message stays until the field is typed in. Leaving with changes
-unsaved, by `Esc` or by clicking away, asks what should happen to them:
-`s` saves and leaves, `d` discards, `k` keeps editing. Leaving with
-nothing changed asks nothing.
-
-A terminal too narrow or too short for the right side gets the list on
-its own, and `Enter` gives the form the whole screen instead; it comes
-back here when it closes. A tab with nothing in it says what that kind
-of thing is for and how to get one.
-
-### Selecting commands
+The queue shows order, name and command text, with long rows abbreviated and placeholders highlighted. The detail pane shows command information, working directory and shell. Wide screens share one detail pane; narrow screens switch between candidates and queue.
 
 | Key | Action |
-|-----|--------|
-| `↑` / `↓` | Move cursor |
-| `Tab` | Toggle selection |
-| `Enter` | Confirm — with nothing toggled, acts on the hovered row alone |
-| `Esc` | Clear the search if active, otherwise go back (with selections, a second press confirms discarding them) |
-| Type | Search — matches name, group, command body, and embedded values; space-separated terms are ANDed (e.g. `make auth`) |
-| `Ctrl+C` | Quit from anywhere, including mid-edit in a text field |
+|---|---|
+| Type | Filter by name, group, command body or values; terms are ANDed |
+| `↑↓` | Move within the focused list |
+| `Tab` in candidates | Select / deselect |
+| `F2` | Switch candidates / queue (`Ctrl+Q` also works) |
+| `J/K` or `Shift+↓/↑` in queue | Reorder |
+| `Del` / `x` in queue | Remove from this run, keeping the command definition |
+| `Enter` | Resolve inputs and proceed to execution review |
+| `Esc` in queue | Return to candidates |
+| `Esc` in candidates | Clear the filter first; otherwise leave, asking before discarding selections |
+| `F1` | Help |
 
-### Workflows
+With nothing selected, `Enter` in candidates uses the highlighted command. In an empty queue, `Enter` does nothing. The discard dialog defaults to **Keep selecting**. `Esc` cancels it and preserves the selection; choose **Discard and go back** and press `Enter` to leave. Execution starts only after the final run confirmation.
 
-Workflows are saved sequences of commands. Creating one is just picking commands and naming them (**Manage workflows → Create workflow**); remaining `{slots}` are prompted at run time, and fixed values belong to the saved commands the workflow contains.
+### Run workflow
 
-Run one from **Run workflow** — the list is searchable like the command selector: the workflow name, its step names, and the step command bodies all match. A name still the generated `step1+step2` one has its joiners picked out in gold, so the step names read as separate chunks; baton only does this after rebuilding the name from the workflow's own steps and finding it identical, so a name you typed is shown exactly as typed even when it contains a `+`.
+Create saved sequences in **Edit project → Workflows**. The Run workflow list searches workflow names, step names and command bodies. Wide screens show workflows and execution steps side by side.
 
-**Running part of a workflow.** `Enter` runs every step; `→` opens the step picker for the highlighted workflow, where `Tab` toggles individual steps and `Enter` runs the chosen ones. Selected steps always execute in the workflow's own order — the picker chooses *which* steps run, never the order — so a fixed sequence you deliberately advance a few steps at a time stays one workflow instead of a search each time. With nothing toggled, `Enter` runs just the highlighted step, and steps whose command no longer exists are shown but cannot be selected.
+| Key | Action |
+|---|---|
+| `↑↓` | Choose a workflow |
+| `Enter` in the workflow list | Resolve inputs and review all steps |
+| `→` | Choose steps for this run |
+| `F2` in the workflow list | Open step details |
+| `↑↓` in step selection | Inspect a step |
+| `Tab` in step selection | Select / deselect a runnable step |
+| `F2` in step selection | Switch step / detail focus; narrow screens switch views |
+| `Enter` in step selection | Review selected steps, or the highlighted step if none are selected |
+| `Esc` | Return one level; the workflow list clears an active filter before leaving |
 
-The management pick screens (Edit/Delete of commands, workflows, and lists) are searchable the same way — just start typing to filter; `Esc` clears the filter first, then goes back.
+Details show the command, working directory and shell. Missing commands remain visible but cannot be selected. Selections apply **only to this run** and retain saved workflow order. They do not change the saved workflow. Remaining slots are prompted before execution review; fixed answers come from the saved commands. `F1` shows help.
+
 
 ### Retry on failure
 
