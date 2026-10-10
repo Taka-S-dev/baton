@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/charmbracelet/bubbles/textinput"
 	"strings"
 	"unicode"
 
@@ -73,7 +74,7 @@ func (m *Model) updateCreateCommandKind(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			currentValues: make(map[string]string),
 		}
 	case "esc":
-		m.screen = ScreenManageCommands
+		m.gotoManageCommands()
 		m.listCursor = 0
 	}
 	return m, nil
@@ -84,31 +85,29 @@ func (m *Model) updateCreateCommandKind(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // openCommandForm opens the direct-input form. Pass editIdx -1 to create,
 // or the index of a concrete command in config.Commands to edit it.
 func (m *Model) openCommandForm(editIdx int) (tea.Model, tea.Cmd) {
-	cf := &commandFormState{mode: 0, editIdx: -1}
+	cf := &commandFormState{mode: 0, editIdx: -1, returnTo: ScreenManageCommands}
 	if editIdx >= 0 && editIdx < len(m.config.Commands) {
 		cmd := m.config.Commands[editIdx]
 		cf.mode = 1
 		cf.editIdx = editIdx
 		cf.fields = [5]string{cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell}
 	}
+	cf.original = cf.fields
 	m.cf = cf
 	m.screen = ScreenCommandForm
-	m.nameInput.Prompt = commandFormLabels[0] + " > "
-	m.nameInput.SetValue(cf.fields[0])
-	return m, m.nameInput.Focus()
+	return m, m.cfGotoField(formFieldAt(0))
 }
 
 // openCommandFormTSV opens the form on a TSV row (config.Base index).
 // Saving rewrites exactly that row via UpdateCommandTSV.
 func (m *Model) openCommandFormTSV(baseIdx int) (tea.Model, tea.Cmd) {
 	cmd := m.config.Base[baseIdx]
-	cf := &commandFormState{mode: 1, editIdx: baseIdx, tsvEdit: true, origName: cmd.Name}
+	cf := &commandFormState{mode: 1, editIdx: baseIdx, tsvEdit: true, origName: cmd.Name, returnTo: ScreenManageCommands}
 	cf.fields = [5]string{cmd.Name, cmd.Cmd, cmd.Dir, cmd.Group, cmd.Shell}
+	cf.original = cf.fields
 	m.cf = cf
 	m.screen = ScreenCommandForm
-	m.nameInput.Prompt = commandFormLabels[0] + " > "
-	m.nameInput.SetValue(cf.fields[0])
-	return m, m.nameInput.Focus()
+	return m, m.cfGotoField(formFieldAt(0))
 }
 
 // formNameTaken applies the duplicate-name check for the form, honoring
@@ -126,21 +125,23 @@ func (m *Model) formNameTaken(name string) bool {
 }
 
 func (m *Model) closeCommandForm() {
+	back := m.cf.returnTo
 	m.cf = nil
 	m.nameInput.Prompt = "Name > "
-	m.screen = ScreenManageCommands
-}
-
-// slotInsertAvailable reports whether the slot-insert panel applies to the
-// current form field (only cmd and workdir accept {slot} placeholders).
-func (cf *commandFormState) slotInsertAvailable(listCount int) bool {
-	return (cf.fieldIdx == 1 || cf.fieldIdx == 2) && listCount > 0
+	m.screen = back
 }
 
 // cfGotoField focuses the given form field, loading its stored text.
 func (m *Model) cfGotoField(idx int) tea.Cmd {
 	m.cf.fieldIdx = idx
-	m.cf.slotPickFocus = false
+	m.cf.pickOpen = false
+	m.resizeNameInput()
+	// An empty name field shows the name the cmd suggests, dimmed in
+	// place, and → takes it. Elsewhere the placeholder is nothing.
+	m.nameInput.Placeholder = ""
+	if idx == 0 && m.cf.mode == 0 && m.cf.fields[0] == "" {
+		m.nameInput.Placeholder = m.suggestFormName()
+	}
 	m.nameInput.Prompt = commandFormLabels[idx] + " > "
 	m.nameInput.SetValue(m.cf.fields[idx])
 	m.nameInput.CursorEnd()
@@ -153,21 +154,17 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 	cf := m.cf
 	name, cmdStr := cf.fields[0], cf.fields[1]
 	if name == "" {
-		m.errMsg = "name cannot be empty"
-		return m, m.cfGotoField(0)
+		return m, m.formError(0, "a name is needed")
 	}
 	if cmdStr == "" {
-		m.errMsg = "cmd cannot be empty"
-		return m, m.cfGotoField(1)
+		return m, m.formError(1, "a command line is needed")
 	}
 	shell := strings.ToLower(cf.fields[4])
 	if shell != "" && shell != "ps" {
-		m.errMsg = `shell must be empty or "ps"`
-		return m, m.cfGotoField(4)
+		return m, m.formError(4, `empty, or "ps" for PowerShell`)
 	}
 	if m.formNameTaken(name) {
-		m.errMsg = "name already in use: " + name
-		return m, m.cfGotoField(0)
+		return m, m.formError(0, "already in use: "+name)
 	}
 	if cf.tsvEdit {
 		newCmd := m.config.Base[cf.editIdx] // keeps Slots and Source
@@ -238,127 +235,202 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.cf == nil {
 		return m, nil
 	}
+	if m.leaveAsk != leaveNone {
+		return m, m.updateLeave(msg)
+	}
 	cf := m.cf
+	pos := formPos(cf.fieldIdx)
+	key := msg.String()
+	commit := func() { cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value()) }
 
-	// Placeholder picker window has key focus. Left pane inserts {name},
-	// right pane inserts the selected concrete value, both at the cursor
-	// position of the field being edited.
-	if cf.slotPickFocus {
-		names := m.sortedListNames()
-		var entries []mdl.ListEntry
-		if cf.slotPickCursor < len(names) {
-			entries = m.lists[names[cf.slotPickCursor]]
-		}
-		insertAtCursor := func(text string) {
-			v := []rune(m.nameInput.Value())
-			pos := m.nameInput.Position()
-			if pos > len(v) {
-				pos = len(v)
-			}
-			m.nameInput.SetValue(string(v[:pos]) + text + string(v[pos:]))
-			m.nameInput.SetCursor(pos + len([]rune(text)))
-			cf.slotPickFocus = false
-		}
-
-		switch msg.String() {
+	// The candidate popup takes the keys that pick from it. Typing keeps
+	// narrowing it, since what follows the brace is the filter; any key
+	// that is none of these closes it and is handled as if it were not
+	// there, so the popup never traps a keystroke meant for the form.
+	if cf.pickOpen {
+		cands := m.pickCandidates(cf.pickTyped(m.nameInput))
+		switch key {
 		case "up":
-			if cf.slotPickPane == 1 {
-				if cf.slotPickValueCursor > 0 {
-					cf.slotPickValueCursor--
-				}
-			} else if cf.slotPickCursor > 0 {
-				cf.slotPickCursor--
-				cf.slotPickValueCursor = 0
-			}
+			cf.pickCursor = max(0, cf.pickCursor-1)
+			return m, nil
 		case "down":
-			if cf.slotPickPane == 1 {
-				if cf.slotPickValueCursor < len(entries)-1 {
-					cf.slotPickValueCursor++
-				}
-			} else if cf.slotPickCursor < len(names)-1 {
-				cf.slotPickCursor++
-				cf.slotPickValueCursor = 0
-			}
-		case "right":
-			if cf.slotPickPane == 0 && len(entries) > 0 {
-				cf.slotPickPane = 1
-				cf.slotPickValueCursor = 0
-			}
-		case "left":
-			cf.slotPickPane = 0
+			cf.pickCursor = min(max(0, len(cands)-1), cf.pickCursor+1)
+			return m, nil
 		case "enter":
-			if cf.slotPickPane == 1 && cf.slotPickValueCursor < len(entries) {
-				insertAtCursor(entries[cf.slotPickValueCursor].Value)
-			} else if cf.slotPickPane == 0 && cf.slotPickCursor < len(names) {
-				insertAtCursor("{" + names[cf.slotPickCursor] + "}")
+			if cf.pickCursor < len(cands) {
+				m.insertPick(cands[cf.pickCursor].text)
 			}
-		case "tab", "esc":
-			cf.slotPickFocus = false
+			cf.pickOpen = false
+			return m, nil
+		case "esc":
+			cf.pickOpen = false
+			return m, nil
+		case "backspace":
+			ti, cmd := m.nameInput.Update(msg)
+			m.nameInput = ti
+			// Deleting the brace itself takes the popup with it.
+			if m.nameInput.Position() <= cf.pickFrom {
+				cf.pickOpen = false
+			}
+			cf.pickCursor = 0
+			return m, cmd
 		}
-		return m, nil
+		if msg.Type == tea.KeyRunes {
+			ti, cmd := m.nameInput.Update(msg)
+			m.nameInput = ti
+			// A closing brace typed by hand means the placeholder was
+			// finished without the popup.
+			if strings.ContainsRune(key, '}') {
+				cf.pickOpen = false
+			}
+			cf.pickCursor = 0
+			return m, cmd
+		}
+		cf.pickOpen = false
 	}
 
-	switch msg.String() {
-	case "tab":
-		if cf.slotInsertAvailable(len(m.lists)) {
-			cf.slotPickFocus = true
-			cf.slotPickCursor = 0
-			cf.slotPickPane = 0
-			cf.slotPickValueCursor = 0
+	switch key {
+	case "tab", "shift+tab":
+		// Tab is the next field and nothing else, on every field: a key
+		// that meant three things depending on where the caret was is
+		// what made the form hard to learn.
+		commit()
+		step := 1
+		if key == "shift+tab" {
+			step = -1
 		}
-		return m, nil
+		next := pos + step
+		if next < 0 || next >= len(formOrder) {
+			return m, nil
+		}
+		return m, m.cfGotoField(formFieldAt(next))
+	case "right":
+		// On an empty name field the suggestion is shown in place, and
+		// → takes it — the shell's idiom for accepting what is shown
+		// dimmed ahead of the caret.
+		if cf.fieldIdx == 0 && m.nameInput.Value() == "" && m.nameInput.Placeholder != "" {
+			m.nameInput.SetValue(m.nameInput.Placeholder)
+			m.nameInput.CursorEnd()
+			return m, nil
+		}
 	case "enter":
-		cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
+		commit()
 		// Validate the name as soon as the field is confirmed, so a
 		// duplicate surfaces immediately instead of after the last field.
 		if cf.fieldIdx == 0 {
 			name := cf.fields[0]
 			if name == "" {
-				m.errMsg = "name cannot be empty"
-				return m, m.cfGotoField(0)
+				return m, m.formError(0, "a name is needed")
 			}
 			if m.formNameTaken(name) {
-				m.errMsg = "name already in use: " + name
-				return m, m.cfGotoField(0)
+				return m, m.formError(0, "already in use: "+name)
 			}
 		}
-		if cf.fieldIdx < len(cf.fields)-1 {
-			return m, m.cfGotoField(cf.fieldIdx + 1)
+		if pos < len(formOrder)-1 {
+			return m, m.cfGotoField(formFieldAt(pos + 1))
 		}
 		return m.saveCommandForm()
 	case "ctrl+s":
 		// Save from any field — no need to walk the rest of the form.
-		cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
+		commit()
 		return m.saveCommandForm()
 	case "up":
-		if cf.fieldIdx > 0 {
-			cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
-			return m, m.cfGotoField(cf.fieldIdx - 1)
+		if pos > 0 {
+			commit()
+			return m, m.cfGotoField(formFieldAt(pos - 1))
 		}
+		return m, nil
 	case "down":
-		if cf.fieldIdx < len(cf.fields)-1 {
-			cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
-			return m, m.cfGotoField(cf.fieldIdx + 1)
+		if pos < len(formOrder)-1 {
+			commit()
+			return m, m.cfGotoField(formFieldAt(pos + 1))
 		}
+		return m, nil
 	case "esc":
-		if cf.fieldIdx > 0 {
-			cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
-			return m, m.cfGotoField(cf.fieldIdx - 1)
+		if pos > 0 {
+			commit()
+			return m, m.cfGotoField(formFieldAt(pos - 1))
+		}
+		if m.askToLeave(leaveForm) {
+			return m, nil
 		}
 		m.closeCommandForm()
 		m.listCursor = 0
-	default:
-		ti, cmd := m.nameInput.Update(msg)
-		m.nameInput = ti
-		return m, cmd
+		return m, nil
 	}
-	return m, nil
+
+	ti, cmd := m.nameInput.Update(msg)
+	m.nameInput = ti
+	// Typing in the field the error is about is taken as dealing with it.
+	if cf.fieldErr != "" && cf.errField == cf.fieldIdx {
+		cf.fieldErr = ""
+	}
+	// A brace typed into the cmd or workdir opens the candidates for
+	// what can go there, the way an editor's completion opens on the
+	// character that starts a name.
+	if key == "{" && (cf.fieldIdx == 1 || cf.fieldIdx == 2) && len(m.pickCandidates("")) > 0 {
+		cf.pickOpen = true
+		cf.pickCursor = 0
+		cf.pickFrom = m.nameInput.Position() - 1
+	}
+	return m, cmd
 }
 
-// ── Edit: pick which command to edit ──────────────────────────────────────────
+// pickCandidate is one thing that can be put where a brace was typed.
+type pickCandidate struct {
+	text string // what is inserted: {env}, {env...} or {$root}
+	what string // what it means, beside it
+}
 
-// editableCommands lists the commands the TUI can edit or delete —
-// TSV rows and local template-derived commands — in display order.
+// pickCandidates lists what a brace can become, narrowed by what has
+// been typed after it: every list as a {slot} and as a variadic
+// {slot...}, then every global as a {$var}, each with what choosing it
+// would mean. The description is the point — a newcomer who has not
+// met a slot or a variable is choosing between two things the braces
+// alone do not tell apart.
+func (m Model) pickCandidates(typed string) []pickCandidate {
+	var out []pickCandidate
+	add := func(text, what string) {
+		if typed == "" || strings.Contains(strings.ToLower(text), strings.ToLower("{"+typed)) {
+			out = append(out, pickCandidate{text, what})
+		}
+	}
+	for _, name := range m.sortedListNames() {
+		n := len(m.lists[name])
+		add("{"+name+"}", fmt.Sprintf("pick at run time · %s", countLabel(n, "choice")))
+		add("{"+name+"...}", "pick several at run time")
+	}
+	for _, k := range sortedKeys(m.vars) {
+		if !strings.Contains(k, ".") {
+			add("{$"+k+"}", "fixed · "+m.vars[k])
+		}
+	}
+	return out
+}
+
+// pickTyped is what has been typed after the brace that opened the
+// popup, up to the caret — the filter the candidates are narrowed by.
+func (cf *commandFormState) pickTyped(ti textinput.Model) string {
+	v := []rune(ti.Value())
+	from, to := cf.pickFrom+1, ti.Position()
+	if from < 0 || from > len(v) || to < from || to > len(v) {
+		return ""
+	}
+	return string(v[from:to])
+}
+
+// insertPick replaces the brace and what was typed after it with the
+// chosen placeholder, and leaves the caret after it.
+func (m *Model) insertPick(text string) {
+	v := []rune(m.nameInput.Value())
+	from, to := m.cf.pickFrom, m.nameInput.Position()
+	if from < 0 || from > len(v) || to < from || to > len(v) {
+		return
+	}
+	m.nameInput.SetValue(string(v[:from]) + text + string(v[to:]))
+	m.nameInput.SetCursor(from + len([]rune(text)))
+}
+
 func (m *Model) editableCommands() ([]string, []editRef) {
 	var names []string
 	var refs []editRef
@@ -442,7 +514,7 @@ func (m *Model) updateEditCommandPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.clearPickFilter()
 			break
 		}
-		m.screen = ScreenManageCommands
+		m.gotoManageCommands()
 		m.listCursor = 1
 	default:
 		m.handlePickTyping(msg, nil)
@@ -571,7 +643,7 @@ func (m Model) renameCommand(name string) (tea.Model, tea.Cmd) {
 	sce := m.sce
 	if sce == nil || sce.editIdx < 0 || sce.editIdx >= len(m.config.Commands) {
 		m.sce = nil
-		m.screen = ScreenManageCommands
+		m.gotoManageCommands()
 		m.listCursor = 1
 		return m, nil
 	}
@@ -592,7 +664,7 @@ func (m Model) renameCommand(name string) (tea.Model, tea.Cmd) {
 		m.successMsg = "renamed command to \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 	}
 	m.sce = nil
-	m.screen = ScreenManageCommands
+	m.gotoManageCommands()
 	m.listCursor = 1
 	return m, nil
 }
@@ -662,7 +734,7 @@ func (m *Model) updateCreateCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.successMsg = "created command \"" + name + "\""
 		}
-		m.screen = ScreenManageCommands
+		m.gotoManageCommands()
 		m.listCursor = 0
 		m.sce = nil
 	case "esc":
@@ -747,7 +819,7 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.successMsg = "updated command \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 		}
-		m.screen = ScreenManageCommands
+		m.gotoManageCommands()
 		m.listCursor = 1
 		m.sce = nil
 	case "esc":
@@ -765,7 +837,7 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) updateDeleteCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.updateDeleteList(msg, len(m.listItems), nil,
 		func() {
-			m.screen = ScreenManageCommands
+			m.gotoManageCommands()
 			m.listCursor = 2
 		},
 		func(indices []int) {
@@ -1075,4 +1147,112 @@ func (m *Model) backToCommandTemplatePick() (tea.Model, tea.Cmd) {
 		m.screen = ScreenCreateCommandTemplate
 	}
 	return m, nil
+}
+
+// formOrder is the order the form asks for its fields, which is not the
+// order they are stored in: the TSV keeps the name first because that is
+// the column order, but the form asks for the cmd first. The name is the
+// only part of a command that takes thought, and making it the first
+// gate — rejected on the spot when it collides — is what made
+// registering one feel expensive.
+var formOrder = [5]int{1, 0, 2, 3, 4}
+
+// formPos is where a stored field sits in the order it is asked.
+func formPos(idx int) int {
+	for p, f := range formOrder {
+		if f == idx {
+			return p
+		}
+	}
+	return 0
+}
+
+// formFieldAt is the stored field asked at position p.
+func formFieldAt(p int) int { return formOrder[min(max(p, 0), len(formOrder)-1)] }
+
+// suggestNameFromCmd derives a name from what the command actually runs,
+// so the field can be filled with Tab instead of invented. It keeps the
+// first couple of words that are neither a flag nor a placeholder, and
+// reduces a path to its last segment — `go test ./internal/{pkg}/`
+// becomes `go-test`.
+func suggestNameFromCmd(cmd string) string {
+	var parts []string
+	for _, tok := range strings.Fields(cmd) {
+		if strings.HasPrefix(tok, "-") || strings.Contains(tok, "{") {
+			continue
+		}
+		tok = strings.Trim(tok, `"'`)
+		if i := strings.LastIndexAny(tok, `/\`); i >= 0 {
+			tok = tok[i+1:]
+		}
+		var clean strings.Builder
+		for _, r := range strings.ToLower(tok) {
+			switch {
+			case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+				clean.WriteRune(r)
+			case r == '-' || r == '_' || r == '.':
+				clean.WriteRune('-')
+			}
+		}
+		if p := strings.Trim(clean.String(), "-"); p != "" {
+			parts = append(parts, p)
+		}
+		if len(parts) == 2 {
+			break
+		}
+	}
+	return strings.Join(parts, "-")
+}
+
+// suggestFormName is suggestNameFromCmd with a numeric suffix when the
+// obvious name is already taken, the same way saved commands avoid
+// colliding.
+func (m *Model) suggestFormName() string {
+	base := suggestNameFromCmd(m.cf.fields[1])
+	if base == "" || !m.formNameTaken(base) {
+		return base
+	}
+	for i := 2; i < 100; i++ {
+		candidate := fmt.Sprintf("%s-%d", base, i)
+		if !m.formNameTaken(candidate) {
+			return candidate
+		}
+	}
+	return base
+}
+
+// resizeNameInput sets how wide the text field may draw, which depends
+// on where the form is: beside the tree it has the pane, on a screen of
+// its own it has the terminal.
+//
+// It has to be set before the value is. The textinput works out which
+// part of a value too long to fit it should show when the value or the
+// cursor moves, not when it draws, so a width handed to it at draw time
+// arrives after the decision it should have informed — which is how a
+// workdir came to be shown with its drive letter cut off the left.
+func (m *Model) resizeNameInput() {
+	w := m.viewWidth()
+	if m.screen == ScreenExplore {
+		if l := m.exploreLayout(w); !l.single {
+			w = l.rightW - 2 // inside the editor box's edges
+		}
+	}
+	m.nameInput.Width = max(12, w-14)
+}
+
+// gotoManageCommands opens the Manage commands submenu — or, for a flow
+// launched from the overview, goes back to the overview instead.
+func (m *Model) gotoManageCommands() {
+	if m.returnFromFlow() {
+		return
+	}
+	m.screen = ScreenManageCommands
+}
+
+// formError puts a validation failure under the field it is about and
+// moves the caret there. It stays until that field is typed in, where
+// the banner would have vanished on the next key.
+func (m *Model) formError(field int, msg string) tea.Cmd {
+	m.cf.fieldErr, m.cf.errField = msg, field
+	return m.cfGotoField(field)
 }

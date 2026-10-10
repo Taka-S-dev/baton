@@ -20,6 +20,9 @@ var varNamePattern = regexp.MustCompile(`^\w+$`)
 
 // gotoVarsMgmt opens the Manage vars submenu.
 func (m *Model) gotoVarsMgmt() {
+	if m.returnFromFlow() {
+		return
+	}
 	m.screen = ScreenManageVars
 	m.listItems = []string{"Create variable (global)", "Edit variable", "Delete variable"}
 	m.listCursor = 0

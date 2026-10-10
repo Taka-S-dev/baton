@@ -24,6 +24,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = ws.Width
 		m.height = ws.Height
 		m.updateStepsViewport()
+		// A field already holding a value has to be told the new width
+		// before it is asked to draw, and then re-shown the value so it
+		// works out what fits all over again.
+		if m.cf != nil {
+			m.resizeNameInput()
+			pos := m.nameInput.Position()
+			m.nameInput.SetValue(m.nameInput.Value())
+			m.nameInput.SetCursor(pos)
+		}
 		return m, nil
 	}
 
@@ -69,6 +78,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		// Only the overview is pointable so far: it is the screen built
+		// to be looked over rather than walked through, which is what
+		// makes a pointer worth having.
+		if m.screen == ScreenExplore {
+			return m.updateExploreMouse(msg)
+		}
+		return m, nil
 	case runReadyMsg:
 		if m.running != nil {
 			m.running.starting = false
@@ -167,6 +184,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSwitchConfig(msg)
 		case ScreenRenameRepair:
 			return m.updateRenameRepair(msg)
+		case ScreenExplore:
+			// The overview edits in its own pane, so while a form is
+			// open the keys belong to it, not to the tree behind it.
+			if m.cf != nil {
+				return m.updateCommandForm(msg)
+			}
+			if m.wfe != nil {
+				return m.updateWorkflowEditor(msg)
+			}
+			return m.updateExplore(msg)
 		}
 	}
 	return m, nil

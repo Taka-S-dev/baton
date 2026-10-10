@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/slot"
@@ -132,6 +131,8 @@ func (m Model) renderScreen(w int) string {
 		view = m.viewDeleteList("Delete commands", m.listItems, w)
 	case ScreenRenameRepair:
 		view = m.viewRenameRepair(w)
+	case ScreenExplore:
+		view = m.viewExplore(w)
 	}
 	return view
 }
@@ -205,6 +206,7 @@ type menuGroup struct {
 }
 
 var mainMenuGroups = []menuGroup{
+	{"", []string{"Overview"}},
 	{"Run", []string{"Run workflow", "Run commands"}},
 	{"Manage", []string{"Manage workflows", "Manage commands", "Manage lists", "Manage vars"}},
 	{"", []string{"Switch config", "Exit"}},
@@ -219,6 +221,7 @@ func mainMenuItems() []string {
 }
 
 var menuItemInfos = map[string]menuItemInfo{
+	"Overview":         {desc: "The project as a tree, and what points at what.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Run workflow":     {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
 	"Run commands":     {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
 	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
@@ -1111,7 +1114,7 @@ func (m Model) roomForLogo() bool { return m.termHeight() >= 20 }
 // of the four the list had to itself. The line is always written, empty
 // or not, so the frame keeps one height as the window scrolls.
 func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string, render func(i int) string) {
-	viewStart := max(0, min(cursor-viewH/2, n-viewH))
+	viewStart := windowStart(viewH, n, cursor)
 	viewEnd := min(viewStart+viewH, n)
 	rows := 0
 	if n == 0 && emptyMsg != "" {
@@ -1137,6 +1140,13 @@ func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string
 	} else {
 		b.WriteString("\n")
 	}
+}
+
+// windowStart is the index of the first row a cursor-following window
+// shows. It is shared with the click handling, which has to work out
+// which row the pointer landed on from the same arithmetic.
+func windowStart(viewH, n, cursor int) int {
+	return max(0, min(cursor-viewH/2, n-viewH))
 }
 
 // truncate shortens s to at most maxLen display runes, marking the cut
@@ -1973,23 +1983,29 @@ func (m Model) viewCommandForm(w int) string {
 	if cf.mode == 1 {
 		title = "Edit command"
 	}
+	if m.formDirty() {
+		title += "  ● unsaved"
+	}
 	var b strings.Builder
 	b.WriteString("\n" + header(title, w) + "\n\n")
-	for i, label := range commandFormLabels {
-		if i == cf.fieldIdx {
-			b.WriteString("  " + m.nameInput.View() + "\n")
-		} else if cf.fields[i] != "" {
-			b.WriteString("  " + gray(label+" > ") + cf.fields[i] + "\n")
-		} else {
-			b.WriteString("  " + gray(label+" > ") + "\n")
-		}
-	}
+	// The same rows the box beside the list draws, with the same marks
+	// on changed fields and the same error under the field it is about.
+	m.writeCommandFields(&b, cf.fields, cf.fieldIdx, w-4)
 
-	// Placeholder picker: opens as a centered floating window (Tab).
-	if cf.slotPickFocus {
-		return m.viewPlaceholderWindow(w)
+	if m.leaveAsk != leaveNone {
+		b.WriteString("\n")
+		m.writeLeaveAsk(&b)
+		b.WriteString("\n" + hline(w) + "\n")
+		b.WriteString("  " + gray("↑↓ Choose  Enter Answer  s / d / k") + "\n")
+		return b.String()
 	}
-	if lines := m.slotValidationLines(cf); len(lines) > 0 {
+	if cf.pickOpen {
+		// What is left under the fields once the rule and the key line
+		// below, the blank around the candidates and the count line are
+		// paid for — so the popup never pushes the frame past the bottom.
+		rows := m.termHeight() - strings.Count(b.String(), "\n") - 6
+		m.writePickCandidates(&b, cf, w-4, rows)
+	} else if lines := m.slotValidationLines(cf); len(lines) > 0 {
 		b.WriteString("\n")
 		for _, l := range lines {
 			b.WriteString("  " + l + "\n")
@@ -1997,160 +2013,9 @@ func (m Model) viewCommandForm(w int) string {
 	}
 
 	b.WriteString("\n" + hline(w) + "\n")
-	guide := "↑↓: field   Enter: next / save   Ctrl+S: save   Esc: previous / cancel"
-	if cf.slotInsertAvailable(len(m.lists)) {
-		guide = "Tab: insert placeholder   " + guide
-	}
+	guide := m.formKeys()
 	b.WriteString("  " + gray(guide) + "\n")
 	return b.String()
-}
-
-// viewPlaceholderWindow renders the placeholder picker as a centered
-// floating window (LazyVim style) while it has key focus: list names in
-// the left pane, the selected list's entries in the right pane. The field
-// being edited is echoed at the top so the insertion context stays visible.
-func (m Model) viewPlaceholderWindow(w int) string {
-	cf := m.cf
-	names := m.sortedListNames()
-
-	// Left pane: list names with cursor (dimmed while the right pane is focused).
-	var left strings.Builder
-	for i, name := range names {
-		if i == cf.slotPickCursor {
-			if cf.slotPickPane == 0 {
-				left.WriteString(accentBold("▶ ") + white("{"+name+"}") + "\n")
-			} else {
-				left.WriteString(gray("▶ ") + white("{"+name+"}") + "\n")
-			}
-		} else {
-			left.WriteString("  " + gray("{"+name+"}") + "\n")
-		}
-	}
-
-	// Right pane: entries of the selected list (value + label). The pane
-	// takes focus with → and inserts the selected value directly.
-	//
-	// The pane width is fixed to the widest entry across ALL lists (clamped
-	// to the terminal width) so the window frame keeps the same size while
-	// the cursor moves between lists; values that don't fit are truncated
-	// with an ellipsis instead of stretching the frame.
-	leftW := 0
-	for _, name := range names {
-		if lw := 2 + lipgloss.Width("{"+name+"}"); lw > leftW {
-			leftW = lw
-		}
-	}
-	rightW := 9 // room for "(empty)" and the scroll markers
-	for _, name := range names {
-		for _, e := range m.lists[name] {
-			lw := 2 + lipgloss.Width(e.Value)
-			if e.Label != "" {
-				lw += 2 + lipgloss.Width(e.Label)
-			}
-			if lw > rightW {
-				rightW = lw
-			}
-		}
-	}
-	// Chrome around the right pane's content: window border+padding (6),
-	// left pane + its gap (leftW+2), divider + right pane padding (3).
-	if maxRight := w - leftW - 11; maxRight >= 8 && rightW > maxRight {
-		rightW = maxRight
-	}
-
-	const maxRows = 8
-	var right strings.Builder
-	if cf.slotPickCursor < len(names) {
-		entries := m.lists[names[cf.slotPickCursor]]
-		if len(entries) == 0 {
-			right.WriteString(dim("(empty)") + "\n")
-		}
-		start := 0
-		if cf.slotPickPane == 1 && cf.slotPickValueCursor >= maxRows {
-			start = cf.slotPickValueCursor - maxRows + 1
-		}
-		if start > 0 {
-			right.WriteString(dim(fmt.Sprintf("…%d above", start)) + "\n")
-		}
-		for i := start; i < len(entries); i++ {
-			if i >= start+maxRows {
-				right.WriteString(dim(fmt.Sprintf("…+%d more", len(entries)-i)) + "\n")
-				break
-			}
-			e := entries[i]
-			avail := rightW - 2 // cursor prefix
-			val := ansi.Truncate(e.Value, avail, "…")
-			line := val
-			if e.Label != "" {
-				if rem := avail - lipgloss.Width(val) - 2; rem > 0 {
-					line += "  " + gray(ansi.Truncate(e.Label, rem, "…"))
-				}
-			}
-			if cf.slotPickPane == 1 && i == cf.slotPickValueCursor {
-				right.WriteString(accentBold("▶ ") + line + "\n")
-			} else {
-				right.WriteString("  " + line + "\n")
-			}
-		}
-	}
-	rightPane := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(lipgloss.Color("240")).
-		PaddingLeft(2).
-		Width(rightW + 2).
-		Render(strings.TrimRight(right.String(), "\n"))
-
-	panes := lipgloss.JoinHorizontal(lipgloss.Top,
-		lipgloss.NewStyle().PaddingRight(2).Render(strings.TrimRight(left.String(), "\n")),
-		rightPane)
-
-	help := "↑↓ move   →: values   Enter: insert {placeholder}   Esc: close"
-	if cf.slotPickPane == 1 {
-		help = "↑↓ move   ←: lists   Enter: insert value   Esc: close"
-	}
-
-	// Full-text footer: list rows are truncated to keep the frame stable,
-	// so while the value pane is focused the selected entry is echoed in
-	// full above the help line, wrapped to the window's existing width.
-	footer := ""
-	if cf.slotPickPane == 1 && cf.slotPickCursor < len(names) {
-		if entries := m.lists[names[cf.slotPickCursor]]; cf.slotPickValueCursor < len(entries) {
-			e := entries[cf.slotPickValueCursor]
-			need := 2 + lipgloss.Width(e.Value)
-			if e.Label != "" {
-				need += 2 + lipgloss.Width(e.Label)
-			}
-			if need > rightW {
-				full := e.Value
-				if e.Label != "" {
-					full += "  " + e.Label
-				}
-				innerW := lipgloss.Width(panes)
-				if hw := lipgloss.Width(help); hw > innerW {
-					innerW = hw
-				}
-				footer = dim(lipgloss.NewStyle().Width(innerW).Render(full)) + "\n\n"
-			}
-		}
-	}
-
-	content := accentBold(" Insert placeholder / value ") + "\n\n" +
-		m.nameInput.View() + "\n\n" +
-		panes + "\n\n" +
-		footer +
-		gray(help)
-
-	win := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("36")).
-		Padding(0, 2).
-		Render(content)
-
-	h := m.height
-	if h == 0 {
-		h = 24
-	}
-	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, win)
 }
 
 // slotValidationLines checks every {slot} in the cmd/workdir fields against

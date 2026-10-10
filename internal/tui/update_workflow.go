@@ -82,6 +82,9 @@ func (m Model) suggestWorkflowNameFor(cmds []string, excludeIdx int) string {
 
 // gotoWorkflowMgmt opens the Manage workflows submenu.
 func (m *Model) gotoWorkflowMgmt() {
+	if m.returnFromFlow() {
+		return
+	}
 	m.screen = ScreenWorkflowMgmt
 	m.listItems = []string{"Create workflow", "Edit workflow", "Delete workflow"}
 	m.listCursor = 0

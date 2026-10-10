@@ -60,6 +60,7 @@ const (
 	ScreenDeleteCommand
 	ScreenRenameRepair
 	ScreenRunWorkflowSteps
+	ScreenExplore
 )
 
 type nameInputMode int
@@ -346,13 +347,27 @@ type commandFormState struct {
 	origName string
 	fieldIdx int
 	fields   [5]string // name, cmd, workdir, group, shell
+	original [5]string // the fields as opened; what "unsaved" is measured against
 
-	// Placeholder picker window: left pane picks a list name to insert
-	// {name}; the right pane picks a concrete value to insert directly.
-	slotPickFocus       bool
-	slotPickCursor      int
-	slotPickPane        int // 0=list names, 1=values
-	slotPickValueCursor int
+	// A validation failure is shown under the field it is about and
+	// stays until that field is typed in, instead of flashing in the
+	// banner and vanishing on the next key.
+	fieldErr string
+	errField int
+
+	// Where closing the form lands. The form is reached from the manage
+	// menu and from the overview, and the overview edits in place — going
+	// back to a menu from there would undo the point of editing without
+	// leaving the project in view.
+	returnTo Screen
+
+	// The candidate popup that opens when { is typed in the cmd or
+	// workdir field: what can go there, filtered by what is typed after
+	// the brace. The brace stays in the text; choosing a candidate
+	// replaces it and what followed it with the full placeholder.
+	pickOpen   bool
+	pickCursor int
+	pickFrom   int // rune index of the { that opened it
 }
 
 var commandFormLabels = [5]string{"Name", "Cmd", "Workdir (optional)", "Group (optional)", shellFormLabel()}
@@ -464,6 +479,38 @@ type Model struct {
 	renames   []config.Rename
 	renameBtn int // 0=No, 1=Yes
 	snapOld   map[string]string
+
+	// Overview: which tab is open, where the cursor sits on each tab —
+	// kept per tab, so switching away and back lands where you were —
+	// and the search typed over the list.
+	exploreTab       int
+	exploreCursor    [tabCount]int
+	exploreSearch    string
+	exploreSearching bool
+
+	// The action menu Space opens over the row under the cursor, and
+	// the flag a flow launched from here carries so that, where it
+	// would go back to its own menu, it comes back here instead.
+	exploreMenu       bool
+	exploreMenuCursor int
+	exploreLaunched   bool
+
+	// The workflow being edited in the box beside the list, as a working
+	// copy of its steps; nil when none is.
+	wfe *workflowEditState
+
+	// The question asked on leaving the form or the workflow editor
+	// with unsaved changes: which of the two is being left, and which
+	// answer the cursor is on.
+	leaveAsk    int
+	leaveCursor int
+
+	// Where the two panes meet, in columns from the left. Zero means
+	// the proportion the screen opens with; dragging the divider or the
+	// resize keys set it, and a resize of the terminal clamps it back
+	// inside the new width.
+	exploreSplit    int
+	exploreDragging bool
 
 	editTargetIdx  int
 	mainMenuCursor int
@@ -612,12 +659,16 @@ func (m *Model) saveConfig() error {
 
 // gotoManageLists opens the Manage lists submenu.
 func (m *Model) gotoManageLists() {
+	if m.returnFromFlow() {
+		return
+	}
 	m.screen = ScreenManageLists
 	m.listItems = []string{"Create list", "Edit list", "Delete list"}
 	m.listCursor = 0
 }
 
 func (m *Model) gotoMainMenu() {
+	m.exploreLaunched = false
 	m.screen = ScreenMainMenu
 	m.listItems = mainMenuItems()
 	// Re-diagnose so the warnings describe the current state — TUI

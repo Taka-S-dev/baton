@@ -301,20 +301,38 @@ Saved commands can fix a variadic slot the same way as any other — the stored 
 - Placeholders can be **skipped** when creating a template-derived command — skipped ones are prompted at run time instead
 - **Repeated questions carry their answer forward.** When several commands in one run share a placeholder — `clean` and `build` both asking for the same directory — the later picker opens on the earlier answer and says where it came from (`same as clean — Enter keeps it`), so repeating it costs one keypress. The answer is never applied on your behalf: picking a different value works exactly as before, so a workflow that deploys to staging and then to production still asks twice. Two placeholders count as the same question only when both the name and the list behind them match, so a `{target}` mapped to different lists in the `slots` column is always asked separately.
 
-### Placeholder picker
+### Writing a command directly
 
-When writing a command directly (**Manage commands → Create command → Write directly**), the form asks for name, cmd, workdir, group, and shell (leave empty for the platform default, or `ps` for PowerShell). The result is **appended to the project's TSV** — the form is a guided way to author a hand-editable row without remembering the column layout or placeholder syntax. Press `Tab` in the cmd / workdir field to open a two-pane picker window:
+**Manage commands → Create command → Write directly** (or `n` on the
+Overview) opens a form for name, cmd, workdir, group, and shell (leave
+empty for the platform default, or `ps` for PowerShell). The result is
+**appended to the project's TSV** — the form is a guided way to author a
+hand-editable row without remembering the column layout or placeholder
+syntax.
 
-- the **left pane** lists the selection lists — `Enter` inserts a `{placeholder}` at the cursor
-- the **right pane** (focus with `→`) shows the selected list's entries — `Enter` inserts the concrete value instead
+The keys mean one thing each: `Tab` / `Shift+Tab` move to the next and
+previous field, `Enter` moves on (and saves from the last field),
+`Ctrl+S` saves from anywhere, `Esc` steps back a field and then cancels.
 
-Hand-typed `{slots}` are validated as you type: `✓` when a matching list exists, `⚠` when the value will fall back to free input at run time.
+The form asks for the cmd first and the name second, because the name is
+the only part that takes thought. An empty name field shows the name the
+cmd suggests, dimmed in place (`go test ./internal/{pkg}/` suggests
+`go-test`); `→` takes it.
 
-#### Navigation during placeholder selection
+Typing `{` in the cmd or workdir field opens the candidates for what can
+go there, each with what choosing it means:
 
-- Type to filter the list
-- `Esc` — clear the filter if active, otherwise go back
-- `Enter` — confirm selection
+```
+  Cmd > go test ./{
+  ▶ {pkg}        pick at run time · 5 choices
+    {pkg...}     pick several at run time
+    {$root}      fixed · C:\work\Phase1
+```
+
+What you type after the brace narrows them; `↑↓` choose, `Enter` inserts
+the placeholder in place of the brace, `Esc` leaves what you typed as it
+is. Hand-typed `{slots}` are validated as you go: `✓` when a matching
+list exists, `⚠` when the value will fall back to free input at run time.
 
 ## Project Variables
 
@@ -397,16 +415,19 @@ them. On a short terminal it drops the logo, then the group headings, and
 finally scrolls its own entries, so it stays usable in an editor panel:
 
 ```
+                                │
   ┌─────────────┐               │
   │  B A T O N  │               │
   └─────────────┘               │
-  project: myproject            │ Run workflow
+  project: myproject            │ Overview
                                 │ ────────────────────────
-  RUN                           │ Run a saved workflow.
-  ▶   Run workflow              │
-      Run commands              │ Keys
-                                │   Enter    Run
-  MANAGE                        │   Esc      Back
+  ▶  Overview                   │ The project as a tree, and what points at what.
+                                │
+  RUN                           │ Keys
+      Run workflow              │   Enter    Open
+      Run commands              │   Esc      Back
+                                │
+  MANAGE                        │
       Manage workflows          │
       Manage commands           │
       Manage lists              │
@@ -415,9 +436,102 @@ finally scrolls its own entries, so it stays usable in an editor panel:
       Switch config             │
       Exit                      │
                                 │
-  ────────────────────────────────────────────────────────────────────────
+  ──────────────────────────────────────────────────────────────────────────────────
   ↑↓ Move  Enter Select  Esc Quit
 ```
+
+### Overview
+
+**Overview** is a workspace in three parts: a tab picks what kind of
+thing is listed, the list on the left picks one, and the right side is
+where it is edited (above) and where what it will actually do is read
+back (below).
+
+```
+  [1 Commands]  [2 Workflows]  [3 Lists]  [4 Variables]
+
+╭─ Commands (5) ─────────────╮ ╭─ Command · build ─────────────────────────╮
+│ / search                   │ │ Cmd > make build                          │
+│   deploy  [deploy]  {...}  │ │ Name > build                              │
+│ ▶ build  [make]  $ make b..│ │ Workdir > {$root}\api                     │
+│   test  [make]  $ go test..│ │ Group > make                              │
+│   build-api  (build)       │ │ Shell > -                                 │
+│   hello  $ echo hello      │ ╰───────────────────────────────────────────╯
+│                            │ ╭─ Preview ─────────────────────────────────╮
+│                            │ │ workdir  C:\work\Phase1\api               │
+│                            │ │ $ make build                              │
+│                            │ │  ── used by ────────────────────────────  │
+│                            │ │  workflow "release" step 1                │
+│                            │ │  derived command "build-api"              │
+│                            │ │  ── defined in ─────────────────────────  │
+│                            │ │  commands.tsv  ·  editable here           │
+╰────────────────────────────╯ ╰───────────────────────────────────────────╯
+```
+
+Each tab holds one kind of thing, so a row in the list is always
+something you can act on — a `group` is a tag on the command's row, not
+a level of its own, and commands still sort together by group. The
+references between kinds are read in the preview rather than by seeing
+two lists at once: a command shows the workflow steps, derived commands
+and `vars.tsv` rows that name it; a list shows the commands whose
+placeholders draw on it; a variable shows what resolves through it. A
+workflow shows its steps above and what each will actually run below,
+with a step whose command is gone marked in place.
+
+`1`–`4` or `←` `→` switch tabs (a click on the label does too), `↑↓`
+move, `/` searches the open tab — the arrows still move through the
+matches, `Enter` keeps the filter, `Esc` clears it — and each tab keeps
+its own place, so coming back lands where you were. The selected row is
+a bar across the box; it dims while the editor beside it has the keys,
+and the box being driven has the bright edge. The column between the
+boxes can be dragged, or moved with `[` and `]`.
+
+**Editing a workflow.** `Enter` on a workflow opens its steps in the box
+beside the list, as the ordered sequence it is: `J` / `K` move the step
+under the cursor down and up, `x` takes it out, `a` adds one — a picker
+of the commands, narrowed by typing, goes in after the cursor — and
+`Enter` opens the command a step names. Taking a step out and deleting
+the command it names are different things, and only the first happens
+here. The steps are a working copy until `Ctrl+S`; the preview below
+reads the copy, so a reorder shows the sequence it produces before it is
+saved, and `Esc` leaves the workflow as it was.
+
+**What can be done to a row.** `Space` opens a menu of the actions for
+the thing under the cursor, each with its key — `e` edit, `d` duplicate,
+`r` rename, `x` delete for a command; edit steps, rename and delete for a
+workflow; edit and delete for a list or a variable. The arrows and
+`Enter` run one, and so does its key, with or without the menu: the menu
+is how the keys are learnt. Each action hands the row to the flow that
+already does that job, picked in advance — `x` is the confirmation and
+nothing before it — and a flow started here comes back here when it is
+done, where from the menu it would go back to the menu.
+
+**Editing a command.** `Enter`, or a click on any field of the editor
+box, puts the caret in the form — the box shows the fields whether or
+not the caret is in them, so a click lands on the field it looks like
+it lands on. `n` starts a new command. The form asks for the `cmd` first
+and the name second, because the name is the only part that takes
+thought; an empty name field shows the one the cmd suggests, and `→`
+takes it. `Tab` and `Shift+Tab` move between fields, and `{` in the cmd
+or workdir opens the candidates for what can go there. As you type, the
+row appears in the list in gold, tagged with the group you give it, and
+the preview resolves what it will run. `Ctrl+S` saves, `Esc` backs out a
+field at a time and then cancels.
+
+**What is unsaved, and what is wrong.** The editor box says `● unsaved`
+in its title once anything differs from what was opened, and marks each
+field that differs, so what `Ctrl+S` would change is readable before it
+is pressed. A field the form refuses — an empty name, one already in
+use, a shell that is not `ps` — says so directly under that field, and
+the message stays until the field is typed in. Leaving with changes
+unsaved, by `Esc` or by clicking away, asks what should happen to them:
+`s` saves and leaves, `d` discards, `k` keeps editing. Leaving with
+nothing changed asks nothing.
+
+A terminal too narrow or too short for the right side gets the list on
+its own, and `Enter` gives the form the whole screen instead; it comes
+back here when it closes. A tab with nothing in it says what that kind
+of thing is for and how to get one.
 
 ### Selecting commands
 

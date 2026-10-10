@@ -56,6 +56,7 @@ func heightFixture(h int, sc Screen) Model {
 	m.sce = &commandEditState{name: "n", currentSlots: []slot.Def{{Name: "env"}}, currentValues: map[string]string{}}
 	m.vr = &varRebaseState{varName: "root", items: []varRebaseItem{{label: "cmd-0.env", oldValue: `C:\old`}}}
 	m.updateStepsViewport()
+	m.exploreCursor[tabCommands] = 3
 	return m
 }
 
@@ -79,6 +80,7 @@ var screenFloors = map[Screen]struct {
 	ScreenRunCommands:           {"run commands", 7},
 	ScreenRunWorkflow:           {"run workflow", 7},
 	ScreenRunWorkflowSteps:      {"run workflow steps", 8},
+	ScreenExplore:               {"overview", 8},
 	ScreenSlotPick:              {"slot pick", 13},
 	ScreenConfirmRun:            {"confirm run", 11},
 	ScreenRunning:               {"running", 8},

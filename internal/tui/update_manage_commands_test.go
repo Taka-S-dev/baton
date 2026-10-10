@@ -28,14 +28,14 @@ func TestCommandForm_ShellField(t *testing.T) {
 		m.updateCommandForm(enter)
 	}
 
-	typeAndEnter("list-src")          // name
 	typeAndEnter("Get-ChildItem src") // cmd
+	typeAndEnter("list-src")          // name
 	typeAndEnter("")                  // workdir
 	typeAndEnter("")                  // group
 
 	typeAndEnter("bash") // shell: invalid
-	if m.errMsg == "" || m.cf == nil || m.cf.fieldIdx != 4 {
-		t.Fatalf("invalid shell must be rejected on the field: errMsg=%q cf=%v", m.errMsg, m.cf)
+	if m.cf == nil || m.cf.fieldErr == "" || m.cf.fieldIdx != 4 {
+		t.Fatalf("invalid shell must be rejected under the field: cf=%+v", m.cf)
 	}
 
 	typeAndEnter("PS") // shell: valid, normalized to lowercase
@@ -79,23 +79,24 @@ func TestCommandForm_NameValidatedEarly(t *testing.T) {
 	m.openCommandForm(-1)
 
 	enter := tea.KeyMsg{Type: tea.KeyEnter}
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyDown}) // the form opens on cmd; the name is next
 
 	m.nameInput.SetValue("build")
 	m.updateCommandForm(enter)
-	if m.errMsg == "" || m.cf.fieldIdx != 0 {
-		t.Fatalf("duplicate name must be rejected on the name field: errMsg=%q fieldIdx=%d", m.errMsg, m.cf.fieldIdx)
+	if m.cf.fieldErr == "" || m.cf.fieldIdx != 0 {
+		t.Fatalf("duplicate name must be rejected under the name field: err=%q fieldIdx=%d", m.cf.fieldErr, m.cf.fieldIdx)
 	}
 
 	m.nameInput.SetValue("")
 	m.updateCommandForm(enter)
-	if m.errMsg == "" || m.cf.fieldIdx != 0 {
-		t.Fatalf("empty name must be rejected on the name field: errMsg=%q fieldIdx=%d", m.errMsg, m.cf.fieldIdx)
+	if m.cf.fieldErr == "" || m.cf.fieldIdx != 0 {
+		t.Fatalf("empty name must be rejected under the name field: err=%q fieldIdx=%d", m.cf.fieldErr, m.cf.fieldIdx)
 	}
 
 	m.nameInput.SetValue("build2")
 	m.updateCommandForm(enter)
-	if m.cf.fieldIdx != 1 {
-		t.Fatalf("unique name must advance to the cmd field, fieldIdx=%d", m.cf.fieldIdx)
+	if m.cf.fieldIdx != 2 {
+		t.Fatalf("unique name must advance to the workdir field, fieldIdx=%d", m.cf.fieldIdx)
 	}
 
 	// Edit mode: keeping the command's own name is not a duplicate.
@@ -103,8 +104,9 @@ func TestCommandForm_NameValidatedEarly(t *testing.T) {
 	m2.nameInput = textinput.New()
 	m2.config.Commands = []mdl.Command{{Name: "build", Cmd: "make"}}
 	m2.openCommandForm(0)
+	m2.updateCommandForm(tea.KeyMsg{Type: tea.KeyDown})
 	m2.updateCommandForm(enter)
-	if m2.errMsg != "" || m2.cf.fieldIdx != 1 {
+	if m2.errMsg != "" || m2.cf.fieldIdx != 2 {
 		t.Fatalf("edit mode must accept its own name: errMsg=%q fieldIdx=%d", m2.errMsg, m2.cf.fieldIdx)
 	}
 }
@@ -215,6 +217,7 @@ func TestTSVEdit_RenameUpdatesRefs(t *testing.T) {
 	if m.cf == nil || !m.cf.tsvEdit {
 		t.Fatalf("picking the TSV row must open the form in TSV mode, cf=%+v", m.cf)
 	}
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyDown}) // the form opens on cmd; the name is next
 	m.nameInput.SetValue("build2")
 	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
 	if m.errMsg != "" {
@@ -433,6 +436,7 @@ func TestEditAndDeleteTSVCommands(t *testing.T) {
 	if m.cf == nil || !m.cf.tsvEdit {
 		t.Fatalf("picking a TSV row must open the form in TSV mode, cf=%+v", m.cf)
 	}
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyDown}) // the form opens on cmd; the name is next
 	m.nameInput.SetValue("edited")
 	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
 	raw, _ := os.ReadFile(filepath.Join(dir, "commands.tsv"))
@@ -579,6 +583,7 @@ func TestCommandForm_CtrlSSavesFromAnyField(t *testing.T) {
 	m.config.Commands = []mdl.Command{{Name: "old", Cmd: "echo hi"}}
 	m.openCommandForm(0)
 
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyDown}) // the form opens on cmd; the name is next
 	m.nameInput.SetValue("new")
 	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
 	if m.cf != nil {
@@ -845,7 +850,7 @@ func TestCommandForm_CreatedCommandIsEditable(t *testing.T) {
 	m.openCommandForm(-1)
 
 	enter := tea.KeyMsg{Type: tea.KeyEnter}
-	for _, v := range []string{"deploy-api", "make deploy", "", "", ""} {
+	for _, v := range []string{"make deploy", "deploy-api", "", "", ""} {
 		m.nameInput.SetValue(v)
 		m.updateCommandForm(enter)
 	}

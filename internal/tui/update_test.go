@@ -26,6 +26,7 @@ func TestUpdate_ResizeReachesEveryScreen(t *testing.T) {
 		ScreenSlotPick,
 		ScreenConfirmRun,
 		ScreenRunWorkflowSteps,
+		ScreenExplore,
 	}
 	for _, sc := range screens {
 		m := Model{screen: sc, width: 80, height: 24}
@@ -71,7 +72,7 @@ func TestUpdate_ResizeResizesStepsPreview(t *testing.T) {
 // keystroke rather than a signal; baton ignored it, which left no way out
 // of a text field except walking back with Esc.
 func TestUpdate_CtrlCQuitsEveryScreen(t *testing.T) {
-	for sc := ScreenProjectSelect; sc <= ScreenRunWorkflowSteps; sc++ {
+	for sc := ScreenProjectSelect; sc <= ScreenExplore; sc++ {
 		m := Model{screen: sc, width: 80, height: 24}
 		m.spinner = spinner.New()
 		m.nameInput = textinput.New()

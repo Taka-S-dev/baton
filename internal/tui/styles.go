@@ -9,17 +9,22 @@ import (
 )
 
 var (
-	sAccent      = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
-	sGray        = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	sWhite       = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-	sSuccess     = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
-	sWarn        = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // gold — warnings and confirm prompts
-	sHighlight   = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // gold — emphasis (e.g. the {slot} being resolved), not a warning
-	sError       = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	sBold        = lipgloss.NewStyle().Bold(true)
-	sDim         = lipgloss.NewStyle().Faint(true)
-	sCursor      = lipgloss.NewStyle().Background(lipgloss.Color("238")).Foreground(lipgloss.Color("97"))
-	sMenuSelect  = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("255")).Bold(true).Width(26)
+	sAccent     = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
+	sGray       = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	sWhite      = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	sSuccess    = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
+	sWarn       = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // gold — warnings and confirm prompts
+	sHighlight  = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // gold — emphasis (e.g. the {slot} being resolved), not a warning
+	sError      = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	sBold       = lipgloss.NewStyle().Bold(true)
+	sDim        = lipgloss.NewStyle().Faint(true)
+	sCursor     = lipgloss.NewStyle().Background(lipgloss.Color("238")).Foreground(lipgloss.Color("97"))
+	sMenuSelect = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("255")).Bold(true).Width(26)
+	// The overview's selected row, drawn as a bar across the pane. It
+	// dims when the pane beside it has the keys, so which half is being
+	// driven is readable without a frame around either.
+	sRowActive   = lipgloss.NewStyle().Background(lipgloss.Color("23")).Foreground(lipgloss.Color("255"))
+	sRowInactive = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("249"))
 	sSelNum      = lipgloss.NewStyle().Foreground(lipgloss.Color("32"))
 	sGroup       = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	sAccentBold  = lipgloss.NewStyle().Foreground(lipgloss.Color("36")).Bold(true)

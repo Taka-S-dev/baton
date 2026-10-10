@@ -34,6 +34,8 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.mainMenuCursor = m.listCursor
 		switch m.listItems[m.listCursor] {
+		case "Overview":
+			m.gotoExplore()
 		case "Run workflow":
 			m.screen = ScreenRunWorkflow
 			names := make([]string, len(m.workflows))

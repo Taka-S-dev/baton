@@ -92,7 +92,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	// The overview is pointable: a tree is the one shape where reaching
+	// for the mouse is the obvious move. Cell motion rather than all
+	// motion — clicks and the wheel, no event per pixel of travel.
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
