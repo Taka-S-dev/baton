@@ -30,3 +30,26 @@ func TestProjectSearchInlineAndNavigation(t *testing.T) {
 		t.Fatal("Esc did not clear search")
 	}
 }
+
+func TestProjectSearchClickTargetsSearchLine(t *testing.T) {
+	m := exploreProject()
+	m.screen = ScreenProjectSelect
+	m.projects = []string{"sample"}
+	view := stripStyle(m.viewProjects(80))
+	lines := strings.Split(view, "\n")
+	if !strings.Contains(lines[0], "BATON · Projects") || !strings.Contains(lines[2], "/ Search…") {
+		t.Fatal("title and search must be separate")
+	}
+	for _, y := range []int{0, 1} {
+		next, _ := m.Update(tea.MouseMsg{X: 5, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+		m = next.(Model)
+		if m.projectMode != "" {
+			t.Fatal("heading activated search")
+		}
+	}
+	next, _ := m.Update(tea.MouseMsg{X: 5, Y: 2, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m = next.(Model)
+	if m.projectMode != "search" {
+		t.Fatal("search line not clickable")
+	}
+}

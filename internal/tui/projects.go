@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/charmbracelet/lipgloss"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -242,37 +243,61 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 type projectFolderMsg struct{ err error }
 
-func (m Model) projectRows(w int) (int, int) { return 3, max(1, m.termHeight()-8) }
+func (m Model) projectRows(w int) (int, int) {
+	return 3, min(max(1, len(m.visibleProjects())), max(1, m.termHeight()-8))
+}
+func (m Model) projectAddY(w int) int { y, rows := m.projectRows(w); return y + rows + 1 }
+
 func (m Model) viewProjects(w int) string {
 	names := m.visibleProjects()
 	y, rows := m.projectRows(w)
 	_ = y
 	var b strings.Builder
-	search := " / " + m.projectFilter
-	if m.projectMode == "search" {
-		search += accent("_")
+	b.WriteString(" " + accent(truncate("BATON · Projects", max(1, w-1))) + "\n")
+	b.WriteString(" " + gray(truncate("Choose a project to run commands or edit settings.", max(1, w-1))) + "\n")
+	search := "/ " + m.projectFilter
+	if m.projectFilter == "" && m.projectMode != "search" {
+		search = "/ Search…"
 	}
-	b.WriteString(box("BATON · Projects", search, w, 3, true) + "\n")
+	if m.projectMode == "search" {
+		b.WriteString(" " + accent(truncate(search+"_", max(1, w-1))) + "\n")
+	} else {
+		b.WriteString(" " + gray(truncate(search, max(1, w-1))) + "\n")
+	}
+
 	empty := "No projects · a creates one"
 	if m.projectFilter != "" {
 		empty = "No matches · Esc clears search"
 	}
+	nameW := 0
+	for _, name := range names {
+		nameW = max(nameW, lipgloss.Width(name))
+	}
+	nameW = min(nameW, max(1, w-18))
 	writeWindowedList(&b, rows, len(names), m.listCursor, empty, func(i int) string {
 		prefix := "   "
 		if i == m.listCursor {
 			prefix = " ▶ "
 		}
-		line := truncate(fmt.Sprintf("%s%s  %d commands", prefix, names[i], m.projectCmdCounts[names[i]]), w)
+		name := truncate(names[i], nameW)
+		line := truncate(fmt.Sprintf("%s%s%s  %d commands", prefix, name, strings.Repeat(" ", max(0, nameW-lipgloss.Width(name))), m.projectCmdCounts[names[i]]), w)
+		if i == m.listCursor {
+			line += strings.Repeat(" ", max(0, w-lipgloss.Width(line)))
+			line = sRowActive.Render(line)
+		}
 		return searchHighlight(line, []string{m.projectFilter}, i == m.listCursor, true)
 	})
-	for strings.Count(b.String(), "\n") < m.termHeight()-3 {
+	for strings.Count(b.String(), "\n") < m.projectAddY(w) {
 		b.WriteString("\n")
 	}
 	b.WriteString(accent("+ Add project  a") + "\n")
+	for strings.Count(b.String(), "\n") < m.termHeight()-2 {
+		b.WriteString("\n")
+	}
 	if m.termHeight() >= 8 {
 		b.WriteString(hline(w) + "\n")
 	}
-	keys := "Enter Open  / Search  Space Actions  r Refresh  Del Delete  F1 Help"
+	keys := "↑↓ Select  Enter Open  / Search  Space Actions  a Add  r Refresh  Del Delete  q Quit  F1 Help"
 	if m.projectMode == "search" {
 		keys = "↑↓ Select  Enter Done  Esc Clear  F1 Help"
 	}

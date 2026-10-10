@@ -182,14 +182,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && mouse.Y == 1 {
+		if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && mouse.Y == 2 {
 			m.projectMode = "search"
 			return m, nil
 		}
 		names := m.visibleProjects()
 		y, rows := m.projectRows(m.viewWidth())
 		if mouse.Action == tea.MouseActionPress {
-			if mouse.Y == m.termHeight()-3 && mouse.Button == tea.MouseButtonLeft {
+			if mouse.Y == m.projectAddY(m.viewWidth()) && mouse.Button == tea.MouseButtonLeft {
 				return m.updateProjects(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 			}
 			row := mouse.Y - y
