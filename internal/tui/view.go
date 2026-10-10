@@ -1509,11 +1509,13 @@ func (m Model) viewEditList(w int) string {
 	// The "+ Add value" row scrolls with the entries as the last row.
 	viewH := m.listBudget(&b, 3)
 	writeWindowedList(&b, viewH, len(le.entries)+1, le.cursor, "", func(i int) string {
+		// The add row is an action and is drawn like every other Add
+		// row: in the accent, with its key beside it.
 		if i == len(le.entries) {
 			if i == le.cursor {
-				return "  " + accentBold("▶") + " " + success("+ Add value")
+				return "  " + accentBold("▶") + " " + accent("+ Add value  a")
 			}
-			return "    " + gray("+ Add value")
+			return "    " + accent("+ Add value  a")
 		}
 		e := le.entries[i]
 		lbl := ""

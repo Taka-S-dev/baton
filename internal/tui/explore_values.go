@@ -80,12 +80,18 @@ func (m Model) exploreValueBox(l exploreLayout) string {
 			b.WriteString("\n\n " + dim("Label is optional. Enter confirms each field."))
 		default:
 			writeWindowedList(&b, max(1, l.editH-4), len(le.entries)+1, le.cursor, "", func(i int) string {
-				value := "+ Add value"
-				if i < len(le.entries) {
-					value = le.entries[i].Value
-					if le.entries[i].Label != "" {
-						value += "  · " + le.entries[i].Label
+				// The add row is an action, not an entry: it takes the
+				// same accent and key hint as the Add row of the list pane.
+				if i == len(le.entries) {
+					marker := "   "
+					if i == le.cursor {
+						marker = accent(" ▶ ")
 					}
+					return marker + accent(truncate("+ Add value  a", width))
+				}
+				value := le.entries[i].Value
+				if le.entries[i].Label != "" {
+					value += "  · " + le.entries[i].Label
 				}
 				if i == le.cursor {
 					return accent(" ▶ ") + truncate(value, width)

@@ -76,3 +76,21 @@ func TestListPaneMouseSelectsAndOpensEntry(t *testing.T) {
 		t.Fatal("second click did not open entry")
 	}
 }
+
+// TestAddValueRowLooksLikeAnAction: the editor's "+ Add value" row is an
+// action, so it is drawn like the list pane's "+ Add list" — in the
+// accent with its key beside it — and not like the entries above it.
+func TestAddValueRowLooksLikeAnAction(t *testing.T) {
+	for _, width := range []int{110, 60} { // beside the list, and full screen
+		m := exploreProject()
+		m.width, m.exploreTab = width, tabLists
+		m = createKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+		if m.le == nil {
+			t.Fatalf("width %d: Enter did not open the list editor", width)
+		}
+		view := m.View()
+		if !strings.Contains(view, accent("+ Add value  a")) {
+			t.Fatalf("width %d: the add row is not drawn as an action:\n%s", width, stripStyle(view))
+		}
+	}
+}
