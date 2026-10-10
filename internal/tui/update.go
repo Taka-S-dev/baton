@@ -166,6 +166,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenMainMenu {
+		return m.updateMainMenuMouse(mouse)
+	}
 	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenProjectSelect {
 		if m.projectMode != "" && m.projectMode != "search" {
 			if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {

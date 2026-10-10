@@ -222,7 +222,7 @@ func mainMenuItems() []string {
 var menuItemInfos = map[string]menuItemInfo{
 	"Edit project":     {desc: "Edit workflows, commands, shared lists and variables.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Run workflow":     {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
-	"Run commands":     {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
+	"Run commands":     {desc: "Choose commands, order and inputs, then review before running.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
 	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage lists":     {desc: "Create, edit or delete selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
@@ -231,7 +231,7 @@ var menuItemInfos = map[string]menuItemInfo{
 	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
 
-func (m Model) viewMainMenu(w int) string {
+func (m Model) viewMainMenuContent(w int) string {
 	groups := mainMenuGroups
 
 	leftW := 32
@@ -302,7 +302,7 @@ func (m Model) viewMainMenu(w int) string {
 		for _, item := range g.items {
 			if idx >= first && idx < first+shown {
 				if idx == m.listCursor {
-					leftLines = append(leftLines, "    "+sMenuSelect.Render(" "+item))
+					leftLines = append(leftLines, "    "+sRowActive.Width(max(1, min(leftW, w)-6)).Render("▶ "+item))
 				} else {
 					leftLines = append(leftLines, "      "+item)
 				}
@@ -358,24 +358,32 @@ func (m Model) viewMainMenu(w int) string {
 	if info, ok := menuItemInfos[selected]; ok {
 		rightLines = append(rightLines, white(selected))
 		if withPanelDesc {
-			desc := truncate(info.desc, max(10, rightW-2))
+			description := info.desc
+			if selected == "Run workflow" && len(m.workflows) == 0 {
+				description = "No workflows. Add one in Edit project → Workflows."
+			}
+			desc := truncate(description, max(10, rightW-2))
 			rightLines = append(rightLines, gray(strings.Repeat("─", min(rightW-2, 24))))
 			rightLines = append(rightLines, dim(desc))
 			rightLines = append(rightLines, "")
 		}
 		rightLines = append(rightLines, gray("Keys"))
-		for _, sc := range info.shortcuts {
+		shortcuts := [][2]string{{"↑↓", "Move"}, {"Enter", "Open"}, {"Esc", "Quit"}}
+		if selected == "Exit" {
+			shortcuts[1][1] = "Quit"
+		}
+		for _, sc := range shortcuts {
 			rightLines = append(rightLines, fmt.Sprintf("  %-8s %s", white(sc[0]), gray(sc[1])))
 		}
-		for i := len(info.shortcuts); i < maxShortcuts; i++ {
+		for i := len(shortcuts); i < maxShortcuts; i++ {
 			rightLines = append(rightLines, "")
 		}
 		if withPanelExtras {
 			rightLines = append(rightLines, "")
-			rightLines = append(rightLines, gray("Config"))
-			rightLines = append(rightLines, "  "+gray("project: ")+white(filepath.Base(m.projectDir)))
+			rightLines = append(rightLines, gray("Project summary"))
+			rightLines = append(rightLines, fmt.Sprintf("  commands: %d", len(m.config.Base)+len(m.config.Commands)))
 			if m.configFile != "" {
-				rightLines = append(rightLines, "  "+gray("file:    ")+white(m.configFile))
+				rightLines = append(rightLines, "  "+gray("file:    ")+dim(truncate(m.configFile, max(1, rightW-12))))
 			}
 			rightLines = append(rightLines, "")
 			rightLines = append(rightLines, gray("Stats"))
