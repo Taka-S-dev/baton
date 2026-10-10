@@ -15,6 +15,7 @@ import (
 // ── Multi-select ──────────────────────────────────────────────────────────────
 
 func (m *Model) setupMultiSelect() tea.Cmd {
+	m.loadCommandSort()
 	m.msItems = nil
 	m.msCursor = 0
 	m.msSelected = nil
@@ -55,6 +56,7 @@ func (m *Model) msFiltered() []int {
 			out = append(out, i)
 		}
 	}
+	m.sortCommandIndices(out)
 	return out
 }
 
@@ -86,6 +88,10 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.msSelected = nil
 		m.msSearchTI.SetValue("")
 		msg = tea.KeyMsg{Type: tea.KeyEsc}
+	}
+	if msg.String() == "f3" {
+		m.cycleCommandSort()
+		return m, nil
 	}
 	if msg.String() == "ctrl+q" || msg.String() == "f2" {
 		m.runQueueFocused = !m.runQueueFocused

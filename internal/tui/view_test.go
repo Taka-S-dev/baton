@@ -108,34 +108,23 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
-// TestViewRunWorkflowSteps_ShowsWorkdir checks each step keeps the
-// context the workflow list already showed: the same command means
-// something different per directory, so the workdir travels into the
-// picker — resolved for {$vars}, left literal for run-time slots, and
-// absent when the command has none.
-func TestViewRunWorkflowSteps_ShowsWorkdir(t *testing.T) {
+// Workdirs stay available in details while the table shows command bodies.
+func TestViewRunWorkflowSteps_TableAndDetails(t *testing.T) {
 	m := Model{width: 96, height: 24}
-	m.vars = map[string]string{"root": `C:\work`}
-	m.config = mdl.Config{Base: []mdl.Command{
-		{Name: "build", Cmd: "make build", Dir: "{workdir}"},
-		{Name: "pack", Cmd: "zip -r out.zip .", Dir: `{$root}\dist`},
-		{Name: "hello", Cmd: "echo hi"},
-	}}
-	m.workflows = []mdl.Workflow{{Name: "wf", Commands: []string{"build", "pack", "hello"}}}
+	m.config = mdl.Config{Base: []mdl.Command{{Name: "build", Cmd: "make build", Dir: "{workdir}"}}}
+	m.workflows = []mdl.Workflow{{Name: "wf", Commands: []string{"build"}}}
 	m.gotoWorkflowStepPick(0)
-
-	view := m.viewRunWorkflowSteps(96)
-	for _, want := range []string{
-		"$ make build  (workdir: {workdir})",
-		`$ zip -r out.zip .  (workdir: C:\work\dist)`,
-		"$ echo hi",
-	} {
+	view := m.viewRunWorkflowStepsList(96)
+	for _, want := range []string{"Run", "Step", "Name", "Command", "$ make build", "Select at least one step"} {
 		if !strings.Contains(view, want) {
-			t.Errorf("view missing %q\n%s", want, view)
+			t.Errorf("missing %q", want)
 		}
 	}
-	if strings.Contains(view, "echo hi  (workdir") {
-		t.Error("a command with no workdir must not show an empty one")
+	if strings.Contains(view, "workdir:") {
+		t.Fatal("workdir duplicated in table")
+	}
+	if !strings.Contains(m.workflowRunDetail(96), "workdir:") {
+		t.Fatal("workdir missing from details")
 	}
 }
 

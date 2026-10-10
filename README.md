@@ -458,7 +458,7 @@ On narrow terminals, the editor switches to list and detail screens with compact
 
 ### Run commands
 
-Select commands on the left and review their execution order in **Run queue**. The Run column shows each selected command’s current execution position, synchronized with queue reordering and removal. Unselected rows are blank, and filtering preserves the positions. Other columns show Name, Group and Type; narrow panes omit Group. A separate Match column explains search hits in command text or fixed values when space permits.
+Select commands on the left and review their execution order in **Run queue**. The Run column shows each selected command’s current execution position, synchronized with queue reordering and removal. Unselected rows show `—`, and filtering preserves the positions. Other columns show Name, Group and Type; narrow panes omit Group. A separate Match column explains search hits in command text or fixed values when space permits.
 
 The queue shows order, name and command text, with long rows abbreviated and placeholders highlighted. The detail pane shows command information, working directory and shell. Wide screens share one detail pane; narrow screens switch between candidates and queue.
 
@@ -485,12 +485,13 @@ Create saved sequences in **Edit project → Workflows**. The Run workflow list 
 |---|---|
 | `↑↓` | Choose a workflow |
 | `Enter` in the workflow list | Resolve inputs and review all steps |
-| `→` | Choose steps for this run |
+| `Tab` / `→` | Choose steps for this run |
 | `F2` in the workflow list | Open step details |
 | `↑↓` in step selection | Inspect a step |
 | `Tab` in step selection | Select / deselect a runnable step |
+| Click a step / checkbox | Inspect its details / toggle selection |
 | `F2` in step selection | Switch step / detail views on narrow screens; wide screens show read-only details |
-| `Enter` in step selection | Review selected steps, or the highlighted step if none are selected |
+| `Enter` in step selection | Review selected steps; select at least one step first |
 | `Esc` | Return one level; the workflow list clears an active filter before leaving |
 
 Details show the command, working directory and shell. Missing commands remain visible but cannot be selected. Selections apply **only to this run** and retain saved workflow order. They do not change the saved workflow. Remaining slots are prompted before execution review; fixed answers come from the saved commands. `F1` shows help.

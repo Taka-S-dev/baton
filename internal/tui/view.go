@@ -589,7 +589,7 @@ func (m Model) viewMultiSelectList(w int) string {
 	return m.viewMultiSelectCandidates(w, true)
 }
 
-func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
+func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func(int, int)) string {
 	title := "Select commands"
 	if m.screen == ScreenEditWorkflowCommands {
 		title = "Edit commands"
@@ -599,12 +599,20 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 
 	terms := strings.Fields(m.msSearchTI.Value())
 	orderW := max(3, len(fmt.Sprint(len(m.msSelected))))
-	columnW, matchW := max(1, w-5-orderW), 0
+	columnW, matchW := max(1, w-3-orderW), 0
 	if len(terms) > 0 && columnW >= 48 {
 		matchW = min(32, columnW/3)
 		columnW -= matchW + 2
 	}
-	tableHeader := selectCommandColumns("Name", "Group", "Type", columnW)
+	commandW := 0
+	if columnW >= 76 {
+		commandW = columnW - 58
+		columnW = 56
+	}
+	tableHeader := selectCommandColumns(m.sortHeading("name", "Name"), m.sortHeading("group", "Group"), m.sortHeading("type", "Type"), columnW)
+	if commandW > 0 {
+		tableHeader += "  " + fmt.Sprintf("%-*s", commandW, "Command")
+	}
 	if matchW > 0 {
 		tableHeader += "  " + "Match"
 	}
@@ -628,13 +636,16 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 	if m.compact() {
 		gap, below = "", 4
 	}
-	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))) + "\n" + gap)
+	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))+"  Sort: "+m.commandSortLabel()+" · F3") + "\n" + gap)
 
 	if !showPreview {
 		previewH = 0
 	}
 	if m.termHeight() >= 10 {
-		b.WriteString("    " + gray(fmt.Sprintf("%*s ", orderW, "Run")+tableHeader) + "\n")
+		if len(hitRow) > 0 {
+			hitRow[0](-1, strings.Count(b.String(), "\n"))
+		}
+		b.WriteString("  " + gray(fmt.Sprintf("%-*s ", orderW, "Run")+tableHeader) + "\n")
 	}
 	previewH = m.previewBudget(&b, previewH, below, 3)
 	if previewH == 0 {
@@ -644,17 +655,24 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 	}
 	viewH := m.listBudget(&b, previewH+below)
 	writeWindowedList(&b, viewH, n, cursor, "No results.", func(i int) string {
+		if len(hitRow) > 0 {
+			hitRow[0](i, strings.Count(b.String(), "\n"))
+		}
 		origIdx := filtered[i]
 		item := m.msItems[origIdx]
 
-		check := strings.Repeat(" ", orderW)
+		check := fmt.Sprintf("%-*s", orderW, "—")
 		for order, selected := range m.msSelected {
 			if selected == origIdx {
-				check = sSelNum.Render(fmt.Sprintf("%*d", orderW, order+1))
+				check = sSelNum.Render(fmt.Sprintf("%-*d", orderW, order+1))
 				break
 			}
 		}
 		label := selectCommandColumns(item.cmd.Name, item.cmd.Group, commandKind(*item.cmd), columnW)
+		if commandW > 0 {
+			body := ansi.Truncate(m.syntaxText(strings.Join(strings.Fields(item.cmd.Cmd), " ")), commandW, "…")
+			label += "  " + body + strings.Repeat(" ", max(0, commandW-lipgloss.Width(body)))
+		}
 
 		if matchW > 0 {
 			reason := commandMatchReason(item.cmd, label, terms, matchW)
@@ -663,9 +681,15 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 
 		label = searchHighlight(label, terms, false, true)
 		if i == cursor {
-			return "  " + accentBold("▶") + " " + check + " " + label
+			row := "▶ " + check + " " + label
+			row += strings.Repeat(" ", max(0, w-lipgloss.Width(row)))
+			style := sRowActive
+			if m.runQueueFocused {
+				style = sRowInactive
+			}
+			return searchHighlight(style.Render(ansi.Strip(row)), terms, true, !m.runQueueFocused)
 		}
-		return "    " + check + " " + label
+		return "  " + check + " " + label
 	})
 
 	// Hover preview, padded to previewH so the footer below never moves.
@@ -698,7 +722,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 	joined := truncate(strings.Join(selNames, ", "), max(10, w-40))
 	b.WriteString(gap + "  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
 	b.WriteString(hline(w) + "\n")
-	b.WriteString("  " + gray("Tab Select  Enter Review  F2 Queue  Esc Back") + "\n")
+	b.WriteString("  " + gray("Tab Select  Enter Review  F2 Queue  F3 Sort  Esc Back") + "\n")
 
 	// Discard guard: opens as a centered floating window over the list.
 	if m.msEscArmed && len(m.msSelected) > 0 {
@@ -1834,7 +1858,7 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 
 // ── Run workflow: per-run step selection ──────────────────────────────────────
 
-func (m Model) viewRunWorkflowStepsList(w int) string {
+func (m Model) viewRunWorkflowStepsList(w int, hitRow ...func(int, int)) string {
 	var b strings.Builder
 	p := m.wfp
 	if p == nil || p.wfIdx >= len(m.workflows) {
@@ -1844,10 +1868,25 @@ func (m Model) viewRunWorkflowStepsList(w int) string {
 	n := len(wf.Commands)
 
 	m.writeHeading(&b, "Run workflow: "+wf.Name, w)
-	b.WriteString("  " + gray("Pick the steps to run — they always run in the order below.") + "\n")
+	b.WriteString("  " + gray(truncate("Pick steps to run · saved order", max(1, w-2))) + "\n")
 
+	stepW := max(4, len(fmt.Sprint(n)))
+	nameW := min(20, max(1, w-2-4-stepW-1))
+	showCommand := w >= 44
+	if showCommand {
+		nameW = min(20, w/4)
+	}
+	commandW := max(1, w-2-4-stepW-1-nameW-2)
+	heading := fmt.Sprintf("%-3s %*s %-*s", "Run", stepW, "Step", nameW, "Name")
+	if showCommand {
+		heading += "  Command"
+	}
+	b.WriteString("  " + gray(truncate(heading, max(1, w-2))) + "\n")
 	viewH := m.listBudget(&b, 4)
 	writeWindowedList(&b, viewH, n, p.cursor, "(no steps)", func(i int) string {
+		for _, hit := range hitRow {
+			hit(i, strings.Count(b.String(), "\n"))
+		}
 		name := wf.Commands[i]
 		box := "[ ]"
 		if p.picked[i] {
@@ -1855,23 +1894,21 @@ func (m Model) viewRunWorkflowStepsList(w int) string {
 		}
 		note := ""
 		if cmd, ok := m.workflowStepCommand(name); ok {
-			// Same one-line shape as the step preview on the workflow
-			// list: the directory decides what "make build" even means,
-			// so it must not disappear on the way into this screen.
-			text := "$ " + cmd.Cmd
-			if cmd.Dir != "" {
-				text += "  (workdir: " + cmd.Dir + ")"
-			}
-			note = m.syntaxText(truncate(text, max(8, w-len(name)-24)))
+			note = m.syntaxText(truncate("$ "+cmd.Cmd, commandW))
 		} else {
 			box = dim("[-]")
-			note = warn("(not found)")
+			note = warn(truncate("(not found)", commandW))
 		}
-		row := fmt.Sprintf("%s %d. %-16s %s", box, i+1, name, note)
+		name = truncate(name, nameW)
+		name += strings.Repeat(" ", max(0, nameW-lipgloss.Width(name)))
+		row := fmt.Sprintf("%s %*d %s", box, stepW, i+1, name)
+		if showCommand {
+			row += "  " + note
+		}
 		if i == p.cursor {
-			return m.selectedSyntaxRow("  ▶ "+row, max(1, w))
+			return m.selectedSyntaxRow("▶ "+row, max(1, w))
 		}
-		return "    " + row
+		return ansi.Truncate("  "+row, max(1, w), "…")
 	})
 
 	b.WriteString("\n" + hline(w) + "\n")
@@ -1885,7 +1922,7 @@ func (m Model) viewRunWorkflowStepsList(w int) string {
 		b.WriteString("  " + success(fmt.Sprintf("Selected(%d)", c)) + ": " +
 			truncate(strings.Join(picked, " → "), max(8, w-20)) + "\n")
 	} else {
-		b.WriteString("  " + gray("Nothing selected — Enter reviews the highlighted step") + "\n")
+		b.WriteString("  " + gray(truncate("Select at least one step with Tab to review", max(1, w-2))) + "\n")
 	}
 	keys := "↑↓ Select  Tab Toggle  Enter Review  Esc Back"
 	if !m.workflowDetailsInline() {

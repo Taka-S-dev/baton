@@ -363,17 +363,9 @@ func (m Model) updateRunWorkflowSteps(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if len(steps) == 0 {
-			// Nothing toggled: Enter runs the hovered step, the same
-			// fzf-style fallback the command selector uses.
-			if p.cursor >= n {
-				break
-			}
-			if !m.stepRunnable(wf, p.cursor) {
-				m.errMsg = "step not found: " + wf.Commands[p.cursor]
-				return m, nil
-			}
-			steps = []string{wf.Commands[p.cursor]}
+			return m, nil
 		}
+
 		return m.startWorkflowRun(wf, steps)
 	case "esc", "left":
 		m.wfp = nil

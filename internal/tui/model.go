@@ -426,6 +426,7 @@ type Model struct {
 	varPickNames []string
 
 	// Multi-select
+	commandSort     string
 	msItems         []msItem
 	msCursor        int
 	msSelected      []int

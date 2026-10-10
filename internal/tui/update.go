@@ -227,6 +227,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateExploreValueMouse(mouse)
 	}
 
+	if mouse, ok := msg.(tea.MouseMsg); ok && (m.screen == ScreenRunCommands || m.screen == ScreenCreateWorkflow || m.screen == ScreenEditWorkflowCommands) {
+		return m.updateRunSelectMouse(mouse)
+	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenRunWorkflowSteps {
+		return m.updateWorkflowStepsMouse(mouse)
+	}
 	// Forward non-key messages to textinput (handles internal blink tick).
 	if _, ok := msg.(tea.KeyMsg); !ok {
 		if m.screen == ScreenNameInput || m.screen == ScreenCreateCommandName || m.screen == ScreenEditCommandName || m.screen == ScreenCommandForm || m.screen == ScreenVarForm {

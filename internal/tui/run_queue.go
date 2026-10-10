@@ -30,7 +30,19 @@ func (m Model) viewMultiSelect(w int) string {
 	leftW := w / 2
 	left := strings.TrimRight(m.viewMultiSelectCandidates(leftW, false), "\n")
 	right := m.viewRunQueue(w - leftW - 1)
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
+	leftLines := strings.Split(left, "\n")
+	rightLines := strings.Split(right, "\n")
+	leftLines = leftLines[:max(0, len(leftLines)-2)]
+	rightLines = rightLines[:max(0, len(rightLines)-1)]
+	rows := max(1, m.termHeight()-2)
+	for len(leftLines) < rows {
+		leftLines = append(leftLines, "")
+	}
+	for len(rightLines) < rows {
+		rightLines = append(rightLines, "")
+	}
+	body := lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(leftLines[:rows], "\n"), " ", strings.Join(rightLines[:rows], "\n"))
+	return body + "\n" + hline(w) + "\n" + gray(truncate(m.runSelectKeys(), w))
 }
 func (m Model) viewRunQueue(w int) string {
 	h := m.termHeight()
@@ -42,14 +54,14 @@ func (m Model) viewRunQueue(w int) string {
 		nameWidth = max(nameWidth, lipgloss.Width(m.msItems[idx].name()))
 	}
 	nameWidth = min(nameWidth, max(4, (w-10)/3))
-	writeWindowedList(&b, max(1, queueH-3), len(m.msSelected), cursor, "Tab selects commands for this queue.", func(i int) string {
+	writeWindowedList(&b, max(1, queueH-3), len(m.msSelected), cursor, "Tab adds from the list; Enter there reviews one command.", func(i int) string {
 		item := m.msItems[m.msSelected[i]]
 		name := truncate(item.name(), nameWidth)
 		name += strings.Repeat(" ", max(0, nameWidth-lipgloss.Width(name)))
 		command := strings.Join(strings.Fields(item.cmd.Cmd), " ")
 		label := ansi.Truncate(fmt.Sprintf(" %d  %s  $ ", i+1, name)+m.previewVars(command), max(1, w-2), "…")
 		if i == cursor && m.runQueueFocused {
-			return sRowActive.Render(label)
+			return m.selectedSyntaxRow(label, max(1, w-2))
 		}
 		return label
 	})
@@ -68,10 +80,14 @@ func (m Model) viewRunQueue(w int) string {
 		m.writeCommandHover(&detail, m.msItems[index].cmd, w-2)
 	}
 	bottom := box("Command details", detail.String(), w, max(3, h-queueH-2), false)
-	footer := "F2 Queue / List · Enter Review"
-	if m.runQueueFocused {
-		footer = "J/K Move · x Remove from queue · Esc List"
-	}
+	footer := m.runSelectKeys()
 	lines := strings.Split(top+"\n"+bottom, "\n")
 	return strings.Join(lines[:min(max(0, h-1), len(lines))], "\n") + "\n" + gray(truncate(footer, w))
+}
+
+func (m Model) runSelectKeys() string {
+	if m.runQueueFocused {
+		return "↑↓ Select  J/K Reorder  Del Remove  Enter Review  F2 List  Esc List  F1 Help"
+	}
+	return "↑↓ Select  Tab Toggle  Enter Review  F2 Queue  F3 Sort  Esc Back  F1 Help"
 }

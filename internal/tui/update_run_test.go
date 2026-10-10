@@ -203,39 +203,30 @@ func TestWorkflowStepPick_RunsSubsetInWorkflowOrder(t *testing.T) {
 	}
 }
 
-// TestWorkflowStepPick_HoverFallbackAndMissingSteps checks Enter with
-// nothing toggled runs the hovered step, and that a step whose command
-// is gone can neither be toggled nor run while the rest stay usable.
-func TestWorkflowStepPick_HoverFallbackAndMissingSteps(t *testing.T) {
+// Empty selections never proceed; missing commands cannot be selected.
+func TestWorkflowStepPick_RequiresSelection(t *testing.T) {
 	m := wfModel()
 	m.projectDir = t.TempDir()
 	m.workflows[0].Commands = []string{"ghost", "build"}
 	m.gotoWorkflowStepPick(0)
-
-	// Cursor starts on the missing step: it cannot be toggled or run.
 	nm, _ := m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyTab})
 	m = nm.(Model)
 	if m.wfp.count() != 0 {
-		t.Fatal("a missing step must not be selectable")
+		t.Fatal("missing step selectable")
 	}
-	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyEnter})
-	m = nm.(Model)
-	if m.resolve != nil || !strings.Contains(m.errMsg, "ghost") {
-		t.Fatalf("running a missing step must fail with a named error, err=%q", m.errMsg)
+	for _, key := range []tea.KeyType{tea.KeyEnter, tea.KeyDown, tea.KeyEnter} {
+		nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: key})
+		m = nm.(Model)
+		if m.resolve != nil || m.screen == ScreenConfirmRun {
+			t.Fatal("empty selection advanced")
+		}
 	}
-
-	// The intact step still runs via the hover fallback, no toggle needed.
-	// It has no slots, so resolution completes and lands on the confirm
-	// screen in one step.
-	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyDown})
+	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyTab})
 	m = nm.(Model)
 	nm, _ = m.updateRunWorkflowSteps(tea.KeyMsg{Type: tea.KeyEnter})
 	m = nm.(Model)
-	if m.screen != ScreenConfirmRun {
-		t.Fatalf("Enter with nothing toggled must run the hovered step, screen=%v err=%q", m.screen, m.errMsg)
-	}
-	if len(m.confirmRunItems) != 1 || m.confirmRunItems[0].Name != "build" {
-		t.Fatalf("run items = %+v, want just the hovered step", m.confirmRunItems)
+	if m.screen != ScreenConfirmRun || len(m.confirmRunItems) != 1 || m.confirmRunItems[0].Name != "build" {
+		t.Fatalf("selected step not reviewed: %+v", m.confirmRunItems)
 	}
 }
 
