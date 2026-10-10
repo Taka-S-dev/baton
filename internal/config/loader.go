@@ -66,7 +66,7 @@ func ListProjects(projectsDir string) []string {
 	}
 	var out []string
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() && e.Name() != ".baton-trash" {
 			out = append(out, e.Name())
 		}
 	}

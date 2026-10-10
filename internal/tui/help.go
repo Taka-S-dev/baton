@@ -1,0 +1,114 @@
+package tui
+
+import (
+	"github.com/charmbracelet/x/ansi"
+	"strings"
+)
+
+func (m Model) helpHint() string {
+	if m.exploreListFocused() && !m.exploreSearching {
+		return "? Help"
+	}
+	return "F1 Help"
+}
+func (m Model) helpGeometry(w int) actionPopupLayout {
+	return actionPopupLayout{w: min(72, w), h: min(24, max(3, m.termHeight())), x: max(0, (w-min(72, w))/2), y: max(0, (m.termHeight()-min(24, max(3, m.termHeight())))/2)}
+}
+func (m Model) helpLines(w int) []string {
+	lines := []string{"Current screen"}
+	if m.screen == ScreenProjectSelect {
+		lines = append(lines, "a Add project · Enter Open · / Search", "r Refresh · Space / right-click Actions", "o Open folder · c Copy path · Del/x Delete", "Deletion moves settings into .baton-trash; working directories are untouched.", "Restore by moving the archived folder back under projects.", "Esc closes a form or clears search; q quits.")
+	} else if m.pasteMenu {
+		for _, a := range m.contextActions {
+			lines = append(lines, a.key+"  "+a.label)
+		}
+		lines = append(lines, "↑↓ Select · Enter Confirm · Esc Close")
+	} else if m.leaveAsk != leaveNone {
+		for _, a := range leaveChoices {
+			lines = append(lines, a.key+"  "+a.label)
+		}
+	} else if m.screen == ScreenExplore || m.exploreValueFlow() || m.exploreTemplateFlow() || m.cf != nil {
+		if m.exploreMenu {
+			if it, ok := m.exploreCurrent(); ok {
+				for _, a := range m.exploreActions(it) {
+					lines = append(lines, a.key+"  "+a.label)
+				}
+			}
+		} else {
+			lines = append(lines, strings.Split(m.exploreKeys(), "  ")...)
+		}
+		if m.contextInputActive() {
+			lines = append(lines, "Ctrl+V Paste · Right-click: Paste / Copy value")
+		}
+	} else {
+		lines = append(lines, "Use the shortcuts shown at the bottom of this screen.", "Esc Back")
+	}
+	lines = append(lines, "", "Concepts")
+	lines = append(lines, conceptDiagram(max(1, w-4))...)
+	lines = append(lines, "",
+		"Workflow: an ordered sequence of command references.",
+		"Command: executable text, workdir, shell and input slots.",
+		"List: shared choices for an interactive {slot}; not owned by a command.",
+		"Variable: shared constant substituted as {$name} in commands and list values.",
+		"Fixed values: saved slot answers owned by a command. A fixed answer skips the run-time prompt; edit via Change values.",
+		"", "Navigation",
+		"1 Workflows · 2 Commands · 3 Lists · 4 Variables (Project editor)",
+		"Space / right-click: actions for the selected item.",
+		"Command actions include links to referenced lists and variables.",
+		"Esc returns from a related item, preserving your previous selection.",
+		"a adds to the focused pane; n also creates a project item.",
+		"F1 opens help while typing; ? remains ordinary input.",
+	)
+	var wrapped []string
+	for _, line := range lines {
+		wrapped = append(wrapped, strings.Split(ansi.Hardwrap(line, max(1, w-4), false), "\n")...)
+	}
+	return wrapped
+}
+func (m *Model) clampHelpOffset() {
+	p := m.helpGeometry(m.viewWidth())
+	m.helpOffset = min(max(0, m.helpOffset), max(0, len(m.helpLines(p.w))-max(1, p.h-4)))
+}
+func (m Model) overlayHelp(bg string, w int) string {
+	p := m.helpGeometry(w)
+	lines := m.helpLines(p.w)
+	rows := max(1, p.h-4)
+	start := min(m.helpOffset, max(0, len(lines)-rows))
+	end := min(len(lines), start+rows)
+	body := " " + strings.Join(lines[start:end], "\n ") + "\n\n ↑↓ Scroll · Esc / ? / F1 Close"
+	return overlayBox(bg, box("Help", body, p.w, p.h, true), p.x, p.y, w)
+}
+
+// Keep connectors intact on narrow terminals by switching to a compact map.
+func conceptDiagram(width int) []string {
+	if width < 48 {
+		return []string{
+			"Workflow",
+			" +-> Command A (step 1)",
+			" +-> Command B (step 2)",
+			"",
+			"Command B",
+			" +-> List: {env}",
+			" +-> Variable: {$root}",
+			" +-- Fixed: env=prod",
+			"",
+			"-> references (shared)",
+			"-- owns (command only)",
+		}
+	}
+	return []string{
+		"Workflow",
+		" |",
+		" +-- Step 1 --> Command A",
+		" +-- Step 2 --> Command B",
+		"                  |",
+		"                  +-- {env} --> List: env",
+		"                  |            dev / staging / prod",
+		"                  +-- {$root} --> Variable: root",
+		"                  |              /workspace",
+		"                  +-- Fixed values (owned)",
+		"                       env = prod",
+		"",
+		"--> references a shared item",
+	}
+}

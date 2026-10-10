@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -19,14 +20,14 @@ import (
 
 // The tabs, in the order they are numbered on screen.
 const (
-	tabCommands = iota
-	tabWorkflows
+	tabWorkflows = iota
+	tabCommands
 	tabLists
 	tabVars
 	tabCount
 )
 
-var tabNames = [tabCount]string{"Commands", "Workflows", "Lists", "Variables"}
+var tabNames = [tabCount]string{"Workflows", "Commands", "Lists", "Variables"}
 
 // exploreKind is what a list row stands for.
 type exploreKind int
@@ -40,11 +41,14 @@ const (
 
 // wsItem is one row of the list on the left.
 type wsItem struct {
-	kind  exploreKind
-	name  string // what the row stands for: a command, workflow, list or var name
-	label string // the name plus its tag, as drawn
-	note  string // trailing detail, dimmed
-	draft bool   // the row the open form is writing, not saved yet
+	group       string
+	commandType string
+	template    string
+	kind        exploreKind
+	name        string // what the row stands for: a command, workflow, list or var name
+	label       string // the name plus its tag, as drawn
+	note        string // trailing detail, dimmed
+	draft       bool   // the row the open form is writing, not saved yet
 }
 
 // exploreItems lists what the given tab holds, before any search.
@@ -68,7 +72,7 @@ func (m Model) exploreVisible() []wsItem {
 	items := m.exploreItems(m.exploreTab)
 	terms := strings.Fields(strings.ToLower(m.exploreSearch))
 	if len(terms) == 0 {
-		return items
+		return m.withValueDraft(items)
 	}
 	var out []wsItem
 	for _, it := range items {
@@ -76,7 +80,7 @@ func (m Model) exploreVisible() []wsItem {
 			out = append(out, it)
 		}
 	}
-	return out
+	return m.withValueDraft(out)
 }
 
 // exploreCommandItems lists every command, grouped by their group
@@ -109,11 +113,14 @@ func (m Model) exploreCommandItems() []wsItem {
 			label += "  {...}"
 		}
 		out = append(out, wsItem{
-			kind:  exCommand,
-			name:  c.Name,
-			label: label,
-			note:  "$ " + slot.ApplyVars(c.Cmd, m.vars),
-			draft: c.Source == draftSource,
+			kind:        exCommand,
+			name:        c.Name,
+			label:       label,
+			note:        "$ " + slot.ApplyVars(c.Cmd, m.vars),
+			draft:       c.Source == draftSource,
+			group:       c.Group,
+			commandType: commandKind(c),
+			template:    c.Template,
 		})
 	}
 	return out
@@ -150,18 +157,18 @@ func (m Model) exploreListItems() []wsItem {
 // for saved commands. Both are rows of vars.tsv; what a row is is said
 // on the row.
 func (m Model) exploreVarItems() []wsItem {
-	var globals, fixed []wsItem
+	var globals []wsItem
 	for _, k := range sortedKeys(m.vars) {
 		it := wsItem{kind: exVar, name: k, note: m.vars[k]}
 		if strings.Contains(k, ".") {
-			it.label = fixedValueLabel(k)
-			fixed = append(fixed, it)
+			it.label = "Fixed · " + fixedValueLabel(k)
+			// Fixed values are edited with their owning command.
 		} else {
-			it.label = "{$" + k + "}"
+			it.label = "Global · {$" + k + "}"
 			globals = append(globals, it)
 		}
 	}
-	return append(globals, fixed...)
+	return globals
 }
 
 // exploreDraftCommands is the command list as the overview should show
@@ -273,13 +280,17 @@ func countLabel(n int, unit string) string {
 // with the form open on the right, the list still fills the left, and
 // nothing else would say a command is half-written.
 func (m Model) exploreTitle() string {
+	title := "Project editor"
+	if m.projectDir != "" {
+		title += " · " + filepath.Base(filepath.Clean(m.projectDir))
+	}
 	if m.cf == nil {
-		return "Overview"
+		return title
 	}
 	if m.cf.mode == 1 {
-		return "Overview  ›  edit " + m.cf.origName
+		return title + " › Edit " + m.cf.origName
 	}
-	return "Overview  ›  new command"
+	return title + " › New command"
 }
 
 // exploreLayout is where the overview's parts land on screen. The view
@@ -296,6 +307,7 @@ type exploreLayout struct {
 
 	leftW  int // outer width of the list box (the whole width when single)
 	listY  int // screen row of the first list row
+	addY   int // fixed create action row; -1 when too short
 	listH  int // rows the list has for items
 	rightX int // column the right boxes start at
 	rightW int
@@ -325,7 +337,7 @@ func (m Model) exploreLayout(w int) exploreLayout {
 
 	var b strings.Builder
 	m.writeHeading(&b, m.exploreTitle(), w)
-	l := exploreLayout{tabY: strings.Count(b.String(), "\n")}
+	l := exploreLayout{addY: -1, tabY: strings.Count(b.String(), "\n")}
 
 	gap := 1
 	if m.compact() {
@@ -337,11 +349,14 @@ func (m Model) exploreLayout(w int) exploreLayout {
 	l.single = w < exploreMinList+exploreMinRight+1 || l.bodyH < 9
 
 	// The tab labels, so a click on one can be told from a click beside it.
-	x := 2
-	for i, name := range tabNames {
-		label := fmt.Sprintf("[%d %s]", i+1, name)
+	labels, sep := m.tabPresentation(w)
+	x := len(sep)
+	for i, label := range labels {
+		if i == 2 && sep == "  " {
+			x += 3
+		}
 		l.tabX[i] = [2]int{x, x + len(label)}
-		x += len(label) + 2
+		x += len(label) + len(sep)
 	}
 
 	l.leftW = w
@@ -359,6 +374,19 @@ func (m Model) exploreLayout(w int) exploreLayout {
 		// follows that, with the editor never cut below its fields.
 		l.editY = l.bodyY
 		l.editH = max(9, l.bodyH*40/100)
+		if m.cf == nil && m.screen == ScreenExplore && m.exploreTab == tabCommands {
+			it, _ := m.exploreCurrent()
+			if cmd, ok := m.config.FindCommand(it.name); ok {
+				need := 10
+				if cmd.Template != "" {
+					need += 1 + len(cmd.Values)
+				}
+				l.editH = max(l.editH, min(l.bodyH-3, need))
+			}
+		}
+		if m.cf != nil && m.cf.shellOpen {
+			l.editH = max(l.editH, min(l.bodyH, 10))
+		}
 		if m.cf != nil && m.cf.pickOpen {
 			// The candidates open under the fields and need rows of
 			// their own; the preview has nothing to say about a brace
@@ -368,7 +396,7 @@ func (m Model) exploreLayout(w int) exploreLayout {
 		if m.wfe != nil {
 			// The steps are the thing being worked on, so the box holds
 			// as many of them as it can before the preview has its say.
-			l.editH = max(l.editH, min(l.bodyH-3, len(m.wfe.steps)+4))
+			l.editH = max(5, min(l.bodyH/2, len(m.wfe.steps)+5))
 		}
 		l.prevH = l.bodyH - l.editH
 		if l.prevH < 3 {
@@ -386,10 +414,24 @@ func (m Model) exploreLayout(w int) exploreLayout {
 	} else {
 		l.listY = l.bodyY + 2
 		l.listH = max(1, l.bodyH-4)
+		if m.exploreTab == tabCommands && l.bodyH >= 6 {
+			l.listY++
+			l.listH--
+		}
+	}
+
+	if !l.plain && l.bodyH >= 7 {
+		l.addY = l.bodyY + l.bodyH - 2
+		l.listH--
 	}
 
 	l.items = m.exploreVisible()
 	l.cursor = min(max(0, m.exploreCursor[m.exploreTab]), max(0, len(l.items)-1))
+	for i, it := range l.items {
+		if it.draft && (m.exploreTab == tabLists || m.exploreTab == tabVars) {
+			l.cursor = i
+		}
+	}
 	l.start = windowStart(l.listH, len(l.items), l.cursor)
 	return l
 }

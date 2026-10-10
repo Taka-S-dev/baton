@@ -21,6 +21,7 @@ func (m Model) openNameInput(mode nameInputMode) (tea.Model, tea.Cmd) {
 	// Other forms (command fields, vars) repurpose the shared input with
 	// their own prompts — reset so a leftover prompt never leaks in here.
 	m.nameInput.Prompt = "Name > "
+	m.nameInput.Placeholder = ""
 	if mode == nameInputWorkflow {
 		// Pre-fill a suggested name built from the picked commands —
 		// Enter accepts it, editing replaces it.
@@ -194,6 +195,10 @@ func (m Model) updateDeleteLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) saveNewList(name string) (tea.Model, tea.Cmd) {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\\<>:\"|?*\t\r\n") || strings.HasSuffix(name, ".") {
+		m.nameInputErr = "use a list name without path separators or special filename characters"
+		return m, nil
+	}
 	if _, exists := m.lists[name]; exists {
 		m.nameInputErr = "name already in use: " + name
 		return m, nil
@@ -201,13 +206,19 @@ func (m Model) saveNewList(name string) (tea.Model, tea.Cmd) {
 	listsDir := filepath.Join(m.projectDir, "lists")
 	if err := slot.SaveList(listsDir, name, nil); err != nil {
 		m.errMsg = "failed to create list: " + err.Error()
+		return m, nil
 	} else {
 		m.successMsg = "created list \"" + name + "\""
 	}
+	if m.lists == nil {
+		m.lists = make(map[string][]mdl.ListEntry)
+	}
 	m.lists[name] = []mdl.ListEntry{}
+	m.selectExploreCreated(tabLists, name)
 	m.le = &listEditState{
 		name:    name,
 		entries: []mdl.ListEntry{},
+		adding:  m.exploreLaunched,
 	}
 	m.screen = ScreenEditList
 	return m, nil
@@ -228,16 +239,19 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				cmd := le.editLblTI.Focus()
 				return m, cmd
 			}
-			oldVal := le.entries[le.cursor].Value
+			oldEntry := le.entries[le.cursor]
+			oldVal := oldEntry.Value
 			le.entries[le.cursor] = mdl.ListEntry{
 				Value: le.editValTI.Value(),
 				Label: le.editLblTI.Value(),
 			}
-			le.editing = false
 			listsDir := filepath.Join(m.projectDir, "lists")
 			if err := slot.SaveList(listsDir, le.name, le.entries); err != nil {
 				m.errMsg = "failed to save list: " + err.Error()
+				le.entries[le.cursor] = oldEntry
+				return m, nil
 			}
+			le.editing = false
 			m.lists[le.name] = append([]mdl.ListEntry{}, le.entries...)
 			// Other values that shared the old value — fixed values and
 			// entries of any list — can follow, offered explicitly.
@@ -273,15 +287,17 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				le.entries = append(le.entries, mdl.ListEntry{Value: le.addVal, Label: le.addLbl})
+				listsDir := filepath.Join(m.projectDir, "lists")
+				if err := slot.SaveList(listsDir, le.name, le.entries); err != nil {
+					le.entries = le.entries[:len(le.entries)-1]
+					m.errMsg = "failed to save list: " + err.Error()
+					return m, nil
+				}
 				le.cursor = len(le.entries) - 1
 				le.adding = false
 				le.addVal = ""
 				le.addLbl = ""
 				le.addFld = 0
-				listsDir := filepath.Join(m.projectDir, "lists")
-				if err := slot.SaveList(listsDir, le.name, le.entries); err != nil {
-					m.errMsg = "failed to save list: " + err.Error()
-				}
 				m.lists[le.name] = append([]mdl.ListEntry{}, le.entries...)
 			}
 		case "backspace":
@@ -313,10 +329,11 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if le.cursor < total-1 {
 			le.cursor++
 		}
+	case "a":
+		le.startAdding()
 	case "enter":
 		if le.cursor == len(le.entries) {
-			le.adding = true
-			le.addFld = 0
+			le.startAdding()
 		} else {
 			entry := le.entries[le.cursor]
 			valTI := newListTextinput("Value > ", entry.Value)
@@ -367,4 +384,12 @@ func newListTextinput(prompt, value string) textinput.Model {
 	ti.Width = 48
 	ti.CharLimit = 256
 	return ti
+}
+
+// startAdding is shared by the shortcut and the visible Add row.
+// Keep the selection until an entry is saved, and start with a clean draft.
+func (le *listEditState) startAdding() {
+	le.adding = true
+	le.addFld = 0
+	le.addVal, le.addLbl = "", ""
 }

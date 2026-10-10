@@ -19,6 +19,9 @@ func (m *Model) gotoExplore() {
 }
 
 func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyDelete && !m.exploreSearching && (m.exploreTab == tabLists || m.exploreTab == tabVars) {
+		msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")}
+	}
 	items := m.exploreVisible()
 	cur := &m.exploreCursor[m.exploreTab]
 	if *cur >= len(items) {
@@ -60,15 +63,15 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// how they are learnt.
 	if m.exploreMenu {
 		it, ok := m.exploreCurrent()
-		acts := exploreActionsFor(it.kind)
+		acts := m.exploreActions(it)
 		if !ok || len(acts) == 0 {
 			m.exploreMenu = false
 			return m, nil
 		}
 		switch key := msg.String(); key {
-		case "up":
+		case "up", "k":
 			m.exploreMenuCursor = max(0, m.exploreMenuCursor-1)
-		case "down":
+		case "down", "j":
 			m.exploreMenuCursor = min(len(acts)-1, m.exploreMenuCursor+1)
 		case "enter":
 			return m, m.runExploreAction(acts[m.exploreMenuCursor].key, it)
@@ -91,12 +94,13 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down":
 		*cur = min(max(0, len(items)-1), *cur+1)
 	case " ":
-		if it, ok := m.exploreCurrent(); ok && len(exploreActionsFor(it.kind)) > 0 {
+		if it, ok := m.exploreCurrent(); ok && len(m.exploreActions(it)) > 0 {
+			m.actionAtMouse = false
 			m.exploreMenu, m.exploreMenuCursor = true, 0
 		}
-	case "d", "r", "x":
+	case "d", "r", "x", "f":
 		if it, ok := m.exploreCurrent(); ok {
-			for _, a := range exploreActionsFor(it.kind) {
+			for _, a := range m.exploreActions(it) {
 				if a.key == msg.String() {
 					return m, m.runExploreAction(a.key, it)
 				}
@@ -116,9 +120,20 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if it, ok := m.exploreCurrent(); ok {
 			return m, m.runExploreAction("e", it)
 		}
-	case "n":
-		if m.exploreTab == tabCommands {
+	case "a", "n":
+		switch m.exploreTab {
+		case tabCommands:
 			return m, m.openExploreCommandForm("")
+		case tabLists:
+			m.exploreLaunched = true
+			return m.openNameInput(nameInputNewList)
+		case tabVars:
+			m.exploreLaunched = true
+			return m.openNewVariable()
+		case tabWorkflows:
+			m.exploreLaunched = true
+			m.screen = ScreenCreateWorkflow
+			return m, m.setupMultiSelect()
 		}
 	case "[":
 		m.exploreSplit = m.exploreLayout(m.viewWidth()).leftW - 2
@@ -129,7 +144,9 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.exploreSearch = ""
 			break
 		}
-		m.gotoMainMenu()
+		if !m.backExploreLink() {
+			m.gotoMainMenu()
+		}
 	}
 	return m, nil
 }
@@ -150,6 +167,9 @@ func (m *Model) switchTab(tab int) {
 // manage menu always gave it, and comes back here when it closes.
 func (m *Model) openExploreCommandForm(name string) tea.Cmd {
 	cf := &commandFormState{mode: 0, editIdx: -1, returnTo: ScreenExplore}
+	if name == "" {
+		m.applyShellPreference(cf)
+	}
 	if name != "" {
 		names, refs := m.editableCommands()
 		for i, n := range names {
@@ -191,9 +211,27 @@ const wheelRows = 3
 // where things are drawn comes from exploreLayout, the same description
 // the view draws from.
 func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.exploreMenu {
+		return m.updateExploreActionMouse(msg)
+	}
 	if m.leaveAsk != leaveNone {
+		return m.updateLeaveMouse(msg)
+	}
+	if msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionPress && m.exploreListFocused() {
+		l := m.exploreLayout(m.viewWidth())
+		row := msg.Y - l.listY
+		if msg.X >= 0 && msg.X < l.leftW && row >= 0 && row < l.listH && l.start+row < len(l.items) {
+			m.exploreCursor[m.exploreTab] = l.start + row
+			it, _ := m.exploreCurrent()
+			if len(m.exploreActions(it)) > 0 {
+				m.exploreMenu, m.exploreMenuCursor = true, 0
+				m.actionAtMouse = true
+				m.contextX, m.contextY = msg.X, msg.Y
+			}
+		}
 		return m, nil
 	}
+	wasEditing := m.cf != nil || m.wfe != nil
 	l := m.exploreLayout(m.viewWidth())
 	cur := &m.exploreCursor[m.exploreTab]
 
@@ -227,12 +265,24 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
 			if !l.single && msg.X >= l.rightX {
-				if i := msg.Y - l.fieldY; i >= 0 && i < len(e.steps) {
-					e.cursor = i
+				if msg.X >= l.rightX+l.rightW-1 {
+					return m, nil
+				}
+				if msg.Y == l.editY+l.editH-2 {
+					return m.updateWorkflowEditor(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+				}
+				rows := max(1, l.editH-4)
+				row := msg.Y - l.fieldY
+				start := windowStart(rows, len(e.steps), e.cursor)
+				if row >= 0 && row < rows && start+row < len(e.steps) {
+					e.cursor = start + row
 				}
 				return m, nil
 			}
-			if msg.X < l.leftW && !m.askToLeave(leaveWorkflow) {
+			if msg.X < l.leftW {
+				if m.askToLeave(leaveWorkflow) {
+					return m, nil
+				}
 				m.wfe = nil
 			}
 		}
@@ -259,18 +309,6 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// With the menu open, a click on one of its rows runs that action
-	// and a click anywhere else closes it.
-	if m.exploreMenu {
-		m.exploreMenu = false
-		if it, ok := m.exploreCurrent(); ok && !l.single && msg.X >= l.rightX {
-			if i := msg.Y - l.fieldY; i >= 0 && i < len(exploreActionsFor(it.kind)) {
-				return m, m.runExploreAction(exploreActionsFor(it.kind)[i].key, it)
-			}
-		}
-		return m, nil
-	}
-
 	if msg.Y == l.tabY && m.cf == nil {
 		for i, span := range l.tabX {
 			if msg.X >= span[0] && msg.X < span[1] {
@@ -281,10 +319,22 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Lists and variables use the same editor entry point as Enter.
+	if !l.single && msg.X >= l.rightX && msg.X < l.rightX+l.rightW && msg.Y >= l.fieldY && msg.Y < l.editY+l.editH-1 && m.exploreListFocused() && (m.exploreTab == tabLists || m.exploreTab == tabVars) {
+		if it, ok := m.exploreCurrent(); ok {
+			return m, m.runExploreAction("e", it)
+		}
+	}
+
 	// The fields of the editor box, whether or not the caret is in them:
 	// a click on one means the same thing in both states.
 	if !l.single && msg.X >= l.rightX && m.exploreTab == tabCommands {
 		field := msg.Y - l.fieldY
+		if m.cf != nil && m.cf.shellOpen && field >= len(formOrder) && field < len(formOrder)+2 {
+			m.cf.shellCursor = field - len(formOrder)
+			m.acceptShellChoice()
+			return m, nil
+		}
 		if field < 0 || field >= len(formOrder) {
 			return m, nil
 		}
@@ -293,7 +343,7 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return m, m.cfGotoField(formFieldAt(field))
 		}
 		if it, ok := m.exploreCurrent(); ok {
-			cmd := m.openExploreCommandForm(it.name)
+			cmd := m.runExploreAction("e", it)
 			if m.cf == nil {
 				return m, cmd
 			}
@@ -305,8 +355,19 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if l.addY >= 0 && msg.Y == l.addY && msg.X > 0 && msg.X < l.leftW-1 {
+		if m.cf != nil {
+			if m.askToLeave(leaveForm) {
+				return m, nil
+			}
+			m.closeCommandForm()
+		}
+		m.exploreSearching = false
+		return m.updateExplore(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	}
+
 	// The search line sits above the rows inside the list box.
-	if !l.plain && msg.Y == l.listY-1 && m.cf == nil {
+	if !l.plain && msg.Y == l.bodyY+1 && m.cf == nil {
 		m.exploreSearching = true
 		return m, nil
 	}
@@ -335,10 +396,8 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	// A second click on the row already selected opens it, so picking
 	// something and editing it is one gesture twice.
-	if i == *cur {
-		if it := l.items[i]; it.kind == exCommand {
-			return m, m.openExploreCommandForm(it.name)
-		}
+	if i == *cur && !wasEditing {
+		return m, m.runExploreAction("e", l.items[i])
 	}
 	*cur = i
 	return m, nil

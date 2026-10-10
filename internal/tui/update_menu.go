@@ -8,22 +8,7 @@ import (
 
 // ── Project select ────────────────────────────────────────────────────────────
 
-func (m Model) updateProjectSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "up", "down":
-		m.moveListCursor(msg.String(), len(m.listItems))
-	case "enter":
-		dir := filepath.Join(m.projectsDir, m.projects[m.listCursor])
-		if err := m.loadProject(dir); err != nil {
-			m.errMsg = err.Error()
-		} else {
-			m.gotoPostLoad()
-		}
-	case "esc", "q":
-		return m, tea.Quit
-	}
-	return m, nil
-}
+func (m Model) updateProjectSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) { return m.updateProjects(msg) }
 
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
@@ -34,7 +19,7 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.mainMenuCursor = m.listCursor
 		switch m.listItems[m.listCursor] {
-		case "Overview":
+		case "Edit project":
 			m.gotoExplore()
 		case "Run workflow":
 			m.screen = ScreenRunWorkflow
@@ -68,8 +53,9 @@ func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.gotoManageLists()
 		case "Manage vars":
 			m.gotoVarsMgmt()
-		case "Switch config":
-			m.screen = ScreenSwitchConfig
+		case "Switch project":
+			m.screen = ScreenProjectSelect
+			m.refreshProjects()
 			m.listItems = m.projects
 			m.listCursor = 0
 		case "Exit":

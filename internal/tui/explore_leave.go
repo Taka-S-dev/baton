@@ -18,12 +18,14 @@ const (
 	leaveNone = iota
 	leaveForm
 	leaveWorkflow
+	leaveTemplate
+	leaveValue
 )
 
 var leaveChoices = []exploreAction{
+	{"k", "Keep editing"},
 	{"s", "Save and leave"},
 	{"d", "Discard changes"},
-	{"k", "Keep editing"},
 }
 
 // formDirty reports whether the form holds anything that is not saved:
@@ -44,6 +46,14 @@ func (m *Model) askToLeave(what int) bool {
 	switch what {
 	case leaveForm:
 		if !m.formDirty() {
+			return false
+		}
+	case leaveValue:
+		if !m.valueDraftDirty() {
+			return false
+		}
+	case leaveTemplate:
+		if !m.templateDraftDirty() {
 			return false
 		}
 	case leaveWorkflow:
@@ -79,6 +89,12 @@ func (m *Model) updateLeave(msg tea.KeyMsg) tea.Cmd {
 	switch key {
 	case "s":
 		m.leaveAsk = leaveNone
+		if what == leaveValue {
+			return m.saveValueBeforeLeaving()
+		}
+		if what == leaveTemplate {
+			return m.saveTemplateBeforeLeaving()
+		}
 		if what == leaveWorkflow {
 			return m.saveWorkflowSteps()
 		}
@@ -87,6 +103,14 @@ func (m *Model) updateLeave(msg tea.KeyMsg) tea.Cmd {
 		return cmd
 	case "d":
 		m.leaveAsk = leaveNone
+		if what == leaveValue {
+			m.closeExploreValue()
+			return nil
+		}
+		if what == leaveTemplate {
+			m.closeExploreTemplate()
+			return nil
+		}
 		if what == leaveWorkflow {
 			m.wfe = nil
 			return nil

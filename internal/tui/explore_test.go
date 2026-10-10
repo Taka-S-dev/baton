@@ -16,7 +16,7 @@ import (
 // exploreProject is a project with one of everything the workspace has
 // to show, including a workflow step whose command is gone.
 func exploreProject() Model {
-	m := Model{width: 110, height: 30, screen: ScreenExplore, projectDir: "demo", configFile: "commands.tsv"}
+	m := Model{exploreTab: tabCommands, width: 110, height: 30, screen: ScreenExplore, projectDir: "demo", configFile: "commands.tsv"}
 	m.config = mdl.Config{Base: []mdl.Command{
 		{Name: "build", Group: "make", Cmd: "make build", Dir: `{$root}\api`, Source: "tsv"},
 		{Name: "test", Group: "make", Cmd: "go test ./...", Source: "tsv"},
@@ -102,7 +102,7 @@ func TestExploreTabsHoldOneKindEach(t *testing.T) {
 		tabCommands:  {"deploy", "build", "test", "build-api", "hello"},
 		tabWorkflows: {"release", "smoke"},
 		tabLists:     {"env"},
-		tabVars:      {"root", "build-api.projDir"},
+		tabVars:      {"root"},
 	}
 	for tab, names := range want {
 		var got []string
@@ -130,22 +130,22 @@ func TestExploreTabSwitching(t *testing.T) {
 	if m.exploreCursor[tabCommands] != 1 {
 		t.Fatalf("the cursor did not move on the commands tab")
 	}
-	m = press(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	m = press(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
 	if m.exploreTab != tabWorkflows {
-		t.Fatalf("2 did not open the workflows tab")
+		t.Fatalf("1 did not open the workflows tab")
 	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyRight})
 	m = press(m, tea.KeyMsg{Type: tea.KeyRight})
 	if m.exploreTab != tabLists {
 		t.Errorf("→ did not move to the next tab")
 	}
-	m = press(m, tea.KeyMsg{Type: tea.KeyLeft})
 	m = press(m, tea.KeyMsg{Type: tea.KeyLeft})
 	if m.exploreTab != tabCommands || m.exploreCursor[tabCommands] != 1 {
 		t.Errorf("coming back did not land where the tab was left: tab=%d cursor=%d", m.exploreTab, m.exploreCursor[tabCommands])
 	}
 
 	l := m.exploreLayout(m.viewWidth())
-	y := rowOf(m.View(), "[1 Commands]")
+	y := rowOf(m.View(), "[2 Commands]")
 	if y != l.tabY {
 		t.Fatalf("the tab line is drawn on row %d but the layout says %d", y, l.tabY)
 	}
@@ -229,7 +229,7 @@ func TestExploreEditsInTheBox(t *testing.T) {
 		key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
 	view := stripStyle(m.View())
-	for _, want := range []string{"New command", "go-test  [make]", "Commands (6)", "{env} → env"} {
+	for _, want := range []string{"New command", "go-test", "Commands (6)", "{env} → env"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("while writing, the screen does not show %q\n%s", want, view)
 		}
@@ -248,12 +248,8 @@ func TestExploreEditsInTheBox(t *testing.T) {
 		t.Error("the draft was saved before Ctrl+S")
 	}
 
-	// Esc steps back a field at a time; with something typed, the Esc
-	// that would leave asks instead. One more Esc on the question
-	// would answer "keep editing", so the presses stop at the question.
-	for i := 0; i < 6 && m.leaveAsk == leaveNone; i++ {
-		key(tea.KeyMsg{Type: tea.KeyEsc})
-	}
+	// Esc asks about unsaved changes immediately, from any field.
+	key(tea.KeyMsg{Type: tea.KeyEsc})
 	if m.leaveAsk != leaveForm {
 		t.Fatalf("Esc out of a form with changes did not ask what to do with them")
 	}
@@ -320,7 +316,13 @@ func TestExploreClickHitsTheRowTheViewDrew(t *testing.T) {
 	m := exploreProject()
 	l := m.exploreLayout(m.viewWidth())
 	for i, it := range l.items {
-		y := rowOf(m.View(), it.label)
+		y := -1
+		for lineNo, line := range strings.Split(stripStyle(m.View()), "\n") {
+			if strings.Contains(truncate(line, l.leftW), it.name+"  ") {
+				y = lineNo
+				break
+			}
+		}
 		if y < 0 {
 			t.Fatalf("row %q is not drawn", it.label)
 		}
@@ -892,14 +894,15 @@ func TestWorkflowStepOpensItsCommand(t *testing.T) {
 	m := openReleaseEditor(t)
 	m = wfKey(m, tea.KeyMsg{Type: tea.KeyDown}) // test
 	m = wfKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.wfe != nil || m.exploreTab != tabCommands || m.cf == nil || m.cf.origName != "test" {
+	if m.wfe != nil || m.exploreTab != tabCommands || m.cf != nil || len(m.exploreHistory) != 1 {
 		t.Errorf("Enter on a step did not open its command: tab=%d wfe=%v cf=%+v", m.exploreTab, m.wfe, m.cf)
 	}
 
 	d := openReleaseEditor(t)
 	d = wfKey(d, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
 	d = wfKey(d, tea.KeyMsg{Type: tea.KeyEnter})
-	if d.wfe == nil || d.errMsg == "" {
+	d = press(d, tea.KeyMsg{Type: tea.KeyEsc})
+	if d.wfe == nil || !d.wfe.dirty {
 		t.Errorf("Enter with unsaved steps left the editor without a word: wfe=%v err=%q", d.wfe, d.errMsg)
 	}
 }
@@ -936,7 +939,7 @@ func TestWorkflowEditsFullScreenWhenNarrow(t *testing.T) {
 	m.width, m.height = 60, 20
 	m.exploreTab = tabWorkflows
 	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.screen != ScreenEditWorkflowCommands || m.wfe != nil {
+	if m.screen != ScreenExplore || m.wfe == nil {
 		t.Errorf("a narrow terminal should edit on its own screen: screen=%v wfe=%v", m.screen, m.wfe)
 	}
 }
@@ -1053,10 +1056,10 @@ func TestLeavingAsksOnlyWhenItWouldLoseSomething(t *testing.T) {
 	if c, _ := saved.config.FindCommand("deploy"); c.Cmd != "deploy --env {env}!" {
 		t.Errorf("s did not write the change: %q", c.Cmd)
 	}
-	// By the arrows: ↓ ↓ Enter is "keep editing".
-	byArrows := formKey(formKey(formKey(m, tea.KeyMsg{Type: tea.KeyDown}), tea.KeyMsg{Type: tea.KeyDown}), tea.KeyMsg{Type: tea.KeyEnter})
+	// Enter defaults to keeping the draft.
+	byArrows := formKey(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if byArrows.cf == nil || byArrows.leaveAsk != leaveNone {
-		t.Error("↓ ↓ Enter did not keep editing")
+		t.Error("Enter did not keep editing")
 	}
 
 	// A click on the list while the form has changes asks too, rather

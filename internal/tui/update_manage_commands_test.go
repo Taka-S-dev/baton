@@ -14,8 +14,7 @@ import (
 )
 
 // TestCommandForm_ShellField walks the create form through all fields and
-// checks the shell field: an unknown value is rejected with the cursor left
-// on the field, and "ps" (any case) is normalized and saved.
+// checks that only supported choices can be selected and saved.
 func TestCommandForm_ShellField(t *testing.T) {
 	m := &Model{}
 	m.nameInput = textinput.New()
@@ -33,12 +32,19 @@ func TestCommandForm_ShellField(t *testing.T) {
 	typeAndEnter("")                  // workdir
 	typeAndEnter("")                  // group
 
-	typeAndEnter("bash") // shell: invalid
-	if m.cf == nil || m.cf.fieldErr == "" || m.cf.fieldIdx != 4 {
-		t.Fatalf("invalid shell must be rejected under the field: cf=%+v", m.cf)
+	if !m.cf.shellOpen {
+		t.Fatal("Shell must open a selector")
 	}
-
-	typeAndEnter("PS") // shell: valid, normalized to lowercase
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("bash")})
+	if m.nameInput.Value() != "" {
+		t.Fatal("Shell must not accept arbitrary text")
+	}
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyDown})
+	m.updateCommandForm(enter)
+	if m.cf == nil || m.cf.shellOpen || m.cf.fields[4] != "ps" {
+		t.Fatal("Enter must confirm PowerShell without saving")
+	}
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
 	if m.cf != nil {
 		t.Fatalf("form must close after a valid save; errMsg=%q", m.errMsg)
 	}
@@ -854,6 +860,7 @@ func TestCommandForm_CreatedCommandIsEditable(t *testing.T) {
 		m.nameInput.SetValue(v)
 		m.updateCommandForm(enter)
 	}
+	m.updateCommandForm(tea.KeyMsg{Type: tea.KeyCtrlS})
 	if m.cf != nil {
 		t.Fatalf("form must close after a valid save, errMsg=%q", m.errMsg)
 	}

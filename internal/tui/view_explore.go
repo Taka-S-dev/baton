@@ -32,13 +32,7 @@ func (m Model) viewExplore(w int) string {
 
 	left := m.exploreListPane(l)
 	if l.single {
-		if it, ok := m.exploreCurrent(); ok && m.exploreMenu {
-			// No box to put the menu in: it floats over the list.
-			var menu strings.Builder
-			m.writeActionMenu(&menu, it)
-			win := box("Actions · "+it.name, menu.String(), min(w-4, 36), len(exploreActionsFor(it.kind))+2, true)
-			left = lipgloss.Place(w, l.bodyH, lipgloss.Center, lipgloss.Center, win)
-		}
+
 		b.WriteString(left)
 	} else {
 		right := m.exploreEditorBox(l)
@@ -50,28 +44,44 @@ func (m Model) viewExplore(w int) string {
 	b.WriteString("\n")
 
 	b.WriteString(gap + hline(w) + "\n")
-	b.WriteString("  " + gray(m.exploreKeys()) + "\n")
-	return b.String()
+	b.WriteString(gray(m.compactFooter(w)) + "\n")
+	view := b.String()
+	if m.exploreMenu {
+		view = m.overlayExploreActions(view, w)
+	}
+	return view
 }
 
 // exploreTabLine draws the tabs. The columns each label spans are what
 // exploreLayout records for clicks, so the spacing here and there is the
 // same arithmetic: two leading columns, two between labels.
 func (m Model) exploreTabLine() string {
-	parts := make([]string, 0, tabCount)
-	for i, name := range tabNames {
-		label := fmt.Sprintf("[%d %s]", i+1, name)
+	labels, sep := m.tabPresentation(m.viewWidth())
+	parts := make([]string, len(labels))
+	for i, label := range labels {
 		if i == m.exploreTab {
-			parts = append(parts, accentBold(label))
+			parts[i] = accentBold(label)
 		} else {
-			parts = append(parts, gray(label))
+			parts[i] = gray(label)
 		}
 	}
-	return "  " + strings.Join(parts, "  ")
+	if sep == "  " {
+		return "  " + strings.Join(parts[:2], sep) + "  │  " + strings.Join(parts[2:], sep)
+	}
+	return " " + strings.Join(parts, sep)
 }
 
 // exploreKeys is the key line, for the state the screen is in.
 func (m Model) exploreKeys() string {
+	if m.exploreTemplateFlow() {
+		return m.templatePaneKeys()
+	}
+	if m.exploreValueFlow() {
+		return m.valuePaneKeys()
+	}
+	if m.leaveAsk != leaveNone {
+		return "↑↓ Choose  Enter Confirm  s Save  d Discard  Esc Keep editing"
+	}
 	if m.cf != nil {
 		return m.formKeys()
 	}
@@ -87,7 +97,23 @@ func (m Model) exploreKeys() string {
 	if m.exploreMenu {
 		return "↑↓ Choose  Enter Do it  Esc Close"
 	}
-	return "↑↓ Select  Enter Open  Space Actions  / Search  1-4 Tab  n New  Esc Back"
+	keys := "↑↓ Select  Enter Open  Space Actions  / Search  1-4 Tab"
+	keys += "  a Add"
+	if m.exploreLayout(m.viewWidth()).single {
+		keys += "  v Details"
+	}
+	if m.exploreTab == tabLists || m.exploreTab == tabVars {
+		keys += "  Del/x Delete"
+	}
+	if len(m.exploreHistory) > 0 {
+		return keys + "  Esc Return"
+	}
+	return keys + "  Esc Back"
+}
+
+// exploreListFocused reports whether navigation keys belong to the list.
+func (m Model) exploreListFocused() bool {
+	return m.cf == nil && m.wfe == nil && !m.exploreMenu && m.leaveAsk == leaveNone && !m.exploreValueFlow() && !m.exploreTemplateFlow()
 }
 
 // exploreListPane draws the list box: the search line, the rows, and
@@ -100,7 +126,10 @@ func (m Model) exploreListPane(l exploreLayout) string {
 	}
 	var rows strings.Builder
 	writeWindowedList(&rows, l.listH, len(l.items), l.cursor, "(none)", func(i int) string {
-		return exploreRow(l.items[i], i == l.cursor, m.cf == nil, inner)
+		if m.exploreTab == tabCommands {
+			return searchHighlight(commandTableRow(l.items[i], i == l.cursor, m.exploreListFocused(), inner), strings.Fields(m.exploreSearch), i == l.cursor, m.exploreListFocused())
+		}
+		return searchHighlight(exploreRow(l.items[i], i == l.cursor, m.exploreListFocused(), inner), strings.Fields(m.exploreSearch), i == l.cursor, m.exploreListFocused())
 	})
 	body := strings.TrimRight(rows.String(), "\n")
 	if l.plain {
@@ -112,7 +141,24 @@ func (m Model) exploreListPane(l exploreLayout) string {
 	if m.exploreSearch != "" {
 		title = fmt.Sprintf("%s (%d/%d)", tabNames[m.exploreTab], len(l.items), all)
 	}
-	return box(title, m.exploreSearchLine()+"\n"+body, l.leftW, l.bodyH, m.cf == nil)
+	if m.exploreTab == tabCommands && l.bodyH >= 6 {
+		body = gray(commandTableLine(wsItem{name: "Name", group: "Group", commandType: "Type", note: "Command"}, inner)) + "\n" + body
+	}
+	content := m.exploreSearchLine() + "\n" + body
+	if l.addY >= 0 {
+		lines := strings.Split(content, "\n")
+		for len(lines) < l.bodyH-3 {
+			lines = append(lines, "")
+		}
+		label := " + Add " + []string{"workflow", "command", "list", "global variable"}[m.exploreTab]
+		if m.exploreListFocused() {
+			label = accent(label + "  a")
+		} else {
+			label = dim(label)
+		}
+		content = strings.Join(lines, "\n") + "\n" + label
+	}
+	return box(title, content, l.leftW, l.bodyH, m.exploreListFocused())
 }
 
 // exploreSearchLine is the first line inside the list box.
@@ -170,6 +216,12 @@ func exploreRow(it wsItem, selected, focused bool, w int) string {
 // exploreEditorBox is the box above the preview: the thing under the
 // cursor as it is defined, and the form once one is open.
 func (m Model) exploreEditorBox(l exploreLayout) string {
+	if m.exploreTemplateFlow() {
+		return m.exploreTemplateBox(l)
+	}
+	if m.exploreValueFlow() {
+		return m.exploreValueBox(l)
+	}
 	inner := l.rightW - 2
 	it, ok := wsItem{}, false
 	if l.cursor < len(l.items) {
@@ -183,11 +235,6 @@ func (m Model) exploreEditorBox(l exploreLayout) string {
 		// changes are in, with the three answers and their keys.
 		m.writeLeaveAsk(&b)
 		return box("Unsaved changes", b.String(), l.rightW, l.editH, true)
-	case m.exploreMenu && ok:
-		// The menu takes the editor box: what can be done to the row,
-		// each with the key that does it without the menu next time.
-		title = "Actions · " + it.name
-		m.writeActionMenu(&b, it)
 	case m.wfe != nil && m.wfe.idx < len(m.workflows):
 		title = "Edit workflow · " + m.workflows[m.wfe.idx].Name
 		if m.wfe.dirty {
@@ -196,7 +243,22 @@ func (m Model) exploreEditorBox(l exploreLayout) string {
 		if m.wfe.adding {
 			title = "Add a step · " + m.workflows[m.wfe.idx].Name
 		}
-		m.writeWorkflowEditor(&b, inner, l.editH-2)
+		if m.wfe.adding {
+			m.writeWorkflowEditor(&b, inner, l.editH-2)
+		} else {
+			m.writeWorkflowEditor(&b, inner, l.editH-3)
+			content := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+			for len(content) < l.editH-3 {
+				content = append(content, "")
+			}
+			b.Reset()
+			b.WriteString(strings.Join(content, "\n") + "\n")
+			hint := "first step"
+			if len(m.wfe.steps) > 0 {
+				hint = fmt.Sprintf("after step %d", m.wfe.cursor+1)
+			}
+			b.WriteString(accent(" + Add step  a") + dim(" · "+hint))
+		}
 		return box(title, b.String(), l.rightW, l.editH, true)
 	case m.exploreTab == tabCommands && m.cf != nil:
 		title = "New command"
@@ -225,6 +287,7 @@ func (m Model) exploreEditorBox(l exploreLayout) string {
 		title = "Command · " + it.name
 		cmd, _ := m.config.FindCommand(it.name)
 		m.writeCommandFields(&b, commandFields(cmd), -1, inner)
+		m.writeCommandIdentity(&b, cmd, inner)
 		b.WriteString("\n " + dim("Enter to edit") + "\n")
 	case it.kind == exWorkflow:
 		title = "Workflow · " + it.name
@@ -239,7 +302,10 @@ func (m Model) exploreEditorBox(l exploreLayout) string {
 			b.WriteString(line + "\n")
 		}
 	case it.kind == exVar:
-		title = "Variable · " + it.name
+		title = "Global variable · " + it.name
+		if _, _, scoped := scopedKey(it.name); scoped {
+			title = "Fixed value · " + it.name
+		}
 		m.writeVarDefinition(&b, it.name)
 	}
 	return box(title, b.String(), l.rightW, l.editH, m.cf != nil)
@@ -253,20 +319,25 @@ func (m Model) explorePreviewBox(l exploreLayout) string {
 	if l.cursor < len(l.items) {
 		it, ok = l.items[l.cursor], true
 	}
+	draft, valueDraft := m.newValueDraft()
 	var b strings.Builder
 	switch {
-	case m.wfe != nil:
-		// What the steps as they stand in the editor will run, live, so
-		// a reorder reads as the sequence it produces before it is saved.
-		for i, step := range m.wfe.steps {
-			cmd, ok := m.workflowStepCommand(step)
-			if !ok {
-				b.WriteString(fmt.Sprintf(" %2d  %s  %s\n", i+1, step, warn("(not found)")))
-				continue
-			}
-			r := slot.ApplyVarsToCommand(cmd, m.vars)
-			b.WriteString(fmt.Sprintf(" %2d  %s\n", i+1, gray("$ ")+truncate(r.Cmd, max(8, inner-7))))
+	case m.exploreTemplateFlow():
+		m.writeTemplatePreview(&b)
+	case valueDraft:
+		label := "New list"
+		if draft.kind == exVar {
+			label = "New global variable"
 		}
+		b.WriteString(" " + white(label) + " · " + highlight("unsaved") + "\n")
+		b.WriteString(" " + gray("name  ") + displayOr(draft.name, "(unnamed)") + "\n")
+		if draft.kind == exVar {
+			b.WriteString(" " + gray("value ") + draft.note + "\n")
+		}
+	case m.exploreValueFlow() && m.screen == ScreenEditList:
+		return m.listValueDetailBox(l)
+	case m.wfe != nil:
+		return m.workflowDetailBox(l)
 	case m.exploreTab == tabCommands && m.cf != nil:
 		f := m.cf.fields
 		f[m.cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value())
@@ -286,7 +357,8 @@ func (m Model) explorePreviewBox(l exploreLayout) string {
 	case it.kind == exWorkflow:
 		m.writeWorkflowSteps(&b, it.name, true, inner)
 	case it.kind == exList:
-		m.writeRefList(&b, "used by", m.listRefLocations(it.name), inner)
+		m.writeRefList(&b, "Commands using list: "+it.name, m.listRefLocations(it.name), inner)
+		return box("List usage", b.String(), l.rightW, l.prevH, false)
 	case it.kind == exVar:
 		if cmdName, _, scoped := scopedKey(it.name); scoped {
 			b.WriteString(" " + gray("fixed value of command ") + white(cmdName) + "\n")
@@ -301,13 +373,9 @@ func (m Model) explorePreviewBox(l exploreLayout) string {
 // and its cmd with every {$var} substituted. A {slot} stays as it is,
 // since it is answered at run time.
 func (m Model) writeResolved(b *strings.Builder, cmd mdl.Command) {
-	resolved := slot.ApplyVarsToCommand(cmd, m.vars)
-	dir := resolved.Dir
-	if dir == "" {
-		dir = "."
-	}
-	b.WriteString(" " + dim("workdir  ") + dir + "\n")
-	b.WriteString(" " + gray("$ ") + resolved.Cmd + "\n")
+	b.WriteString(" " + dim("workdir  ") + m.previewVars(displayOr(cmd.Dir, ".")) + "\n")
+	b.WriteString(" " + gray("$ ") + m.previewVars(cmd.Cmd) + "\n")
+	m.writeSyntaxWarnings(b, cmd.Dir+" "+cmd.Cmd)
 }
 
 // writeWorkflowSteps lists a workflow's steps: by name in the editor,
@@ -338,9 +406,12 @@ func (m Model) writeWorkflowSteps(b *strings.Builder, name string, resolved bool
 func (m Model) writeVarDefinition(b *strings.Builder, key string) {
 	cmdName, slotName, scoped := scopedKey(key)
 	if !scoped {
-		b.WriteString(" " + slotVar("{$"+key+"}") + " = " + m.vars[key] + "\n")
+		b.WriteString(" " + gray("Global variable · shared across commands") + "\n")
+		b.WriteString(" " + m.syntaxText("{$"+key+"}") + " = " + m.vars[key] + "\n")
 		return
 	}
+	b.WriteString(" " + gray("Fixed value · saved for this command") + "\n")
+	b.WriteString(" " + dim("Deleting this value restores the prompt at run time.") + "\n")
 	b.WriteString(" " + gray("command  ") + cmdName + "\n")
 	b.WriteString(" " + gray("slot     ") + slotName + "\n")
 	b.WriteString(" " + gray("value    ") + m.vars[key] + "\n")
@@ -409,7 +480,24 @@ func (m Model) writeCommandFields(b *strings.Builder, fields [5]string, focused,
 				mark = highlight("●")
 			}
 		}
-		if i == focused {
+		if i == 4 {
+			value := fields[4]
+			if i == focused {
+				value = m.nameInput.Value()
+			}
+			label := gray("Shell > ")
+			if i == focused {
+				label = accent("Shell > ")
+			}
+			description := shellChoiceLabel(value)
+			if editing && m.cf.shellRemembered && value == m.cf.original[4] {
+				description += " (last used)"
+			}
+			b.WriteString(mark + label + description + "\n")
+			if i == focused && m.cf.shellOpen && m.leaveAsk == leaveNone {
+				m.writeShellChoices(b)
+			}
+		} else if i == focused {
 			// Only the prompt is set here. The width belongs to the
 			// moment the field is focused, because that is when the
 			// textinput decides which part of a long value to show.
@@ -418,7 +506,11 @@ func (m Model) writeCommandFields(b *strings.Builder, fields [5]string, focused,
 		} else {
 			value := dim("-")
 			if fields[i] != "" {
-				value = truncate(fields[i], max(8, w-len(label)-4))
+				value = fields[i]
+				if i == 1 || i == 2 {
+					value = m.syntaxText(value)
+				}
+				value = ansi.Truncate(value, max(8, w-len(label)-4), "…")
 			}
 			b.WriteString(mark + gray(label+" > ") + value + "\n")
 		}
@@ -441,13 +533,13 @@ func commandFields(c mdl.Command) [5]string {
 func categoryHelp(tab int) (what, how string) {
 	switch tab {
 	case tabWorkflows:
-		return "Commands in a fixed order, run as one.", "pick commands in Manage workflows"
+		return "Commands in a fixed order, run as one.", "press a to create a workflow"
 	case tabCommands:
-		return "The things baton runs.", "press n"
+		return "The things baton runs.", "press a"
 	case tabLists:
-		return "The choices a {slot} offers when a command asks for one.", "add lists/<name>.tsv"
+		return "The choices a {slot} offers when a command asks for one.", "press a to create a list (example: env with dev / prod)"
 	case tabVars:
-		return "Values substituted for {$name} wherever it appears.", "add a * row to vars.tsv"
+		return "Shared constants referenced as {$name}. Command-specific fixed values are edited in Commands.", "press a to create a global variable (example: root = C:/work)"
 	}
 	return "", ""
 }
@@ -495,7 +587,16 @@ func box(title, content string, w, h int, focused bool) string {
 // arrow that takes the suggested name, and it is shown only when there
 // is one to take.
 func (m Model) formKeys() string {
+	if m.cf.fieldIdx == 4 {
+		if m.cf.shellOpen {
+			return "↑↓ Select shell  Enter Confirm  Tab/Shift+Tab Field  Esc Close"
+		}
+		return "Enter Choose shell  Tab/Shift+Tab Field  Ctrl+S Save  Esc Back to list"
+	}
 	keys := "Tab/Shift+Tab Field  Enter Next  Ctrl+S Save  Esc Back"
+	if m.cf.returnTo == ScreenExplore {
+		keys = "Tab/Shift+Tab Field  Enter Next  Ctrl+S Save  Esc Back to list"
+	}
 	switch {
 	case m.cf.pickOpen:
 		return "↑↓ Choose  Enter Insert  Esc Close  Type to narrow"
@@ -536,24 +637,10 @@ func (m Model) writePickCandidates(b *strings.Builder, cf *commandFormState, w, 
 		if i == cursor {
 			marker, text = " ▶ ", highlight(c.text)
 		}
-		b.WriteString(marker + text + "  " + dim(truncate(c.what, max(8, w-len(c.text)-5))) + "\n")
+		b.WriteString(searchHighlight(marker+text+"  "+dim(truncate(c.what, max(8, w-len(c.text)-5))), []string{cf.pickTyped(m.nameInput)}, i == cursor, true) + "\n")
 	}
 	if rest := len(cands) - start - show; rest > 0 {
 		b.WriteString("   " + dim(fmt.Sprintf("↓ %d more", rest)) + "\n")
-	}
-}
-
-// writeActionMenu lists what can be done to an item, the chosen one
-// marked, each with its key: the menu is how the keys are learnt, and
-// once learnt they work without it.
-func (m Model) writeActionMenu(b *strings.Builder, it wsItem) {
-	for i, a := range exploreActionsFor(it.kind) {
-		marker := "   "
-		label := a.label
-		if i == m.exploreMenuCursor {
-			marker, label = " ▶ ", white(a.label)
-		}
-		b.WriteString(marker + accentBold(a.key) + "  " + label + "\n")
 	}
 }
 
@@ -573,7 +660,7 @@ func (m Model) writeWorkflowEditor(b *strings.Builder, w, rows int) {
 			if i == e.addCursor {
 				marker, name = " ▶ ", white(cands[i])
 			}
-			return marker + name + "  " + dim(truncate(cmd.Cmd, max(8, w-len(cands[i])-6)))
+			return searchHighlight(marker+name+"  "+dim(truncate(cmd.Cmd, max(8, w-len(cands[i])-6))), strings.Fields(e.addSearch), i == e.addCursor, true)
 		})
 		b.WriteString(list.String())
 		return

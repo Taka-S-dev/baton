@@ -365,9 +365,12 @@ type commandFormState struct {
 	// workdir field: what can go there, filtered by what is typed after
 	// the brace. The brace stays in the text; choosing a candidate
 	// replaces it and what followed it with the full placeholder.
-	pickOpen   bool
-	pickCursor int
-	pickFrom   int // rune index of the { that opened it
+	shellRemembered bool
+	shellOpen       bool
+	shellCursor     int
+	pickOpen        bool
+	pickCursor      int
+	pickFrom        int // rune index of the { that opened it
 }
 
 var commandFormLabels = [5]string{"Name", "Cmd", "Workdir (optional)", "Group (optional)", shellFormLabel()}
@@ -384,6 +387,9 @@ func shellFormLabel() string {
 // Model is the main bubbletea model.
 type Model struct {
 	dryRun           bool
+	projectMode      string
+	projectInput     string
+	projectFilter    string
 	projectsDir      string
 	projects         []string
 	projectCmdCounts map[string]int
@@ -483,6 +489,10 @@ type Model struct {
 	// Overview: which tab is open, where the cursor sits on each tab —
 	// kept per tab, so switching away and back lands where you were —
 	// and the search typed over the list.
+	narrowDetails    bool
+	helpOpen         bool
+	helpOffset       int
+	exploreHistory   []exploreLocation
 	exploreTab       int
 	exploreCursor    [tabCount]int
 	exploreSearch    string
@@ -491,9 +501,14 @@ type Model struct {
 	// The action menu Space opens over the row under the cursor, and
 	// the flag a flow launched from here carries so that, where it
 	// would go back to its own menu, it comes back here instead.
-	exploreMenu       bool
-	exploreMenuCursor int
-	exploreLaunched   bool
+	contextActions     []clipboardAction
+	contextCursor      int
+	pasteMenu          bool
+	contextX, contextY int
+	actionAtMouse      bool
+	exploreMenu        bool
+	exploreMenuCursor  int
+	exploreLaunched    bool
 
 	// The workflow being edited in the box beside the list, as a working
 	// copy of its steps; nil when none is.
@@ -531,9 +546,6 @@ func New(dryRun bool) (Model, error) {
 		return Model{}, fmt.Errorf("no projects/ directory found next to the executable")
 	}
 	projects := config.ListProjects(projectsDir)
-	if len(projects) == 0 {
-		return Model{}, fmt.Errorf("no projects found in %s", projectsDir)
-	}
 
 	cmdCounts := make(map[string]int, len(projects))
 	for _, p := range projects {
@@ -592,6 +604,7 @@ func (m *Model) loadProject(projectDir string) error {
 	m.snapOld = config.LoadSnapshot(projectDir)
 	m.renames = config.DetectRenames(p.Config, p.Workflows, p.Vars, m.snapOld)
 	m.renameBtn = 1
+	m.mainMenuCursor = m.defaultMainMenuCursor()
 	return nil
 }
 

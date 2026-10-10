@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 // An action is one thing that can be done to the row under the cursor.
@@ -56,9 +57,27 @@ func exploreActionsFor(kind exploreKind) []exploreAction {
 // back here instead.
 func (m *Model) runExploreAction(key string, it wsItem) tea.Cmd {
 	m.exploreMenu = false
+	if it.kind == exCommand {
+		for i, link := range m.commandLinks(it.name) {
+			if key == linkKey(i) {
+				m.openExploreLink(link.tab, link.name)
+				return nil
+			}
+		}
+	}
 	m.exploreLaunched = true
 	switch it.kind {
 	case exCommand:
+		if key == "f" {
+			idx := m.getTemplateRefIdx(it.name)
+			if idx < 0 {
+				m.exploreLaunched = false
+				return nil
+			}
+			m.sce = &commandEditState{mode: 0, editIdx: -1, templateRefIdx: idx}
+			_, cmd := m.startCommandSlots()
+			return cmd
+		}
 		return m.runCommandAction(key, it.name)
 	case exWorkflow:
 		return m.runWorkflowAction(key, it.name)
@@ -164,16 +183,9 @@ func (m *Model) runWorkflowAction(key, name string) tea.Cmd {
 	}
 	switch key {
 	case "e":
-		// The steps are edited in the box beside the list. Without room
-		// for the box, the multi-select screen does the same job.
-		if !m.exploreLayout(m.viewWidth()).single {
-			m.exploreLaunched = false
-			m.openWorkflowEditor(name)
-			return nil
-		}
-		m.editTargetIdx = at
-		m.screen = ScreenEditWorkflowCommands
-		return m.setupMultiSelectWithPreSelected(m.workflows[at].Commands)
+		m.exploreLaunched = false
+		m.openWorkflowEditor(name)
+		return nil
 	case "r":
 		m.editTargetIdx = at
 		m.nameInput.SetValue(name)
@@ -280,4 +292,34 @@ func (m *Model) returnFromFlow() bool {
 	m.exploreLaunched = false
 	m.gotoExplore()
 	return true
+}
+
+// selectExploreCreated reveals a saved item even when a search hid its name.
+func (m *Model) selectExploreCreated(tab int, name string) {
+	if !m.exploreLaunched {
+		return
+	}
+	m.exploreTab = tab
+	m.exploreSearch, m.exploreSearching = "", false
+	for i, it := range m.exploreItems(tab) {
+		if it.name == name {
+			m.exploreCursor[tab] = i
+			return
+		}
+	}
+}
+
+func (m Model) exploreActions(it wsItem) []exploreAction {
+	actions := exploreActionsFor(it.kind)
+	if it.kind == exCommand {
+		if cmd, ok := m.config.FindCommand(it.name); ok && cmd.Template == "" && slot.HasPlaceholders(cmd) {
+			actions = append(actions, exploreAction{"f", "From template"})
+		}
+	}
+	if it.kind == exCommand {
+		for i, link := range m.commandLinks(it.name) {
+			actions = append(actions, exploreAction{linkKey(i), link.label})
+		}
+	}
+	return actions
 }

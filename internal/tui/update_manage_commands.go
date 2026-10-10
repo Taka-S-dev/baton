@@ -86,6 +86,9 @@ func (m *Model) updateCreateCommandKind(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // or the index of a concrete command in config.Commands to edit it.
 func (m *Model) openCommandForm(editIdx int) (tea.Model, tea.Cmd) {
 	cf := &commandFormState{mode: 0, editIdx: -1, returnTo: ScreenManageCommands}
+	if editIdx < 0 {
+		m.applyShellPreference(cf)
+	}
 	if editIdx >= 0 && editIdx < len(m.config.Commands) {
 		cmd := m.config.Commands[editIdx]
 		cf.mode = 1
@@ -127,6 +130,7 @@ func (m *Model) formNameTaken(name string) bool {
 func (m *Model) closeCommandForm() {
 	back := m.cf.returnTo
 	m.cf = nil
+	m.nameInput.Blur()
 	m.nameInput.Prompt = "Name > "
 	m.screen = back
 }
@@ -135,6 +139,11 @@ func (m *Model) closeCommandForm() {
 func (m *Model) cfGotoField(idx int) tea.Cmd {
 	m.cf.fieldIdx = idx
 	m.cf.pickOpen = false
+	m.cf.shellOpen = idx == 4
+	m.cf.shellCursor = 0
+	if strings.EqualFold(m.cf.fields[4], "ps") {
+		m.cf.shellCursor = 1
+	}
 	m.resizeNameInput()
 	// An empty name field shows the name the cmd suggests, dimmed in
 	// place, and → takes it. Elsewhere the placeholder is nothing.
@@ -171,7 +180,9 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		newCmd.Name, newCmd.Cmd, newCmd.Dir, newCmd.Group, newCmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
 		if file, err := config.UpdateCommandTSV(m.projectDir, cf.origName, newCmd); err != nil {
 			m.errMsg = "failed to save: " + err.Error()
+			return m, nil
 		} else {
+			m.rememberShell(shell)
 			m.config.Base[cf.editIdx] = newCmd
 			m.successMsg = "updated command \"" + name + "\" in " + file
 			if cf.origName != name {
@@ -199,7 +210,9 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		}
 		if err != nil {
 			m.errMsg = "failed to save: " + err.Error()
+			return m, nil
 		} else {
+			m.rememberShell(shell)
 			m.successMsg = "updated command \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 		}
 		m.closeCommandForm()
@@ -222,7 +235,9 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 	}
 	if file, err := config.AppendCommandTSV(m.projectDir, newCmd); err != nil {
 		m.errMsg = "failed to save: " + err.Error()
+		return m, nil
 	} else {
+		m.rememberShell(shell)
 		m.config.Base = append(m.config.Base, newCmd)
 		m.successMsg = "created command \"" + name + "\" in " + file
 	}
@@ -239,6 +254,11 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.updateLeave(msg)
 	}
 	cf := m.cf
+	if cf.fieldIdx == 4 {
+		if handled, cmd := m.updateShellChoice(msg); handled {
+			return m, cmd
+		}
+	}
 	pos := formPos(cf.fieldIdx)
 	key := msg.String()
 	commit := func() { cf.fields[cf.fieldIdx] = strings.TrimSpace(m.nameInput.Value()) }
@@ -347,10 +367,7 @@ func (m *Model) updateCommandForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "esc":
-		if pos > 0 {
-			commit()
-			return m, m.cfGotoField(formFieldAt(pos - 1))
-		}
+		// Escape leaves the editor from every field; Shift+Tab moves back.
 		if m.askToLeave(leaveForm) {
 			return m, nil
 		}
@@ -554,6 +571,9 @@ func (m *Model) updateEditCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		editIdx := m.sce.editIdx
 		m.sce = nil
+		if m.returnFromFlow() {
+			return m, nil
+		}
 		m.gotoEditCommandPick(editRef{idx: editIdx})
 	}
 	return m, nil
@@ -734,6 +754,7 @@ func (m *Model) updateCreateCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.successMsg = "created command \"" + name + "\""
 		}
+		m.selectExploreCreated(tabCommands, name)
 		m.gotoManageCommands()
 		m.listCursor = 0
 		m.sce = nil
@@ -819,6 +840,7 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.successMsg = "updated command \"" + name + "\"" + refSummary(wfSteps, tplRefs)
 		}
+		m.selectExploreCreated(tabCommands, name)
 		m.gotoManageCommands()
 		m.listCursor = 1
 		m.sce = nil
@@ -1136,6 +1158,11 @@ func (m *Model) backFromCommandNameInput() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) backToCommandTemplatePick() (tea.Model, tea.Cmd) {
+	if m.exploreLaunched && m.sce.mode == 0 {
+		m.sce, m.sp = nil, nil
+		m.returnFromFlow()
+		return m, nil
+	}
 	switch {
 	case m.sce.mode == 1 && !m.sce.pickedTemplate:
 		// Change values skipped the template pick — return to the menu.

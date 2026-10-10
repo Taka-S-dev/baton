@@ -216,6 +216,7 @@ func (m Model) saveWorkflow(name string) (tea.Model, tea.Cmd) {
 	} else {
 		m.successMsg = "created workflow \"" + name + "\""
 	}
+	m.selectExploreCreated(tabWorkflows, name)
 	m.pendingWorkflowCmds = nil
 	m.gotoWorkflowMgmt()
 	return m, nil

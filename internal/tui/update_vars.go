@@ -137,11 +137,7 @@ func (m Model) updateVarsMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		switch m.listItems[m.listCursor] {
 		case "Create variable (global)":
-			m.ve = &varEditState{mode: 0}
-			m.nameInput.SetValue("")
-			m.nameInput.Prompt = "name  > "
-			m.screen = ScreenVarForm
-			return m, m.nameInput.Focus()
+			return m.openNewVariable()
 		case "Edit variable":
 			m.screen = ScreenEditVarPick
 			m.setVarPickBase()
@@ -186,6 +182,15 @@ func (m Model) updateEditVarPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) openNewVariable() (tea.Model, tea.Cmd) {
+	m.ve = &varEditState{mode: 0}
+	m.nameInput.SetValue("")
+	m.nameInput.Placeholder = ""
+	m.nameInput.Prompt = "name  > "
+	m.screen = ScreenVarForm
+	return m, m.nameInput.Focus()
+}
+
 // ── Create / edit form ────────────────────────────────────────────────────────
 
 func (m Model) updateVarForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -221,6 +226,9 @@ func (m Model) updateVarForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.ve = nil
+		if m.returnFromFlow() {
+			return m, nil
+		}
 		if ve.mode == 1 {
 			m.screen = ScreenEditVarPick
 			m.setVarPickBase()
@@ -240,12 +248,19 @@ func (m Model) saveVar(value string) (tea.Model, tea.Cmd) {
 	if m.vars == nil {
 		m.vars = make(map[string]string)
 	}
+	oldValue, existed := m.vars[ve.name]
 	m.vars[ve.name] = value
 	if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+		if existed {
+			m.vars[ve.name] = oldValue
+		} else {
+			delete(m.vars, ve.name)
+		}
 		m.errMsg = "failed to save vars.tsv: " + err.Error()
 		return m, nil
 	}
 	m.ve = nil
+	m.selectExploreCreated(tabVars, ve.name)
 
 	if _, _, scoped := scopedKey(ve.name); scoped {
 		// A saved command's fixed value: mirror it into the command and

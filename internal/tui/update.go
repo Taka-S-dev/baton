@@ -24,6 +24,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = ws.Width
 		m.height = ws.Height
 		m.updateStepsViewport()
+		if m.cf != nil && m.cf.returnTo == ScreenExplore {
+			if m.exploreLayout(m.viewWidth()).single {
+				m.screen = ScreenCommandForm
+			} else {
+				m.screen = ScreenExplore
+			}
+		}
 		// A field already holding a value has to be told the new width
 		// before it is asked to draw, and then re-shown the value so it
 		// works out what fits all over again.
@@ -36,6 +43,166 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.narrowDetails && !m.helpOpen {
+		if key, ok := msg.(tea.KeyMsg); ok {
+			switch key.String() {
+			case "esc", "v":
+				m.narrowDetails = false
+				return m, nil
+			case "f1":
+				m.helpOpen = true
+				m.helpOffset = 0
+				return m, nil
+			case "ctrl+c":
+				return m, tea.Quit
+			}
+		}
+		return m, nil
+	}
+	if m.helpOpen {
+		switch input := msg.(type) {
+		case tea.KeyMsg:
+			switch input.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "esc", "?", "f1":
+				m.helpOpen = false
+			case "up", "k":
+				m.helpOffset = max(0, m.helpOffset-1)
+			case "down", "j":
+				m.helpOffset++
+			case "pgdown":
+				m.helpOffset += 8
+			case "pgup":
+				m.helpOffset = max(0, m.helpOffset-8)
+			}
+			m.clampHelpOffset()
+			return m, nil
+		case tea.MouseMsg:
+			p := m.helpGeometry(m.viewWidth())
+			if input.Button == tea.MouseButtonWheelDown {
+				m.helpOffset += 3
+			}
+			if input.Button == tea.MouseButtonWheelUp {
+				m.helpOffset = max(0, m.helpOffset-3)
+			}
+			if input.Action == tea.MouseActionPress && input.Button == tea.MouseButtonLeft && (input.X < p.x || input.X >= p.x+p.w || input.Y < p.y || input.Y >= p.y+p.h) {
+				m.helpOpen = false
+			}
+			m.clampHelpOffset()
+			return m, nil
+		}
+	}
+	if key, ok := msg.(tea.KeyMsg); ok && m.screen != ScreenRunning {
+		question := key.String() == "?" && m.screen == ScreenExplore && m.exploreListFocused() && !m.exploreSearching
+		if key.String() == "f1" || question {
+			m.helpOpen = true
+			m.helpOffset = 0
+			return m, nil
+		}
+	}
+	if m.leaveAsk != leaveNone {
+		switch input := msg.(type) {
+		case tea.MouseMsg:
+			return m.updateLeaveMouse(input)
+		case tea.KeyMsg:
+			if input.Type != tea.KeyCtrlC {
+				return m, m.updateLeave(input)
+			}
+		}
+	}
+
+	if pasted, ok := msg.(contextPasteMsg); ok {
+		if pasted.err != nil {
+			m.errMsg = "Paste failed: " + pasted.err.Error()
+			return m, nil
+		}
+		return m.insertClipboard(pasted.text)
+	}
+	if m.pasteMenu {
+		return m.updateClipboardMenu(msg)
+	}
+	if input, ok := msg.(tea.MouseMsg); ok && input.Button == tea.MouseButtonRight && input.Action == tea.MouseActionPress && m.contextInputActive() {
+		l := m.exploreLayout(m.viewWidth())
+		if l.single || (input.X > l.rightX && input.X < l.rightX+l.rightW-1 && input.Y >= l.fieldY && input.Y < l.editY+l.editH-1) {
+			m.contextActions = []clipboardAction{{"p", "Paste", "", true}, {"c", "Copy value", m.contextInputValue(), false}}
+			m.contextCursor = 0
+			m.pasteMenu = true
+			m.contextX, m.contextY = input.X, input.Y
+			return m, nil
+		}
+	}
+	if input, ok := msg.(tea.KeyMsg); ok && input.Type == tea.KeyCtrlV && m.contextInputActive() {
+		return m, readContextClipboard
+	}
+
+	if result, ok := msg.(contextCopyMsg); ok {
+		if result.err != nil {
+			m.errMsg = "Copy failed: " + result.err.Error()
+		} else {
+			m.successMsg = "Copied"
+		}
+		return m, nil
+	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && mouse.Button == tea.MouseButtonRight && mouse.Action == tea.MouseActionPress && m.screen == ScreenExplore && !m.exploreMenu {
+		l := m.exploreLayout(m.viewWidth())
+		if !l.single && mouse.X > l.rightX && mouse.X < l.rightX+l.rightW-1 && mouse.Y >= l.fieldY && mouse.Y < l.bodyY+l.bodyH-1 {
+			if actions := m.commandCopyActions(); len(actions) > 0 {
+				m.contextActions = actions
+				m.contextCursor = 0
+				m.pasteMenu = true
+				m.contextX, m.contextY = mouse.X, mouse.Y
+				return m, nil
+			}
+		}
+	}
+	if key, ok := msg.(tea.KeyMsg); ok && key.String() == "v" && m.exploreLayout(m.viewWidth()).single && m.screen == ScreenExplore && m.cf == nil && !m.exploreSearching && !m.exploreMenu && (m.wfe == nil || !m.wfe.adding) {
+		m.narrowDetails = true
+		return m, nil
+	}
+	if result, ok := msg.(projectFolderMsg); ok {
+		if result.err != nil {
+			m.errMsg = "Open folder failed: " + result.err.Error()
+		}
+		return m, nil
+	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenProjectSelect {
+		if m.projectMode != "" && m.projectMode != "search" {
+			if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
+				pw, ph := min(68, m.viewWidth()), min(8, m.termHeight())
+				x, y := max(0, (m.viewWidth()-pw)/2), max(0, (m.termHeight()-ph)/2)
+				if mouse.X < x || mouse.X >= x+pw || mouse.Y < y || mouse.Y >= y+ph {
+					m.projectMode = ""
+					return m, nil
+				}
+				row := mouse.Y - y - 1
+				if m.projectMode == "actions" && row >= 0 && row < 3 {
+					return m.updateProjects(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune([]string{"o", "c", "x"}[row])})
+				}
+			}
+			return m, nil
+		}
+		if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && mouse.Y == 1 {
+			m.projectMode = "search"
+			return m, nil
+		}
+		names := m.visibleProjects()
+		y, rows := m.projectRows(m.viewWidth())
+		if mouse.Action == tea.MouseActionPress {
+			if mouse.Y == m.termHeight()-3 && mouse.Button == tea.MouseButtonLeft {
+				return m.updateProjects(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+			}
+			row := mouse.Y - y
+			i := windowStart(rows, len(names), m.listCursor) + row
+			if row >= 0 && row < rows && i < len(names) {
+				m.listCursor = i
+				if mouse.Button == tea.MouseButtonRight {
+					m.projectMode = "actions"
+				}
+			}
+		}
+		return m, nil
+	}
 	// Always forward to spinner so TickMsg animates it.
 	{
 		s, c := m.spinner.Update(msg)
@@ -46,6 +213,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			_ = c
 		}
+	}
+
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.exploreTemplateFlow() && !m.exploreLayout(m.viewWidth()).single {
+		return m.updateExploreTemplateMouse(mouse)
+	}
+
+	// Mouse input for embedded value editors must reach the pane before textinput.
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.exploreValueFlow() && !m.exploreLayout(m.viewWidth()).single {
+		return m.updateExploreValueMouse(mouse)
 	}
 
 	// Forward non-key messages to textinput (handles internal blink tick).

@@ -118,25 +118,16 @@ func (m Model) updateWorkflowEditor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			e.dirty = true
 		}
 	case "enter":
-		// Open the command the step names: over on the commands tab,
-		// with the cursor on it. Unsaved steps stay here until saved.
-		if e.dirty {
-			m.errMsg = "save the steps first (Ctrl+S), or Esc to discard them"
-			return m, nil
-		}
 		if n == 0 {
 			return m, nil
 		}
 		name := e.steps[e.cursor]
-		m.wfe = nil
-		m.switchTab(tabCommands)
-		for i, it := range m.exploreVisible() {
-			if it.name == name {
-				m.exploreCursor[tabCommands] = i
-				return m, m.runExploreAction("e", it)
-			}
+		if _, ok := m.workflowStepCommand(name); !ok {
+			m.errMsg = "command not found: " + name
+			return m, nil
 		}
-		m.errMsg = "command \"" + name + "\" not found"
+		m.openExploreLink(tabCommands, name)
+
 	case "ctrl+s":
 		return m, m.saveWorkflowSteps()
 	case "esc":
@@ -156,8 +147,10 @@ func (m *Model) saveWorkflowSteps() tea.Cmd {
 		m.wfe = nil
 		return nil
 	}
+	original := m.workflows[e.idx].Commands
 	m.workflows[e.idx].Commands = append([]string{}, e.steps...)
 	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
+		m.workflows[e.idx].Commands = original
 		m.errMsg = "failed to save: " + err.Error()
 		return nil
 	}

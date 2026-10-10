@@ -63,6 +63,28 @@ func trimBanner(banner []string, n int) []string {
 // renderScreen draws the active screen. The frame it returns is budgeted
 // against m.termHeight, which is the terminal less the banner rows.
 func (m Model) renderScreen(w int) string {
+	if m.narrowDetails && !m.helpOpen {
+		return m.viewNarrowDetails(w)
+	}
+	if m.helpOpen {
+		bg := m
+		bg.helpOpen = false
+		return m.overlayHelp(bg.renderScreen(w), w)
+	}
+	if m.pasteMenu {
+		bg := m
+		bg.pasteMenu = false
+		p := m.pastePopup(w)
+		return overlayBox(bg.renderScreen(w), box("Clipboard", m.clipboardMenuBody(), p.w, p.h, true), p.x, p.y, w)
+	}
+	if m.leaveAsk != leaveNone {
+		background := m
+		background.leaveAsk = leaveNone
+		return m.overlayLeaveAsk(background.renderScreen(w), w)
+	}
+	if (m.exploreValueFlow() || m.exploreTemplateFlow()) && !m.exploreLayout(w).single {
+		return m.viewExplore(w)
+	}
 	var view string
 	switch m.screen {
 	case ScreenProjectSelect:
@@ -112,7 +134,7 @@ func (m Model) renderScreen(w int) string {
 	case ScreenVarRebase:
 		view = m.viewVarRebase(w)
 	case ScreenSwitchConfig:
-		view = m.viewSingleSelect("Switch config", w)
+		view = m.viewSingleSelect("Switch project", w)
 	case ScreenManageCommands:
 		view = m.viewManageCommands(w)
 	case ScreenCreateCommandKind:
@@ -132,7 +154,13 @@ func (m Model) renderScreen(w int) string {
 	case ScreenRenameRepair:
 		view = m.viewRenameRepair(w)
 	case ScreenExplore:
-		view = m.viewExplore(w)
+		if m.exploreLayout(w).single && m.cf != nil {
+			view = m.viewNarrowCommand(w)
+		} else if m.exploreLayout(w).single && m.wfe != nil {
+			view = m.viewNarrowWorkflow(w)
+		} else {
+			view = m.viewExplore(w)
+		}
 	}
 	return view
 }
@@ -161,36 +189,7 @@ func logoBox() []string {
 	}
 }
 
-func (m Model) viewProjectSelect(w int) string {
-	var b strings.Builder
-	if m.roomForLogo() {
-		b.WriteString("\n")
-		for _, line := range logoBox() {
-			b.WriteString(line + "\n")
-		}
-		b.WriteString("  " + gray("Command Runner") + "\n")
-	}
-	// The blank lines framing the list are the first thing to go: on a
-	// ten-line terminal three of them were spacing while the list itself
-	// was down to a single row.
-	gap, below := "\n", 3
-	if m.compact() {
-		gap, below = "", 2
-	}
-	b.WriteString(gap + hlineLabel(w, "Projects") + "\n" + gap)
-	viewH := m.listBudget(&b, below)
-	writeWindowedList(&b, viewH, len(m.projects), m.listCursor, "(no projects)", func(i int) string {
-		p := m.projects[i]
-		count := fmt.Sprintf("%d commands", m.projectCmdCounts[p])
-		if i == m.listCursor {
-			return "  " + accentBold("▶") + " " + p + "   " + gray(count)
-		}
-		return "    " + p + "   " + gray(count)
-	})
-	b.WriteString(gap + hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ move   Enter select   q quit") + "\n")
-	return b.String()
-}
+func (m Model) viewProjectSelect(w int) string { return m.viewProjects(w) }
 
 type menuItemInfo struct {
 	desc      string
@@ -206,10 +205,9 @@ type menuGroup struct {
 }
 
 var mainMenuGroups = []menuGroup{
-	{"", []string{"Overview"}},
 	{"Run", []string{"Run workflow", "Run commands"}},
-	{"Manage", []string{"Manage workflows", "Manage commands", "Manage lists", "Manage vars"}},
-	{"", []string{"Switch config", "Exit"}},
+	{"Project", []string{"Edit project", "Switch project"}},
+	{"", []string{"Exit"}},
 }
 
 func mainMenuItems() []string {
@@ -221,14 +219,14 @@ func mainMenuItems() []string {
 }
 
 var menuItemInfos = map[string]menuItemInfo{
-	"Overview":         {desc: "The project as a tree, and what points at what.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
+	"Edit project":     {desc: "Edit workflows, commands, shared lists and variables.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Run workflow":     {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
 	"Run commands":     {desc: "Pick commands and run them once.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
 	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage lists":     {desc: "Create, edit or delete selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
 	"Manage vars":      {desc: "Project variables ({$name}): change one value to move every reference at once.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Switch config":    {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
+	"Switch project":   {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
 	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
 }
 
@@ -1462,7 +1460,7 @@ func (m Model) viewEditList(w int) string {
 		return b.String()
 	}
 
-	b.WriteString("  " + gray("Del: remove   Esc: done") + "\n\n")
+	b.WriteString("  " + gray("a: add   Del: remove   Esc: done") + "\n\n")
 	labelCol := 0
 	for _, e := range le.entries {
 		if e.Label != "" && len(e.Value)+2 > labelCol {
@@ -1490,7 +1488,7 @@ func (m Model) viewEditList(w int) string {
 		return "    " + e.Value + lbl
 	})
 	b.WriteString("\n" + hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ Enter: edit   Del: remove   Esc: done") + "\n")
+	b.WriteString("  " + gray("↑↓ Enter: edit   a: add   Del: remove   Esc: done") + "\n")
 	return b.String()
 }
 
