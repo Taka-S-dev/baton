@@ -18,6 +18,8 @@ func (m *Model) setupMultiSelect() tea.Cmd {
 	m.msItems = nil
 	m.msCursor = 0
 	m.msSelected = nil
+	m.runQueueFocused = false
+	m.runQueueCursor = 0
 	for i := range m.config.Base {
 		m.msItems = append(m.msItems, msItem{cmd: &m.config.Base[i]})
 	}
@@ -60,12 +62,74 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	filtered := m.msFiltered()
 	n := len(filtered)
 
-	// While the discard window is up, Esc confirms and any other key
-	// just closes it without acting on the list underneath.
-	escArmed := m.msEscArmed
-	m.msEscArmed = false
-	if escArmed && msg.String() != "esc" {
+	escArmed := false
+	if m.msEscArmed {
+		switch msg.String() {
+		case "up", "down", "tab":
+			m.discardCursor = 1 - m.discardCursor
+			return m, nil
+		case "esc", "k":
+			m.msEscArmed = false
+			return m, nil
+		case "d":
+			escArmed = true
+		case "enter":
+			if m.discardCursor == 0 {
+				m.msEscArmed = false
+				return m, nil
+			}
+			escArmed = true
+		default:
+			return m, nil
+		}
+		m.msEscArmed = false
+		m.msSelected = nil
+		m.msSearchTI.SetValue("")
+		msg = tea.KeyMsg{Type: tea.KeyEsc}
+	}
+	if msg.String() == "ctrl+q" || msg.String() == "f2" {
+		m.runQueueFocused = !m.runQueueFocused
 		return m, nil
+	}
+	if m.runQueueFocused && !escArmed {
+		n := len(m.msSelected)
+		m.runQueueCursor = min(m.runQueueCursor, max(0, n-1))
+		i := m.runQueueCursor
+		switch msg.String() {
+		case "esc", "left":
+			m.runQueueFocused = false
+			return m, nil
+		case "up":
+			m.runQueueCursor = max(0, i-1)
+			return m, nil
+		case "down":
+			m.runQueueCursor = min(max(0, n-1), i+1)
+			return m, nil
+		case "K", "shift+up":
+			if i > 0 {
+				m.msSelected[i-1], m.msSelected[i] = m.msSelected[i], m.msSelected[i-1]
+				m.runQueueCursor--
+			}
+			return m, nil
+		case "J", "shift+down":
+			if i < n-1 {
+				m.msSelected[i+1], m.msSelected[i] = m.msSelected[i], m.msSelected[i+1]
+				m.runQueueCursor++
+			}
+			return m, nil
+		case "x", "delete":
+			if n > 0 {
+				m.msSelected = append(m.msSelected[:i], m.msSelected[i+1:]...)
+				m.runQueueCursor = min(i, max(0, n-2))
+			}
+			return m, nil
+		case "enter":
+			if n == 0 {
+				return m, nil
+			}
+		default:
+			return m, nil
+		}
 	}
 
 	switch msg.String() {
@@ -132,6 +196,7 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if len(m.msSelected) > 0 && !escArmed {
 			m.msEscArmed = true
+			m.discardCursor = 0
 			return m, nil
 		}
 		if m.screen == ScreenEditWorkflowCommands {

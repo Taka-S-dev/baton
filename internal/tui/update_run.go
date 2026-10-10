@@ -212,6 +212,11 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor++
 			m.updateStepsViewport()
 		}
+	case "ctrl+q", "f2":
+		if n > 0 && m.listCursor < n {
+			m.gotoWorkflowStepPick(filtered[m.listCursor])
+			m.runWorkflowDetail = true
+		}
 	case "right":
 		// Drill into the workflow to pick which steps run. Space is not
 		// available here — it belongs to the search field.
@@ -234,12 +239,16 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if len(missing) > 0 {
-			m.errMsg = fmt.Sprintf("cannot run %q — step(s) not found: %s (renamed or deleted? fix it in Manage workflows, or press → to run the steps that resolve)",
+			m.errMsg = fmt.Sprintf("cannot run %q — step(s) not found: %s (renamed or deleted? fix it in Edit project, or press → to run the steps that resolve)",
 				wf.Name, strings.Join(missing, ", "))
 			break
 		}
 		return m.startWorkflowRun(wf, wf.Commands)
 	case "esc":
+		if m.stepsFocused {
+			m.stepsFocused = false
+			return m, nil
+		}
 		if m.wfSearchTI.Value() != "" {
 			m.wfSearchTI.SetValue("")
 			m.listCursor = 0
@@ -305,6 +314,7 @@ func (m *Model) gotoWorkflowStepPick(wfIdx int) {
 		wfIdx:  wfIdx,
 		picked: make([]bool, len(m.workflows[wfIdx].Commands)),
 	}
+	m.runWorkflowDetail = false
 	m.screen = ScreenRunWorkflowSteps
 }
 
@@ -317,6 +327,14 @@ func (m Model) updateRunWorkflowSteps(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	wf := m.workflows[p.wfIdx]
 	n := len(wf.Commands)
 
+	if msg.String() == "ctrl+q" || msg.String() == "f2" {
+		m.runWorkflowDetail = !m.runWorkflowDetail
+		return m, nil
+	}
+	if m.runWorkflowDetail && (msg.String() == "esc" || msg.String() == "left") {
+		m.runWorkflowDetail = false
+		return m, nil
+	}
 	switch msg.String() {
 	case "up":
 		if n > 0 {

@@ -426,11 +426,14 @@ type Model struct {
 	varPickNames []string
 
 	// Multi-select
-	msItems    []msItem
-	msCursor   int
-	msSelected []int
-	msSearchTI textinput.Model
-	msEscArmed bool // first Esc with selections pressed; next Esc discards
+	msItems         []msItem
+	msCursor        int
+	msSelected      []int
+	msSearchTI      textinput.Model
+	runQueueFocused bool
+	runQueueCursor  int
+	discardCursor   int
+	msEscArmed      bool // first Esc with selections pressed; next Esc discards
 
 	// Slot picking
 	sp *slotPickState
@@ -463,10 +466,11 @@ type Model struct {
 	nameInputErr  string
 
 	// Sub-models
-	spinner      spinner.Model
-	stepsVP      viewport.Model
-	stepsFocused bool
-	wfSearchTI   textinput.Model // Run workflow list search
+	spinner           spinner.Model
+	stepsVP           viewport.Model
+	stepsFocused      bool
+	runWorkflowDetail bool
+	wfSearchTI        textinput.Model // Run workflow list search
 
 	// List edit
 	le *listEditState

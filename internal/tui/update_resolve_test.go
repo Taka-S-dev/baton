@@ -271,7 +271,7 @@ func TestUpdateMultiSelect_EscDiscardGuard(t *testing.T) {
 		t.Fatalf("first Esc: screen=%v armed=%v selected=%v — must warn and stay", m.screen, m.msEscArmed, m.msSelected)
 	}
 
-	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyTab})
+	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEscape})
 	m = nm.(Model)
 	if m.msEscArmed {
 		t.Fatal("any key other than Esc must close the discard window")
@@ -282,7 +282,7 @@ func TestUpdateMultiSelect_EscDiscardGuard(t *testing.T) {
 
 	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEscape})
 	m = nm.(Model)
-	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEscape})
+	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m = nm.(Model)
 	if m.screen != ScreenMainMenu {
 		t.Fatalf("second Esc: screen=%v, want main menu", m.screen)
