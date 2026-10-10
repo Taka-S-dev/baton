@@ -579,7 +579,7 @@ func (m Model) viewRunWorkflowList(w int) string {
 	}
 
 	b.WriteString(gap + hline(w) + "\n")
-	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab: focus steps  →: pick steps  F2: details") + "\n")
+	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab/→: pick steps  F2: details") + "\n")
 	return b.String()
 }
 
@@ -598,7 +598,8 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 	n := len(filtered)
 
 	terms := strings.Fields(m.msSearchTI.Value())
-	columnW, matchW := max(1, w-6), 0
+	orderW := max(3, len(fmt.Sprint(len(m.msSelected))))
+	columnW, matchW := max(1, w-5-orderW), 0
 	if len(terms) > 0 && columnW >= 48 {
 		matchW = min(32, columnW/3)
 		columnW -= matchW + 2
@@ -633,7 +634,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 		previewH = 0
 	}
 	if m.termHeight() >= 10 {
-		b.WriteString("      " + gray(tableHeader) + "\n")
+		b.WriteString("    " + gray(fmt.Sprintf("%*s ", orderW, "Run")+tableHeader) + "\n")
 	}
 	previewH = m.previewBudget(&b, previewH, below, 3)
 	if previewH == 0 {
@@ -646,10 +647,10 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool) string {
 		origIdx := filtered[i]
 		item := m.msItems[origIdx]
 
-		check := " "
-		for _, selected := range m.msSelected {
+		check := strings.Repeat(" ", orderW)
+		for order, selected := range m.msSelected {
 			if selected == origIdx {
-				check = sSelNum.Render("✓")
+				check = sSelNum.Render(fmt.Sprintf("%*d", orderW, order+1))
 				break
 			}
 		}
@@ -1223,19 +1224,19 @@ func (m Model) writeCommandHover(b *strings.Builder, cmd *mdl.Command, w int) {
 				b.WriteString("    " + gray(k) + " = " + cmd.Values[k] + "\n")
 			}
 		}
-		b.WriteString("  " + gray("$ "+slot.ApplyVars(cmd.Cmd, m.vars)) + "\n")
-		b.WriteString("  " + dim("workdir: "+slot.ApplyVars(displayOr(cmd.Dir, "."), m.vars)) + "\n")
+		b.WriteString("  " + m.previewVars("$ "+cmd.Cmd) + "\n")
+		b.WriteString("  " + dim("workdir: ") + m.previewVars(displayOr(cmd.Dir, ".")) + "\n")
 		b.WriteString("  " + dim("shell: "+shellChoiceLabel(cmd.Shell)) + "\n")
 		return
 	}
 	b.WriteString(hlineLabel(w, "command preview") + "\n")
-	cmdStr := truncate(slot.ApplyVars(cmd.Cmd, m.vars), max(10, w-10))
-	b.WriteString("  " + gray("$ "+cmdStr) + "\n")
+	cmdStr := ansi.Truncate(m.previewVars(cmd.Cmd), max(10, w-10), "…")
+	b.WriteString("  " + "$ " + cmdStr + "\n")
 	workdir := cmd.Dir
 	if workdir == "" {
 		workdir = "."
 	}
-	b.WriteString("  " + dim("workdir: "+slot.ApplyVars(workdir, m.vars)) + "\n")
+	b.WriteString("  " + dim("workdir: ") + m.previewVars(workdir) + "\n")
 	b.WriteString("  " + dim("shell: "+shellChoiceLabel(cmd.Shell)) + "\n")
 }
 
@@ -1861,14 +1862,14 @@ func (m Model) viewRunWorkflowStepsList(w int) string {
 			if cmd.Dir != "" {
 				text += "  (workdir: " + cmd.Dir + ")"
 			}
-			note = gray(truncate(text, max(8, w-len(name)-24)))
+			note = m.syntaxText(truncate(text, max(8, w-len(name)-24)))
 		} else {
 			box = dim("[-]")
 			note = warn("(not found)")
 		}
 		row := fmt.Sprintf("%s %d. %-16s %s", box, i+1, name, note)
 		if i == p.cursor {
-			return "  " + accentBold("▶") + " " + row
+			return m.selectedSyntaxRow("  ▶ "+row, max(1, w))
 		}
 		return "    " + row
 	})
@@ -1886,7 +1887,11 @@ func (m Model) viewRunWorkflowStepsList(w int) string {
 	} else {
 		b.WriteString("  " + gray("Nothing selected — Enter reviews the highlighted step") + "\n")
 	}
-	b.WriteString("  " + gray("↑↓ Tab: toggle   Enter: review   F2: details   Esc ←: back") + "\n")
+	keys := "↑↓ Select  Tab Toggle  Enter Review  Esc Back"
+	if !m.workflowDetailsInline() {
+		keys += "  F2 Details"
+	}
+	b.WriteString("  " + gray(truncate(keys, max(1, w-2))) + "\n")
 	return b.String()
 }
 

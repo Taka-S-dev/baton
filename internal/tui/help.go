@@ -21,7 +21,7 @@ func (m Model) helpLines(w int) []string {
 	} else if m.screen == ScreenRunCommands || m.screen == ScreenCreateWorkflow || m.screen == ScreenEditWorkflowCommands {
 		lines = append(lines, "Type to filter · ↑↓ Move · Tab Select / deselect", "F2 Switch between candidates and execution queue", "Queue: J/K or Shift+↓/↑ Reorder · Del/x Remove from queue", "Enter Continue · Esc Back (keeps selection in the confirmation)", "Removing a queue entry does not delete its command.")
 	} else if m.screen == ScreenRunWorkflowSteps {
-		lines = append(lines, "↑↓ Choose step · Tab Select / deselect", "F2 Details / Steps · Enter Review · Esc Back", "Selections affect this run only; saved workflow is unchanged.", "With no selection, Enter reviews the highlighted step.")
+		lines = append(lines, "↑↓ Choose step · Tab Select / deselect", "F2 Details / Steps on narrow screens · Enter Review · Esc Back", "Selections affect this run only; saved workflow is unchanged.", "With no selection, Enter reviews the highlighted step.")
 	} else if m.screen == ScreenRunWorkflow {
 		lines = append(lines, "Type to filter · ↑↓ Choose workflow", "Enter Continue to inputs and execution review", "→ Choose steps for this run · Esc Back")
 	} else if m.pasteMenu {

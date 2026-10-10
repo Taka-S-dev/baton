@@ -195,8 +195,8 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "tab":
-		if n > 0 {
-			m.stepsFocused = !m.stepsFocused
+		if n > 0 && m.listCursor < n {
+			m.gotoWorkflowStepPick(filtered[m.listCursor])
 		}
 	case "up":
 		if m.stepsFocused {
@@ -215,7 +215,7 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+q", "f2":
 		if n > 0 && m.listCursor < n {
 			m.gotoWorkflowStepPick(filtered[m.listCursor])
-			m.runWorkflowDetail = true
+			m.runWorkflowDetail = !m.workflowDetailsInline()
 		}
 	case "right":
 		// Drill into the workflow to pick which steps run. Space is not
@@ -315,6 +315,7 @@ func (m *Model) gotoWorkflowStepPick(wfIdx int) {
 		picked: make([]bool, len(m.workflows[wfIdx].Commands)),
 	}
 	m.runWorkflowDetail = false
+	m.stepsFocused = false
 	m.screen = ScreenRunWorkflowSteps
 }
 
@@ -328,10 +329,10 @@ func (m Model) updateRunWorkflowSteps(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	n := len(wf.Commands)
 
 	if msg.String() == "ctrl+q" || msg.String() == "f2" {
-		m.runWorkflowDetail = !m.runWorkflowDetail
+		m.runWorkflowDetail = !m.workflowDetailsInline() && !m.runWorkflowDetail
 		return m, nil
 	}
-	if m.runWorkflowDetail && (msg.String() == "esc" || msg.String() == "left") {
+	if m.runWorkflowDetail && !m.workflowDetailsInline() && (msg.String() == "esc" || msg.String() == "left") {
 		m.runWorkflowDetail = false
 		return m, nil
 	}

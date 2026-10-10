@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"regexp"
 	"strings"
 )
@@ -77,4 +78,28 @@ func (m Model) writeSyntaxWarnings(b *strings.Builder, text string) {
 			seen[name] = true
 		}
 	}
+}
+
+// Render every span with the selected background; nested ANSI resets must
+// not erase it between highlighted tokens.
+func (m Model) selectedSyntaxRow(text string, width int) string {
+	text = ansi.Truncate(ansi.Strip(text), max(1, width), "…")
+	text += strings.Repeat(" ", max(0, width-lipgloss.Width(text)))
+	var b strings.Builder
+	end := 0
+	for _, at := range syntaxToken.FindAllStringIndex(text, -1) {
+		b.WriteString(sRowActive.Render(text[end:at[0]]))
+		token := text[at[0]:at[1]]
+		style := sSlotVar
+		if strings.HasPrefix(token, "{$") {
+			style = sFixedVar
+			if _, ok := m.vars[token[2:len(token)-1]]; !ok {
+				style = sError.Bold(true)
+			}
+		}
+		b.WriteString(style.Background(sRowActive.GetBackground()).Render(token))
+		end = at[1]
+	}
+	b.WriteString(sRowActive.Render(text[end:]))
+	return b.String()
 }
