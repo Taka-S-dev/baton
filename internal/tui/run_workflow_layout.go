@@ -46,6 +46,9 @@ func (m Model) viewRunWorkflow(w int) string {
 	}
 	right := box(truncate(title, rightW-4), detail.String(), rightW, m.termHeight()-1, false)
 	footer := "↑↓ Move · Enter Continue · Tab/→ Steps · F2 Details · Esc Back · F1 Help"
+	if m.runHomeVisible() {
+		footer = m.runHomeKeys()
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right) + "\n" + gray(truncate(footer, w)) + "\n"
 }
 

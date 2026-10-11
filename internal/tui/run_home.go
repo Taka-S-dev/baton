@@ -171,45 +171,42 @@ type runHomeAction struct {
 }
 
 func (m Model) runHomeLayout(w int) (string, []runHomeAction) {
-	labels := []string{"[F7 Workflows]", "[F8 Commands]", "F4 Edit", "Projects…", "F1 Help"}
-	if w < 76 {
-		labels[0], labels[1] = "[F7 WF]", "[F8 Cmd]"
-	}
-	name := filepath.Base(m.projectDir)
-	if m.projectDir == "" {
-		name = "Run"
-	}
-	// Reserve both tabs before allocating space to the project name.
-	nameWidth := min(20, max(1, w-lipgloss.Width(labels[0]+labels[1])-5))
-	prefix := ansi.Truncate(name, nameWidth, "…") + " › "
-	text := white(prefix)
-	col := lipgloss.Width(prefix)
+	labels := []string{"[1 Workflows]", "[2 Commands]"}
+	text := ""
+	col := 0
 	var actions []runHomeAction
 	for i, label := range labels {
-		sep := " "
-		if i == 0 {
-			sep = ""
-		} else if i == 2 {
-			sep = "  │  "
-		} else if i > 2 {
-			sep = " · "
+		if i > 0 {
+			text += " "
+			col++
 		}
-		size := lipgloss.Width(sep + label)
-		// Hide whole secondary actions instead of leaving misleading fragments.
-		if col+size > w {
+		end := col + lipgloss.Width(label)
+		if end > w {
 			break
 		}
-		text += gray(sep)
-		start := col + lipgloss.Width(sep)
 		if (i == 0 && m.screen == ScreenRunWorkflow) || (i == 1 && m.screen == ScreenRunCommands) {
 			text += accentBold(label)
 		} else {
 			text += gray(label)
 		}
-		col += size
-		actions = append(actions, runHomeAction{i, start, col})
+		actions = append(actions, runHomeAction{i, col, end})
+		col = end
 	}
-	return ansi.Truncate(text, w, "…"), actions
+	if name := filepath.Base(m.projectDir); m.projectDir != "" && w-col > 5 {
+		text += gray(" · " + ansi.Truncate(name, w-col-3, "…"))
+	}
+	return text, actions
+}
+
+// Match the editor's navigation vocabulary; compact screens keep the list first.
+func (m Model) runHomeKeys() string {
+	if m.runHome.searching {
+		return "Search: ↑↓ Move · Enter Done · Esc Clear · F1 Help"
+	}
+	if m.runQueueFocused && m.screen == ScreenRunCommands {
+		return "J/K Reorder · Del Remove · F2 List · / Search · e Edit · p Projects · q Quit · F1 Help"
+	}
+	return "↑↓ Move · Enter Review · / Search · e Edit · p Projects · q Quit · F1 Help"
 }
 
 func (m Model) runHomeHeader(w int) string {
@@ -230,15 +227,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.runQueueFocused = false
 				m.runHome.searching = true
 				return m, m.syncRunSearch()
-			case "f7":
+			case "1":
 				return m.switchRunTab("workflows")
-			case "f8":
+			case "2":
 				return m.switchRunTab("commands")
-			case "f4":
+			case "e":
 				return m.editFromRunHome()
-			case "f6":
+			case "p":
 				m.openRunProjects()
 				return m, nil
+			case "q":
+				return m, tea.Quit
 			}
 			if key.Type == tea.KeyRunes || key.Type == tea.KeySpace || key.Type == tea.KeyBackspace {
 				if !(m.screen == ScreenRunCommands && m.runQueueFocused && (key.String() == "J" || key.String() == "K" || key.String() == "x")) {
@@ -259,15 +258,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							return m.switchRunTab("workflows")
 						case 1:
 							return m.switchRunTab("commands")
-						case 2:
-							return m.editFromRunHome()
-						case 3:
-							m.openRunProjects()
-							return m, nil
-						case 4:
-							m.helpOpen = true
-							m.helpOffset = 0
-							return m, nil
 						}
 					}
 				}
@@ -287,10 +277,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewRunHome(body string, w int) string {
 	if m.screen == ScreenRunCommands && len(m.msItems) == 0 {
-		body = gray("No commands yet. F4 Add your first command.")
+		body = gray("No commands yet. e Add your first command.")
 	}
 	if m.screen == ScreenRunWorkflow && len(m.workflows) == 0 {
-		body = gray("No workflows yet. F4 Open editor to add one.")
+		body = gray("No workflows yet. e Open editor to add one.")
 	}
 	lines := strings.Split(body, "\n")
 	for i := range lines {

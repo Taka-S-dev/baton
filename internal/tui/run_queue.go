@@ -87,6 +87,9 @@ func (m Model) viewRunQueue(w int) string {
 }
 
 func (m Model) runSelectKeys() string {
+	if m.runHomeVisible() {
+		return m.runHomeKeys()
+	}
 	if m.runQueueFocused {
 		return "↑↓ Select  J/K Reorder  Del Remove  Enter Review  F2 List  Esc List  F1 Help"
 	}

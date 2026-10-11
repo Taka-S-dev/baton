@@ -593,7 +593,11 @@ func (m Model) viewRunWorkflowList(w int) string {
 
 	if m.termHeight() >= 18 {
 		b.WriteString(gap + hline(w) + "\n")
-		b.WriteString("  " + gray("↑↓ Move  Enter Continue  Tab/→ Steps  F2 Details  Esc Back  F1 Help") + "\n")
+		keys := "↑↓ Move  Enter Continue  Tab/→ Steps  F2 Details  Esc Back  F1 Help"
+		if m.runHomeVisible() {
+			keys = m.runHomeKeys()
+		}
+		b.WriteString("  " + gray(keys) + "\n")
 	}
 	if m.termHeight() < 18 {
 		lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
@@ -747,7 +751,11 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 	joined := truncate(strings.Join(selNames, ", "), max(10, w-40))
 	b.WriteString(gap + "  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
 	b.WriteString(hline(w) + "\n")
-	b.WriteString("  " + gray("Tab Select  Enter Review  F2 Queue  F3 Sort  Esc Back") + "\n")
+	keys := "Tab Select  Enter Review  F2 Queue  F3 Sort  Esc Back"
+	if m.runHomeVisible() {
+		keys = m.runHomeKeys()
+	}
+	b.WriteString("  " + gray(keys) + "\n")
 
 	// Discard guard: opens as a centered floating window over the list.
 	if m.msEscArmed && len(m.msSelected) > 0 {

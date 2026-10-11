@@ -128,9 +128,9 @@ any-folder/                  (Windows, or portable install)
         └── commands.tsv
 ```
 
-If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `F7` / `F8` (or click a tab) to switch, `F4` to open the selected item in the project editor, and `Esc` to go back to the project picker (or click **Projects**). Press `/` to start searching. While searching, letters and digits are text; `Enter` finishes search without running a command, and `Esc` clears it.
+If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `1` / `2` (or click a tab) to switch, `e` to open the selected item in the project editor, and `p` to open the project picker (`Esc` also goes back). Press `/` to start searching. While searching, letters and digits are text; `Enter` finishes search without running a command, and `Esc` clears it.
 
-The last Run tab is remembered per project in the app-managed `.last_run_tab`. On first use, projects with workflows open Workflows; otherwise they open Commands. An empty project offers `F4` to add its first command. Switching Run tabs and returning from the editor preserve searches, cursors, and command execution order; deleted commands are removed from that selection. `baton r` remains the separate directory-scoped recent-command launcher.
+The last Run tab is remembered per project in the app-managed `.last_run_tab`. On first use, projects with workflows open Workflows; otherwise they open Commands. An empty project offers `e` to add its first command. Switching Run tabs and returning from the editor preserve searches, cursors, and command execution order; deleted commands are removed from that selection. `baton r` remains the separate directory-scoped recent-command launcher.
 
 ## Configuration
 
@@ -255,7 +255,7 @@ Use `{name}` placeholders in `cmd` or `workdir` to prompt for a value at runtime
 
 ### Selection lists
 
-Create lists via **F4 → Lists** from the Run workspace. Each list is stored as a `.tsv` file in `projects/<name>/lists/`:
+Create lists via **e → Lists** from the Run workspace. Each list is stored as a `.tsv` file in `projects/<name>/lists/`:
 
 ```
 /home/user/api    api
@@ -406,7 +406,7 @@ in CI, or as the verification loop when generating project files with an
 AI agent — the complete file spec, shared by hand-editors and agents,
 lives in [AGENTS.md](AGENTS.md).
 
-The Run workspace has **Workflows** (`F7`) and **Commands** (`F8`) tabs. `F4` opens **Edit project** at the current tab and item; `Esc` goes back to the project picker; clear search and confirm discarding selections first if needed. You can also click **Projects**. `F1` shows the available keys; `Ctrl+C` quits.
+The Run workspace has **Workflows** (`1`) and **Commands** (`2`) tabs. `e` opens **Edit project** at the current tab and item; `Esc` goes back to the project picker; clear search and confirm discarding selections first if needed. `p` opens the project picker directly. `F1` shows the available keys; `q` quits outside search; `Ctrl+C` also quits.
 
 ### Projects
 

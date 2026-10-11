@@ -20,11 +20,7 @@ func homeTestModel(t *testing.T) Model {
 
 func homeKey(m Model, key tea.KeyMsg) Model { next, _ := m.Update(key); return next.(Model) }
 func homeTab(m Model, n rune) Model {
-	key := tea.KeyF7
-	if n == '2' {
-		key = tea.KeyF8
-	}
-	return homeKey(m, tea.KeyMsg{Type: key})
+	return homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{n}})
 }
 
 func TestRunHomeTabKeepsSearchCursorAndOrder(t *testing.T) {
@@ -62,7 +58,7 @@ func TestRunHomeEditorRebuildsSelectionByName(t *testing.T) {
 	m := homeTab(homeTestModel(t), '2')
 	m.msSelected = []int{2, 0}
 	m.msSearchTI.SetValue("build")
-	m = homeKey(m, tea.KeyMsg{Type: tea.KeyF4})
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	if m.screen != ScreenExplore || m.exploreTab != tabCommands {
 		t.Fatal("editor tab")
 	}
@@ -136,7 +132,7 @@ func TestRunHomeCandidateMouseOffset(t *testing.T) {
 	if next.(Model).msCursor != 1 {
 		t.Fatal("header offset selected the wrong row")
 	}
-	if strings.Count(ansi.Strip(m.View()), "F7") != 1 {
+	if strings.Count(ansi.Strip(m.View()), "[1 Workflows]") != 1 {
 		t.Fatal("duplicate tab header")
 	}
 }
@@ -146,7 +142,7 @@ func TestEmptyRunHomeCanAddCommand(t *testing.T) {
 	m.projectDir = t.TempDir()
 	m.config.Base, m.config.Commands, m.workflows = nil, nil, nil
 	m.openRunHome()
-	m = homeKey(m, tea.KeyMsg{Type: tea.KeyF4})
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	if m.cf == nil || m.cf.mode != 0 {
 		t.Fatal("empty state did not open command creation")
 	}
@@ -156,32 +152,18 @@ func TestRunHomeProjectsNavigation(t *testing.T) {
 	for _, tab := range []rune{'1', '2'} {
 		m := homeTab(homeTestModel(t), tab)
 		m.projectsDir = t.TempDir()
-		next := homeKey(m, tea.KeyMsg{Type: tea.KeyF6})
+		next := homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 		if next.screen != ScreenProjectSelect {
-			t.Fatal("F6 event must open projects when delivered")
+			t.Fatal("p must open projects")
 		}
 		next = homeKey(m, tea.KeyMsg{Type: tea.KeyEsc})
 		if next.screen != ScreenProjectSelect {
 			t.Fatal("Esc must open projects with no pending input")
 		}
-		x := -1
-		_, actions := m.runHomeLayout(m.viewWidth())
-		for _, action := range actions {
-			if action.id == 3 {
-				x = action.start
-			}
-		}
-		if x < 0 {
-			t.Fatal("Projects action missing")
-		}
-		clicked, _ := m.Update(tea.MouseMsg{X: x, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-		if clicked.(Model).screen != ScreenProjectSelect {
-			t.Fatal("Projects click must open picker")
-		}
 	}
 }
 
-func TestRunHomeHeaderGroupsAndVisibleActions(t *testing.T) {
+func TestRunHomeHeaderMatchesEditorVocabulary(t *testing.T) {
 	m := homeTab(homeTestModel(t), '2')
 	m.projectDir = "日本語プロジェクト名が長い場合"
 	for _, width := range []int{32, 40, 65, 100, 140} {
@@ -191,25 +173,16 @@ func TestRunHomeHeaderGroupsAndVisibleActions(t *testing.T) {
 		if strings.Contains(plain, "\n") || ansi.StringWidth(header) > width {
 			t.Fatalf("invalid header: %q", plain)
 		}
-		if len(actions) < 2 {
-			t.Fatalf("tabs missing at %d: %q", width, plain)
+		if len(actions) != 2 || !strings.HasPrefix(plain, "[1 Workflows] [2 Commands]") {
+			t.Fatalf("inconsistent tabs: %q", plain)
 		}
-		if !strings.Contains(plain, " › ") {
-			t.Fatal("project context missing")
+		if strings.Contains(plain, "Edit") || strings.Contains(plain, "Projects") {
+			t.Fatal("actions belong in footer")
 		}
 		for _, a := range actions {
 			if a.start < 0 || a.end > width || a.start >= a.end {
-				t.Fatal("invalid click span")
+				t.Fatal("invalid hit span")
 			}
-			if a.id == 4 {
-				next, _ := m.Update(tea.MouseMsg{X: a.start, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
-				if !next.(Model).helpOpen {
-					t.Fatal("Help click failed")
-				}
-			}
-		}
-		if width >= 100 && (!strings.Contains(plain, "  │  ") || !strings.Contains(plain, "Edit · Projects… · F1 Help")) {
-			t.Fatalf("actions not separated: %q", plain)
 		}
 	}
 }
