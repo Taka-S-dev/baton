@@ -101,6 +101,9 @@ func Diagnose(cfg model.Config, workflows []model.Workflow, lists map[string][]m
 		if cmd.Shell != "" && cmd.Shell != "ps" {
 			warnings = append(warnings, "command \""+cmd.Name+"\": unknown shell \""+cmd.Shell+"\" (runs with the platform default)")
 		}
+		for _, problem := range slot.PathErrors(cmd.Cmd + " " + cmd.Dir) {
+			warnings = append(warnings, "command "+cmd.Name+": "+problem)
+		}
 		for _, v := range slot.UndefinedVars(cmd.Cmd+" "+cmd.Dir, vars) {
 			if !undefined[v] {
 				undefined[v] = true

@@ -24,6 +24,12 @@ func (m Model) helpLines(w int) []string {
 		lines = append(lines, "↑↓ Choose step · Tab Select / deselect", "F2 Details / Steps on narrow screens · Enter Review · Esc Back", "Selections affect this run only; saved workflow is unchanged.", "Select at least one step before reviewing. Click a row to inspect; click its checkbox to toggle.")
 	} else if m.screen == ScreenRunWorkflow {
 		lines = append(lines, "Type to filter · ↑↓ Choose workflow", "Enter Continue to inputs and execution review", "Tab / → Choose steps for this run · Esc Back")
+	} else if m.screen == ScreenSlotPick {
+		if m.sp != nil && m.sp.pathDef.PathKind != "" {
+			lines = append(lines, "Reserved path slot: Tab / Ctrl+Space opens choices", "Type to filter · ↑↓ Choose · → Open folder", "Multiple values: Tab checks · Enter applies · Esc cancels", "File pickers show folders for navigation only. Extensions filter files.", "Enter after applying continues to execution review; choosing a file never runs it.", "Paths use workdir, or the launch directory when it is empty.", "Template creation: Ctrl+K keeps this slot interactive.", "Values are literal; quote single-value slots when paths may contain spaces.")
+		} else {
+			lines = append(lines, "Type to filter / enter a value · ↑↓ Choose · Enter Confirm", "Tab toggles multiple selections; single-value slots move to the next row.", "File choices require a reserved slot such as {@file:.go}.")
+		}
 	} else if m.pasteMenu {
 		for _, a := range m.contextActions {
 			lines = append(lines, a.key+"  "+a.label)

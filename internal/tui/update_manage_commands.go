@@ -423,6 +423,11 @@ func (m Model) pickCandidates(typed string) []pickCandidate {
 			add("{$"+k+"}", "fixed · "+m.vars[k])
 		}
 	}
+	add("{@file}", "pick one file at run time")
+	add("{@file...}", "pick multiple files at run time")
+	add("{@dir}", "pick a folder at run time")
+	add("{@file:.go}", "one file · edit .go to filter extensions")
+	add("{@file...:.go,.mod}", "multiple files · edit extension filters")
 	return out
 }
 
@@ -1071,6 +1076,7 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 	sce := m.sce
 	s := sce.currentSlots[sce.currentSlotIdx]
 	sp := &slotPickState{
+		pathDef:       s,
 		slotName:      s.Name,
 		listName:      s.ListName,
 		entries:       m.lists[s.ListName],
@@ -1083,6 +1089,9 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 		currentCmd:    cmd,
 		resolvedSoFar: sce.currentValues,
 	}
+	if s.PathKind != "" {
+		sp.entries = nil
+	}
 	sp.applyFilter()
 	// When editing, start from the command's current value: pre-toggle a
 	// variadic slot's stored values, or park the cursor on a single one.
@@ -1091,6 +1100,11 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 			if s.Variadic {
 				sp.picked = strings.Fields(cur)
 			} else {
+				if s.PathKind != "" {
+					sp.search = cur
+					sp.completedPath = cur
+					sp.cursor = len(sp.filtered)
+				}
 				for i, e := range sp.filtered {
 					if e.Value == cur {
 						sp.cursor = i
@@ -1102,6 +1116,9 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 	}
 	m.sp = sp
 	m.screen = ScreenSlotPick
+	if s.PathKind != "" {
+		return *m, m.startPathCompletion()
+	}
 	return *m, nil
 }
 

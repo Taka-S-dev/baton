@@ -239,7 +239,7 @@ func TestViewConfirmRun_ShowsWhatWillRun(t *testing.T) {
 	m.confirmRunItems = []mdl.RunItem{{Name: "test", Cmd: &cmd}}
 
 	view := m.viewConfirmRun(100)
-	for _, want := range []string{"$ go test ./internal/slot/", "workdir: /srv/api"} {
+	for _, want := range []string{"$ go test ./internal/slot/", "workdir: " + m.confirmWorkdir("/srv/api")} {
 		if !strings.Contains(view, want) {
 			t.Errorf("confirm view missing %q\n%s", want, view)
 		}

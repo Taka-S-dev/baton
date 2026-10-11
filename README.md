@@ -490,6 +490,85 @@ Create saved sequences in **Edit project → Workflows**. The Run workflow list 
 Details show the command, working directory and shell. Missing commands remain visible but cannot be selected. Selections apply **only to this run** and retain saved workflow order. They do not change the saved workflow. Remaining slots are prompted before execution review; fixed answers come from the saved commands. `F1` shows help.
 
 
+### Recent commands in the current directory
+
+```powershell
+baton recent
+baton r                 # alias
+baton recent --dry-run
+```
+
+Open the current launch directory's recent commands directly, newest first.
+Type to filter by command or project; Enter reloads the current definition,
+prompts for interactive inputs (including file completion), then shows execution
+review. On success, recent mode returns directly to the shell after one
+completion summary; failures retain the retry choices. Explicit workdir settings still apply; an empty workdir uses the launch
+directory. Esc clears the filter, then exits. Ctrl+R refreshes the list.
+
+Normal runs and workflow steps also record history when a step is started.
+Dry runs, canceled selections, and steps never reached are not recorded.
+History stores only the project path, command name, launch directory, and time;
+it does not retain runtime input values or resolved command lines. A separate
+file-picker preference remembers the last confirmed path for cursor placement
+only, scoped by project, command, input token, and resolved working directory.
+It never checks or confirms a value automatically; missing paths fall back to
+the normal candidates. This preference is saved when the input is confirmed,
+even if the subsequent execution review is canceled. Saved commands
+keep their explicitly fixed values. Repeated commands occupy one entry per
+project and directory; the latest 100 are shown. Deleted or renamed references
+are shown as unavailable. Browse projects is always available, including when
+this directory has no history yet. Runs from older versions cannot be recovered.
+
+History is app-managed under `projects/.baton-recent/` and is excluded from the
+project list and `baton check`.
+
+### File and folder inputs
+
+Ordinary `{target}` slots retain their list/free-text behavior, including
+Tab to toggle variadic selections. Fixed variables `{$root}` are unchanged.
+Path selection is opt-in through the reserved `{@...}` syntax. In the command
+or workdir editor, type `{@` to see path placeholders and extension-filter
+examples; use Up/Down and Enter to insert one. Edit the example extensions
+to match your command.
+
+
+| Placeholder | Input |
+|---|---|
+| `{@file}` | One file |
+| `{@file:.go}` | One .go file |
+| `{@file:.go,.mod}` | One .go or .mod file |
+| `{@file...:.go,.mod}` | Multiple .go / .mod files |
+| `{@dir}` | One directory |
+
+Extensions include the leading dot, are comma-separated without spaces, and
+match case-insensitively. Compound suffixes such as .tar.gz are supported.
+Directory inputs do not accept extension filters. The `@` namespace is reserved;
+invalid forms are reported by `baton check`.
+
+The dedicated dropdown opens at the input step. Type to fuzzy-filter, use
+arrows to move. File pickers show files first, followed by navigation folders without checkboxes.
+Enter or Right opens a navigation folder, keeping checked files.
+Inside a folder, Left or the parent row returns one level and restores focus
+to the folder just left. The parent row is never selectable as a value. Only one
+directory is listed at a time; there is no recursive search. Typing a directory
+prefix such as `src/` also works. Directory pickers support Right to browse.
+No registered list is mixed in.
+For multiple values, Tab or a click toggles checkboxes, Enter applies the
+selection in selection order, and Esc clears a nonempty filter first.
+With an empty filter, Esc closes suggestions and keeps checked values. Selections survive
+filtering and navigation. A separate Enter continues to execution review.
+Tab or Ctrl+Space reopens the dropdown. During template creation, Ctrl+K keeps
+the input interactive instead of saving an answer.
+
+Paths are relative to the resolved workdir, or the launch directory when it is
+empty. Workdir inputs are resolved first for path commands; a slot that supplies
+workdir itself browses from the launch directory. Only the directory being
+browsed is read. Values remain literal: quote single-value slots for paths with
+spaces; variadic slots retain the existing space-joined argument semantics.
+Identical reserved tokens share one answer; different filters are distinct
+inputs. Saved values use an encoded internal key in vars.tsv; edit only their
+value column as with other command-scoped rows.
+
 ### Retry on failure
 
 When a command fails, baton offers a recovery menu:

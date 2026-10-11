@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-var syntaxToken = regexp.MustCompile(`\{(?:\$\w+|\w+(?:\.\.\.)?)\}`)
+var syntaxToken = regexp.MustCompile(slot.VarPattern.String() + "|" + slot.Pattern.String())
 var sFixedVar = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
 var sCurrentValue = lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Bold(true)
 
@@ -52,7 +52,7 @@ func (m Model) templateSyntax(text string, values map[string]string, active stri
 	for _, at := range slot.Pattern.FindAllStringIndex(text, -1) {
 		b.WriteString(m.previewVars(text[end:at[0]]))
 		ref := text[at[0]:at[1]]
-		name := strings.TrimSuffix(ref[1:len(ref)-1], "...")
+		name := slot.RefName(ref)
 		value, ok := values[name]
 		switch {
 		case name == active:

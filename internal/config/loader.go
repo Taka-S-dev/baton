@@ -66,7 +66,7 @@ func ListProjects(projectsDir string) []string {
 	}
 	var out []string
 	for _, e := range entries {
-		if e.IsDir() && e.Name() != ".baton-trash" {
+		if e.IsDir() && e.Name() != ".baton-trash" && e.Name() != ".baton-recent" {
 			out = append(out, e.Name())
 		}
 	}
@@ -158,11 +158,14 @@ func writeTSVLines(path, eol string, lines []string) error {
 // readTSVLines reads path fresh (so edits saved by an editor moments
 // ago are preserved) and returns its logical lines plus the detected
 // line ending. A missing file yields just a header line.
-func readTSVLines(path string) (lines []string, eol string) {
+func readTSVLines(path string) (lines []string, eol string, err error) {
 	eol = "\n"
 	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return []string{"name\tgroup\tworkdir\tcmd\tshell\tslots"}, eol, nil
+	}
 	if err != nil {
-		return []string{"name\tgroup\tworkdir\tcmd\tshell\tslots"}, eol
+		return nil, eol, err
 	}
 	raw := string(data)
 	if strings.Contains(raw, "\r\n") {
@@ -175,7 +178,7 @@ func readTSVLines(path string) (lines []string, eol string) {
 	if len(lines) == 0 {
 		lines = []string{"name\tgroup\tworkdir\tcmd\tshell\tslots"}
 	}
-	return lines, eol
+	return lines, eol, nil
 }
 
 // AppendCommandTSV appends a command as a new row to the project's
@@ -183,7 +186,10 @@ func readTSVLines(path string) (lines []string, eol string) {
 // are never modified. Returns the file name written to.
 func AppendCommandTSV(projectDir string, cmd model.Command) (string, error) {
 	path := filepath.Join(projectDir, "commands.tsv")
-	lines, eol := readTSVLines(path)
+	lines, eol, err := readTSVLines(path)
+	if err != nil {
+		return "", err
+	}
 	lines = append(lines, tsvRow(cmd))
 	if err := writeTSVLines(path, eol, lines); err != nil {
 		return "", err
@@ -199,7 +205,10 @@ func UpdateCommandTSV(projectDir, oldName string, cmd model.Command) (string, er
 	if !ok {
 		return "", fmt.Errorf("no TSV command file in this project")
 	}
-	lines, eol := readTSVLines(path)
+	lines, eol, err := readTSVLines(path)
+	if err != nil {
+		return "", err
+	}
 	found := false
 	for i := 1; i < len(lines); i++ {
 		if tsvRowName(lines[i]) == oldName {
@@ -228,7 +237,10 @@ func DeleteCommandsTSV(projectDir string, names []string) (string, error) {
 	for _, n := range names {
 		drop[n] = true
 	}
-	lines, eol := readTSVLines(path)
+	lines, eol, err := readTSVLines(path)
+	if err != nil {
+		return "", err
+	}
 	kept := lines[:1]
 	for _, line := range lines[1:] {
 		if !drop[tsvRowName(line)] {
@@ -265,6 +277,9 @@ func loadTSV(path string) (model.Config, error) {
 			continue
 		}
 		parts := strings.Split(line, "\t")
+		if len(parts) < 4 || len(parts) > 6 {
+			return model.Config{}, fmt.Errorf("%s line %d: expected 4 to 6 tab-separated columns (use literal TAB characters)", filepath.Base(path), i+1)
+		}
 		get := func(idx int) string {
 			if idx < len(parts) {
 				return unquoteTSVField(strings.TrimSpace(parts[idx]))
@@ -281,9 +296,10 @@ func loadTSV(path string) (model.Config, error) {
 		if v := get(5); v != "" {
 			cmd.Slots = parseVarsStr(v)
 		}
-		if cmd.Name != "" && cmd.Cmd != "" {
-			commands = append(commands, cmd)
+		if cmd.Name == "" || cmd.Cmd == "" {
+			return model.Config{}, fmt.Errorf("%s line %d: name and cmd are required", filepath.Base(path), i+1)
 		}
+		commands = append(commands, cmd)
 	}
 	return model.Config{Commands: commands}, nil
 }

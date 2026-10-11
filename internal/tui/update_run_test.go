@@ -314,12 +314,12 @@ func TestRunCompletion_FreezesTheTotal(t *testing.T) {
 		t.Fatalf("total = %v, want the elapsed run time", got.running.total)
 	}
 
-	first := got.viewRunning(80)
+	first := got.runCompletionLine()
 	time.Sleep(20 * time.Millisecond)
-	if second := got.viewRunning(80); second != first {
+	if second := got.runCompletionLine(); second != first {
 		t.Fatalf("the done screen changed between renders:\n%q\n%q", first, second)
 	}
-	if !strings.Contains(first, "in 3") {
+	if !strings.Contains(first, "· 3") {
 		t.Fatalf("done screen = %q, want it to report how long the run took", first)
 	}
 }

@@ -23,6 +23,9 @@ func (m Model) exploreTemplateFlow() bool {
 func (m Model) templatePaneKeys() string {
 	switch m.screen {
 	case ScreenSlotPick:
+		if m.sp.pathDef.PathKind != "" {
+			return "Tab Choices  Enter Confirm  Ctrl+K Keep interactive  Esc Back"
+		}
 		if m.sp.variadic {
 			return "Type Filter / Value  ↑↓ Select  Tab Toggle  Enter Confirm  Esc Back"
 		}
@@ -72,6 +75,13 @@ func (m Model) exploreTemplateBox(l exploreLayout) string {
 		sp := m.sp
 		title += " · " + sp.placeholder()
 		b.WriteString(" / " + sp.search + "_\n")
+		if sp.pathDef.PathKind != "" {
+			if len(sp.picked) > 0 {
+				b.WriteString(" Selected: " + strings.Join(sp.picked, " · ") + "\n")
+			}
+			b.WriteString(" Tab: open choices\n")
+			break
+		}
 		var choices []string
 		for _, entry := range sp.filtered {
 			label := entry.Value
@@ -87,7 +97,7 @@ func (m Model) exploreTemplateBox(l exploreLayout) string {
 			}
 			choices = append(choices, label)
 		}
-		choices = append(choices, "Use typed value: "+sp.search)
+		choices = append(choices, sp.typedValueLabel())
 		if sp.canSkip {
 			choices = append(choices, "Keep interactive (choose at run time)")
 		}
@@ -129,7 +139,7 @@ func (m Model) writeTemplatePreview(b *strings.Builder) {
 			values[sp.slotName] = strings.Join(sp.picked, " ")
 		case sp.cursor >= 0 && sp.cursor < len(sp.filtered):
 			values[sp.slotName] = sp.filtered[sp.cursor].Value
-		case sp.cursor == len(sp.filtered) && sp.search != "":
+		case sp.cursor == len(sp.filtered) && sp.search != "" && (sp.pathDef.PathKind == "" || sp.completedPath != ""):
 			values[sp.slotName] = sp.search
 		}
 		b.WriteString(" " + dim("Preview only · Enter confirms this value") + "\n")

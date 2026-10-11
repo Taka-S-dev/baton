@@ -231,6 +231,7 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // ── Resolve flow ──────────────────────────────────────────────────────────────
 
 func (m Model) startResolveFlow(items []msItem) (tea.Model, tea.Cmd) {
+	m.confirmBack = nil
 	names := make([]string, len(items))
 	for i, it := range items {
 		names[i] = it.name()
@@ -308,6 +309,7 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 	entries := m.lists[s.ListName]
 	r := m.resolve
 	sp := &slotPickState{
+		pathDef:       s,
 		slotName:      s.Name,
 		listName:      s.ListName,
 		entries:       entries,
@@ -318,6 +320,9 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 		contextIdx:    r.currentIdx,
 		currentCmd:    cmd,
 		resolvedSoFar: copyMap(r.currentValues),
+	}
+	if s.PathKind != "" {
+		sp.entries = nil
 	}
 	sp.applyFilter()
 	// An earlier step already answered this question — clean and build
@@ -341,6 +346,9 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 	}
 	m.sp = sp
 	m.screen = ScreenSlotPick
+	if s.PathKind != "" {
+		return m, m.startPathCompletion()
+	}
 	return m, nil
 }
 
@@ -366,6 +374,18 @@ func (m Model) finishResolveFlow() (tea.Model, tea.Cmd) {
 
 func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	sp := m.sp
+	if sp.pathDef.PathKind != "" && msg.String() == "ctrl+t" {
+		return m, nil
+	}
+	if sp.pathDef.PathKind != "" && sp.canSkip && m.sce != nil && msg.String() == "ctrl+k" {
+		return m.skipCommandEditSlot()
+	}
+	if sp.completion != nil {
+		return m.updatePathCompletion(msg)
+	}
+	if sp.pathDef.PathKind != "" && (msg.String() == "ctrl+@" || msg.String() == "ctrl+space" || msg.String() == "tab" || (msg.String() == "enter" && sp.completedPath == "" && len(sp.picked) == 0)) {
+		return m, m.startPathCompletion()
+	}
 	skipRow := len(sp.filtered) + 1
 	total := skipRow
 	if sp.canSkip {
@@ -377,12 +397,12 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		sp.cursor = (sp.cursor - 1 + total) % total
 	case "down":
 		sp.cursor = (sp.cursor + 1) % total
-	case "tab":
+	case "tab", "ctrl+t":
 		if !sp.variadic {
 			sp.cursor = (sp.cursor + 1) % total
 			break
 		}
-		// Variadic slot: Tab toggles the hovered entry, or adds the typed
+		// Variadic slot: Ctrl+T toggles the hovered entry, or adds the typed
 		// custom value and clears the input for the next one.
 		if sp.cursor < len(sp.filtered) {
 			sp.togglePicked(sp.filtered[sp.cursor].Value)
@@ -445,6 +465,18 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
+	m.rememberConfirmBack()
+	if m.sp != nil && m.sp.pathDef.PathKind != "" && m.projectsDir != "" && m.sp.currentCmd != nil {
+		focus := m.sp.completedPath
+		if m.sp.variadic && len(m.sp.picked) > 0 {
+			focus = m.sp.picked[len(m.sp.picked)-1]
+		}
+		if base, err := m.completionBase(); err == nil && focus != "" {
+			if err := store.SavePathFocus(m.projectsDir, base, m.projectDir, m.sp.currentCmd.Name, m.sp.placeholder(), focus); err != nil {
+				m.errMsg = "Could not remember file focus: " + err.Error()
+			}
+		}
+	}
 	r := m.resolve
 	def := r.currentSlots[r.currentSlotIdx]
 	r.currentValues[def.Name] = value
@@ -476,6 +508,12 @@ func (m Model) goBackInResolve() (tea.Model, tea.Cmd) {
 	r.currentSlotIdx = 0
 	r.itemNotes[r.currentIdx] = ""
 
+	if r.currentIdx == 0 && m.recentActive {
+		m.resolve = nil
+		m.sp = nil
+		m.gotoRecent()
+		return m, nil
+	}
 	if r.currentIdx == 0 {
 		m.resolve = nil
 		m.sp = nil

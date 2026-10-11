@@ -72,6 +72,9 @@ func (m Model) renderScreen(w int) string {
 		bg.helpOpen = false
 		return m.overlayHelp(bg.renderScreen(w), w)
 	}
+	if m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion != nil {
+		return m.overlayPathCompletion(w)
+	}
 	if m.pasteMenu {
 		bg := m
 		bg.pasteMenu = false
@@ -88,6 +91,8 @@ func (m Model) renderScreen(w int) string {
 	}
 	var view string
 	switch m.screen {
+	case ScreenRecent:
+		view = m.viewRecent(w)
 	case ScreenProjectSelect:
 		view = m.viewProjectSelect(w)
 	case ScreenMainMenu:
@@ -839,7 +844,11 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 
 		// Command preview — separated from the list
 		if sp.currentCmd != nil {
-			b.WriteString(gap + hlineLabelBright(w, "command preview  "+highlight(sp.placeholder())) + "\n" + gap)
+			previewLabel := "command preview  " + highlight(sp.placeholder())
+			if progress := m.inputProgressLabel(); progress != "" {
+				previewLabel += "  ·  " + progress
+			}
+			b.WriteString(gap + hlineLabelBright(w, previewLabel) + "\n" + gap)
 
 			// Hovered value (from list cursor or custom search input)
 			hoveredVal := ""
@@ -847,6 +856,10 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 				hoveredVal = sp.filtered[sp.cursor].Value
 			} else if sp.cursor == len(sp.filtered) && sp.search != "" {
 				hoveredVal = sp.search
+			}
+
+			if sp.pathDef.PathKind != "" && sp.completedPath == "" {
+				hoveredVal = ""
 			}
 
 			// Substitute resolvedSoFar, then the current slot: the joined
@@ -888,18 +901,32 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 
 	// Search field
 	if sp.search == "" {
-		b.WriteString("  " + dim("/ type to filter...") + "\n" + gap)
+		b.WriteString("  " + dim(sp.inputHint()) + "\n" + gap)
 	} else {
-		countStr := ""
-		if len(sp.filtered) == 0 {
-			countStr = warn("no match")
-		} else {
-			countStr = dim(fmt.Sprintf("%d results", len(sp.filtered)))
+		countStr := dim(sp.inputStatus())
+		if m.pathInputReady() {
+			countStr = ""
 		}
 		b.WriteString("  " + accent("/") + " " + white(sp.search) + dim("_") +
 			"  " + countStr + "\n" + gap)
 	}
 
+	if sp.pathDef.PathKind != "" {
+		if len(sp.picked) > 0 {
+			label := dim("Selected: ")
+			if m.pathInputReady() {
+				label = success("✓ Selected: ")
+			}
+			b.WriteString("  " + label + white(strings.Join(sp.picked, "  ·  ")) + "\n")
+		} else if sp.completedPath != "" {
+			b.WriteString("  " + success("✓ ") + white(sp.completedPathTitle()+" selected: "+sp.completedPath) + "\n")
+		} else {
+			b.WriteString("  " + dim("Tab: open choices") + "\n")
+		}
+		keys := m.pathInputKeys()
+		b.WriteString(hline(w) + "\n  " + gray(keys) + "\n")
+		return b.String()
+	}
 	// List
 	skipRow := len(sp.filtered) + 1
 	total := skipRow
@@ -926,11 +953,7 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 			if isSkip {
 				rawLine = "[ → skip — resolve at run time ]"
 			} else if isCustom {
-				if sp.search != "" {
-					rawLine = "[ + " + sp.search + "  (custom) ]"
-				} else {
-					rawLine = "[ + custom value ]"
-				}
+				rawLine = sp.typedValueLabel()
 			} else {
 				e := sp.filtered[i]
 				if e.Label != "" {
@@ -953,11 +976,7 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 		if isSkip {
 			line = dim("[ → skip — resolve at run time ]")
 		} else if isCustom {
-			if sp.search != "" {
-				line = accent("[") + " + " + white(sp.search) + "  " + dim("(custom)") + accent(" ]")
-			} else {
-				line = dim("[ + custom value ]")
-			}
+			line = dim(sp.typedValueLabel())
 		} else {
 			e := sp.filtered[i]
 			if e.Label != "" {
@@ -1349,7 +1368,7 @@ func confirmGap(m Model) string {
 
 func (m Model) viewConfirmRun(w int) string {
 	var b strings.Builder
-	m.writeHeadingUnder(&b, "Confirm", w, 20)
+	m.writeHeadingUnder(&b, "Review & run", w, 20)
 
 	// Every item spans three lines, so the window scrolls whole items.
 	// There is no row cursor here — ↑↓ move the window directly.
@@ -1371,11 +1390,8 @@ func (m Model) viewConfirmRun(w int) string {
 			// the runner will: this screen answers "what is about to
 			// run", so it must not show something else.
 			cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
-			b.WriteString("       " + gray("$ "+cmd.Cmd) + "\n")
-			workdir := cmd.Dir
-			if workdir == "" {
-				workdir = "."
-			}
+			b.WriteString("       " + white("$ "+cmd.Cmd) + "\n")
+			workdir := m.confirmWorkdir(cmd.Dir)
 			b.WriteString("         " + dim("workdir: "+workdir) + "\n")
 		} else {
 			b.WriteString("\n\n")
@@ -1391,27 +1407,18 @@ func (m Model) viewConfirmRun(w int) string {
 	}
 
 	b.WriteString(confirmGap(m) + hline(w) + "\n" + confirmGap(m))
-	b.WriteString(renderBtns(m.confirmRunBtn, "  Run  ", "  Cancel  ") + "\n")
-	b.WriteString(confirmGap(m) + "  " + gray("↑↓: scroll   Tab: switch   Enter: confirm   Esc: back") + "\n")
+	b.WriteString(renderBtns(m.confirmRunBtn, "  Run  ", "  "+m.confirmBackLabel()+"  ") + "\n")
+	b.WriteString(confirmGap(m) + "  " + gray("↑↓: scroll   Tab: switch   Enter: select   Esc: "+strings.ToLower(m.confirmBackLabel())) + "\n")
 	return b.String()
 }
 
 // ── Running ──────────────────────────────────────────────────────────────────
 
 func (m Model) viewRunning(w int) string {
-	r := m.running
-	if r == nil {
+	if m.running == nil || !m.running.completed || m.exitAfterRun {
 		return ""
 	}
-	if !r.completed {
-		return ""
-	}
-	var b strings.Builder
-	n := len(r.items)
-	b.WriteString("\n" + successBold("  [ Done ]") + "  " + gray(fmt.Sprintf("%d/%d", n, n)) +
-		"  " + gray("in "+formatDuration(r.total)) + "\n\n")
-	b.WriteString("  " + gray("Press any key to return to menu...") + "\n")
-	return b.String()
+	return "\n  " + gray("Press Enter to return to menu…") + "\n"
 }
 
 // ── Retry ────────────────────────────────────────────────────────────────────
@@ -2087,7 +2094,9 @@ func (m Model) slotValidationLines(cf *commandFormState) []string {
 	probe := mdl.Command{Cmd: cmdStr, Dir: dirStr}
 	var lines []string
 	for _, s := range slot.GetSlots(probe) {
-		if _, ok := m.lists[s.ListName]; ok {
+		if s.PathKind != "" {
+			lines = append(lines, gray(s.Placeholder()+" → "+s.PathKind+" picker"))
+		} else if _, ok := m.lists[s.ListName]; ok {
 			lines = append(lines, success("✓")+" "+gray(s.Placeholder()+" → "+s.ListName))
 		} else {
 			lines = append(lines, warn("⚠")+" "+gray(s.Placeholder()+" → ")+warn("no list (free input at run time)"))

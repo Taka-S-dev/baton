@@ -48,9 +48,13 @@ const usage = `baton - terminal-based command/workflow runner
 
 Usage:
   baton [--dry-run]
+  baton recent [--dry-run]
+  baton r [--dry-run]
   baton check [project|path]
 
 Commands:
+  recent, r    Choose a recent command for the current directory, then
+               fill its inputs and review before running.
   check        Validate projects without starting the TUI and print any
                warnings. With no argument every project is checked; pass a
                project name or a directory path to check one. Exits 1 when
@@ -72,21 +76,26 @@ func main() {
 		os.Exit(runCheck(os.Args[2:]))
 	}
 
-	dryRun := false
-	for _, arg := range os.Args[1:] {
-		switch arg {
-		case "--dry-run":
-			dryRun = true
-		case "-h", "--help":
-			fmt.Print(usage)
-			return
-		case "--version":
-			fmt.Println("baton " + versionString())
-			return
-		}
+	opts, err := parseLaunchArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		os.Exit(2)
+	}
+	if opts.help {
+		fmt.Print(usage)
+		return
+	}
+	if opts.version {
+		fmt.Println("baton " + versionString())
+		return
+	}
+	var m tui.Model
+	if opts.recent {
+		m, err = tui.NewRecent(opts.dryRun)
+	} else {
+		m, err = tui.New(opts.dryRun)
 	}
 
-	m, err := tui.New(dryRun)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -61,6 +62,7 @@ const (
 	ScreenRenameRepair
 	ScreenRunWorkflowSteps
 	ScreenExplore
+	ScreenRecent
 )
 
 type nameInputMode int
@@ -108,13 +110,17 @@ func matchesAllTerms(haystack string, terms []string) bool {
 
 // slotPickState holds state for the slot-picking screen.
 type slotPickState struct {
-	slotName string
-	listName string
-	entries  []mdl.ListEntry
-	filtered []mdl.ListEntry
-	cursor   int
-	search   string
-	canSkip  bool // true when creating a template-derived command
+	previewOnly   bool // background beneath the active completion popup
+	pathDef       slot.Def
+	completion    *pathCompletion
+	completedPath string // Last inserted completion, cleared as soon as the input changes.
+	slotName      string
+	listName      string
+	entries       []mdl.ListEntry
+	filtered      []mdl.ListEntry
+	cursor        int
+	search        string
+	canSkip       bool // true when creating a template-derived command
 
 	// {name...} slots: Tab toggles values into picked (in toggle order)
 	// and Enter joins them with spaces. With nothing picked, Enter falls
@@ -137,6 +143,9 @@ type slotPickState struct {
 
 // placeholder returns the literal placeholder text being resolved.
 func (s *slotPickState) placeholder() string {
+	if s.pathDef.PathKind != "" {
+		return s.pathDef.Placeholder()
+	}
 	if s.variadic {
 		return "{" + s.slotName + "...}"
 	}
@@ -163,6 +172,9 @@ func (s *slotPickState) isPicked(v string) bool {
 }
 
 func (s *slotPickState) applyFilter() {
+	if s.search != s.completedPath {
+		s.completedPath = ""
+	}
 	if s.search == "" {
 		s.filtered = s.entries
 		return
@@ -386,6 +398,12 @@ func shellFormLabel() string {
 
 // Model is the main bubbletea model.
 type Model struct {
+	launchDir        string
+	recentActive     bool
+	exitAfterRun     bool
+	recentRows       []recentRow
+	recentSearch     string
+	recentCursor     int
 	dryRun           bool
 	projectMode      string
 	projectInput     string
@@ -453,6 +471,7 @@ type Model struct {
 	pendingWorkflowCmds []string
 
 	// Confirm run
+	confirmBack      *Model
 	confirmRunItems  []mdl.RunItem
 	confirmRunLabel  string
 	confirmRunBtn    int
@@ -545,10 +564,22 @@ type Model struct {
 }
 
 // New creates the initial model.
-func New(dryRun bool) (Model, error) {
+func New(dryRun bool) (Model, error) { return newModel(dryRun, false) }
+
+func NewRecent(dryRun bool) (Model, error) { return newModel(dryRun, true) }
+
+func newModel(dryRun, recent bool) (Model, error) {
 	projectsDir, err := config.FindProjectsDir()
 	if err != nil {
 		return Model{}, fmt.Errorf("no projects/ directory found next to the executable")
+	}
+	projectsDir, err = filepath.Abs(projectsDir)
+	if err != nil {
+		return Model{}, err
+	}
+	launchDir, err := os.Getwd()
+	if err != nil {
+		return Model{}, err
 	}
 	projects := config.ListProjects(projectsDir)
 
@@ -571,6 +602,8 @@ func New(dryRun bool) (Model, error) {
 	ti.Width = 40
 
 	m := Model{
+		launchDir:        launchDir,
+		exitAfterRun:     recent,
 		dryRun:           dryRun,
 		projectsDir:      projectsDir,
 		projects:         projects,
@@ -580,6 +613,11 @@ func New(dryRun bool) (Model, error) {
 		stepsVP:          viewport.New(80, 8),
 	}
 
+	if recent {
+		m.recentActive = true
+		m.gotoRecent()
+		return m, nil
+	}
 	if len(projects) == 1 {
 		if err := m.loadProject(filepath.Join(projectsDir, projects[0])); err != nil {
 			return Model{}, err
@@ -642,22 +680,23 @@ func (m *Model) writeSnapshot() {
 
 // saveConfig persists user commands to commands.local.json.
 func (m *Model) saveConfig() error {
+	vars := make(map[string]string, len(m.vars))
+	for k, v := range m.vars {
+		vars[k] = v
+	}
 	// Mirror every template-derived command's fixed values into vars.tsv
 	// ("command.slot" names), drop entries for commands that no longer
 	// exist, and persist the local layer without the values — vars.tsv is
 	// their single editable home.
 	for _, c := range m.config.Commands {
 		if c.Template != "" {
-			slot.SetCommandValues(m.vars, c.Name, c.Values)
+			slot.SetCommandValues(vars, c.Name, c.Values)
 		}
 	}
-	slot.PruneCommandValues(m.vars, func(name string) bool {
+	slot.PruneCommandValues(vars, func(name string) bool {
 		_, ok := m.config.FindCommand(name)
 		return ok
 	})
-	if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
-		return err
-	}
 	// Template-derived entries persist only their identity: cmd/workdir/
 	// slots/values are all recomputed from template + vars.tsv on load,
 	// and a baked copy in the file just looks editable without being so.
@@ -672,7 +711,11 @@ func (m *Model) saveConfig() error {
 			stripped.Commands[i].Slots = nil
 		}
 	}
-	return store.SaveConfig(m.projectDir, stripped)
+	if err := store.SaveConfigWithVars(m.projectDir, stripped, vars); err != nil {
+		return err
+	}
+	m.vars = vars
+	return nil
 }
 
 // gotoManageLists opens the Manage lists submenu.
@@ -686,6 +729,10 @@ func (m *Model) gotoManageLists() {
 }
 
 func (m *Model) gotoMainMenu() {
+	if m.recentActive {
+		m.gotoRecent()
+		return
+	}
 	m.exploreLaunched = false
 	m.screen = ScreenMainMenu
 	m.listItems = mainMenuItems()

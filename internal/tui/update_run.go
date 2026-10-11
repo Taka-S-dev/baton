@@ -42,9 +42,9 @@ func (m Model) updateConfirmRun(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.confirmRunBtn == 0 {
 			return m.startRunning(m.confirmRunItems, 0, m.confirmRunLabel)
 		}
-		m.gotoMainMenu()
+		return m.backFromConfirm()
 	case "esc":
-		m.gotoMainMenu()
+		return m.backFromConfirm()
 	}
 	return m, nil
 }
@@ -76,7 +76,10 @@ func (m Model) startRunningRetry(items []mdl.RunItem, startIdx int, label string
 // workdir, and the resolved command line so the exact invocation is visible
 // in the scrollback.
 func stepHeader(pos, total int, name string, cmd mdl.Command) string {
-	h := fmt.Sprintf("\n── [%d/%d] %s", pos, total, name)
+	h := "\n── " + name
+	if total > 1 {
+		h = fmt.Sprintf("\n── [%d/%d] %s", pos, total, name)
+	}
 	if cmd.Dir != "" {
 		h += fmt.Sprintf("   workdir: %s", cmd.Dir)
 	}
@@ -93,8 +96,11 @@ func (m Model) runNext() tea.Cmd {
 	cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
 	header := stepHeader(r.current+1, len(r.items), item.Name, cmd)
 	prefix := ""
-	if r.current == r.startIdx {
+	if r.current == r.startIdx && ((r.label != "" && r.label != "manual") || r.retryCount > 0) {
 		label := r.label
+		if label == "manual" {
+			label = "Run"
+		}
 		if r.retryCount > 0 {
 			label = fmt.Sprintf("%s (retry #%d)", r.label, r.retryCount)
 		}
@@ -104,6 +110,11 @@ func (m Model) runNext() tea.Cmd {
 			sep = "── " + label + " " + pad
 		}
 		prefix = "\n" + sep + "\n"
+	}
+	if !m.dryRun && m.launchDir != "" && m.projectsDir != "" {
+		if err := store.RecordRecent(m.projectsDir, m.launchDir, m.projectDir, item.Cmd.Name, time.Now()); err != nil {
+			prefix += "Warning: could not save recent command: " + err.Error() + "\n"
+		}
 	}
 	return tea.Sequence(tea.Println(prefix+header), runner.Exec(r.current, cmd, m.dryRun))
 }
@@ -118,7 +129,8 @@ func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	r.current++
-	bar := progressBar(r.current, len(r.items), 24) + "  " + gray(formatDuration(time.Since(r.stepStart)))
+	bar := progressBar(r.current, len(r.items), 24)
+	stepDone := "  " + success("✓ "+r.items[r.current-1].Name) + " · " + gray(formatDuration(time.Since(r.stepStart)))
 	if r.current >= len(r.items) {
 		r.completed = true
 		r.total = time.Since(r.runStart)
@@ -126,11 +138,13 @@ func (m Model) handleRunnerDone(msg runner.DoneMsg) (tea.Model, tea.Cmd) {
 		// The closing line is what stays in the scrollback: a run is
 		// often left unattended, and "when did it end" is only
 		// answerable from the clock, not from a duration.
-		done := fmt.Sprintf("  done in %s   finished at %s",
-			formatDuration(r.total), time.Now().Format("15:04:05"))
-		return m, tea.Sequence(tea.Println(bar), tea.Println(gray(done)), tea.ExitAltScreen)
+		done := m.runCompletionOutput()
+		if len(r.items) > 1 {
+			done = stepDone + "\n" + done
+		}
+		return m, tea.Sequence(tea.Println(done), func() tea.Msg { return runSummaryPrintedMsg{} })
 	}
-	return m, tea.Sequence(tea.Println(bar), m.runNext())
+	return m, tea.Sequence(tea.Println(stepDone+"\n"+bar), m.runNext())
 }
 
 // ── Retry ─────────────────────────────────────────────────────────────────────
@@ -274,6 +288,7 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // run, never the order they run in. Remaining {slots} are resolved
 // interactively per step.
 func (m Model) startWorkflowRun(wf mdl.Workflow, steps []string) (tea.Model, tea.Cmd) {
+	m.confirmBack = nil
 	store.SaveLastWorkflow(m.projectDir, wf.Name)
 	m.lastWorkflow = wf.Name
 

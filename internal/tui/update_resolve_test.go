@@ -337,7 +337,7 @@ func TestUpdateSlotPick_VariadicToggleAndJoin(t *testing.T) {
 		nm, _ = m.updateSlotPick(k)
 		m = nm.(Model)
 	}
-	tab := tea.KeyMsg{Type: tea.KeyTab}
+	tab := tea.KeyMsg{Type: tea.KeyCtrlT}
 	key(tab)                           // toggle api
 	key(tea.KeyMsg{Type: tea.KeyDown}) // → web
 	key(tab)                           // toggle web
@@ -359,7 +359,7 @@ func TestUpdateSlotPick_VariadicToggleAndJoin(t *testing.T) {
 	}
 }
 
-// TestUpdateSlotPick_VariadicCustomToggle checks Tab on the custom row:
+// TestUpdateSlotPick_VariadicCustomToggle checks Ctrl+T on the custom row:
 // the typed value joins the picks and the input clears for the next one.
 func TestUpdateSlotPick_VariadicCustomToggle(t *testing.T) {
 	cmd := mdl.Command{Name: "up", Cmd: "up {services...}"}
@@ -376,7 +376,7 @@ func TestUpdateSlotPick_VariadicCustomToggle(t *testing.T) {
 		key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
 	// "db" matches nothing, so the cursor sits on the custom row.
-	key(tea.KeyMsg{Type: tea.KeyTab})
+	key(tea.KeyMsg{Type: tea.KeyCtrlT})
 	if got := m.sp.picked; len(got) != 1 || got[0] != "db" {
 		t.Fatalf("picked = %v, want [db]", got)
 	}
@@ -384,7 +384,7 @@ func TestUpdateSlotPick_VariadicCustomToggle(t *testing.T) {
 		t.Fatalf("search = %q — must clear after toggling a custom value", m.sp.search)
 	}
 
-	key(tea.KeyMsg{Type: tea.KeyTab}) // cursor is back on "api"
+	key(tea.KeyMsg{Type: tea.KeyCtrlT}) // cursor is back on "api"
 	key(tea.KeyMsg{Type: tea.KeyEnter})
 	if got := m.confirmRunItems[0].Cmd.Cmd; got != "up db api" {
 		t.Fatalf("resolved cmd = %q, want picks in toggle order", got)

@@ -521,8 +521,8 @@ func TestFormBraceOpensTheCandidates(t *testing.T) {
 		t.Fatal("{ did not open the candidates")
 	}
 	cands := m.pickCandidates(m.cf.pickTyped(m.nameInput))
-	if len(cands) != 3 { // {env}, {env...}, {$root}
-		t.Fatalf("candidates = %+v, want the list, its variadic form and the global", cands)
+	if len(cands) != 8 { // list, variadic list, global, and five reserved path forms
+		t.Fatalf("candidates = %+v, want list, variadic list, global and reserved path forms", cands)
 	}
 	view := stripStyle(m.View())
 	for _, want := range []string{"{env}", "pick at run time · 2 choices", "{env...}", "pick several", "{$root}", `fixed · C:\work\Phase1`} {

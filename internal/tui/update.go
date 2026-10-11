@@ -9,6 +9,7 @@ import (
 )
 
 type runReadyMsg struct{}
+type runSummaryPrintedMsg struct{}
 
 // settleAfterRun is how long the done screen ignores input. It only has
 // to outlast the burst the terminal delivers when it comes back, not a
@@ -17,6 +18,9 @@ type runReadyMsg struct{}
 const settleAfterRun = 500 * time.Millisecond
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if result, ok := msg.(pathCompletionResult); ok {
+		return m.receivePathCompletion(result)
+	}
 	// A resize is every screen's business, so it is handled before the
 	// forwarding below — which returns early and would otherwise leave
 	// the layout stale on any screen holding a text input.
@@ -101,6 +105,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	if m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion != nil {
+		switch input := msg.(type) {
+		case tea.MouseMsg:
+			return m.updatePathCompletionMouse(input)
+		case tea.KeyMsg:
+			if input.Type != tea.KeyCtrlC {
+				return m.updatePathCompletion(input)
+			}
+		}
+	}
 	if m.leaveAsk != leaveNone {
 		switch input := msg.(type) {
 		case tea.MouseMsg:
@@ -165,6 +179,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.errMsg = "Open folder failed: " + result.err.Error()
 		}
 		return m, nil
+	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenRecent {
+		return m.updateRecentMouse(mouse)
 	}
 	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenMainMenu {
 		return m.updateMainMenuMouse(mouse)
@@ -271,6 +288,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateExploreMouse(msg)
 		}
 		return m, nil
+	case runSummaryPrintedMsg:
+		if m.exitAfterRun && m.running != nil && m.running.completed {
+			return m, tea.Quit
+		}
+		return m, nil
 	case runReadyMsg:
 		if m.running != nil {
 			m.running.starting = false
@@ -290,6 +312,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = ""
 		m.successMsg = ""
 		switch m.screen {
+		case ScreenRecent:
+			return m.updateRecent(msg)
 		case ScreenProjectSelect:
 			return m.updateProjectSelect(msg)
 		case ScreenMainMenu:
@@ -312,6 +336,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// stops a run the user is still tapping Enter over from
 				// walking the menu and starting itself again.
 				if time.Since(m.running.completedAt) < settleAfterRun {
+					return m, nil
+				}
+				if msg.Type != tea.KeyEnter && msg.Type != tea.KeyEsc {
 					return m, nil
 				}
 				m.running = nil
