@@ -18,7 +18,7 @@ os.makedirs(out_dir, exist_ok=True)
 
 FONT_PATH = os.environ.get("DEMO_FONT", r"C:\Windows\Fonts\CascadiaMono.ttf")
 FONT = ImageFont.truetype(FONT_PATH, 20)
-COLS, ROWS = 100, 20
+COLS = 100
 PAD = 24
 BG = (30, 30, 46)
 FG = (205, 214, 244)
@@ -94,11 +94,11 @@ def cells(text):
         i += 1
 
 
-def render(text, path):
-    img = Image.new("RGB", (int(COLS * CW) + PAD * 2, ROWS * CH + PAD * 2), BG)
+def render(text, path, rows):
+    img = Image.new("RGB", (int(COLS * CW) + PAD * 2, rows * CH + PAD * 2), BG)
     draw = ImageDraw.Draw(img)
     for row, col, ch, fg, bg, bold in cells(text):
-        if row >= ROWS or col >= COLS:
+        if row >= rows or col >= COLS:
             continue
         x, y = PAD + col * CW, PAD + row * CH
         if bg:
@@ -108,8 +108,11 @@ def render(text, path):
     img.save(path)
 
 
+# Every frame of a session has the terminal's height; take it from the tallest.
+frames = sorted(glob.glob(os.path.join(frames_dir, "*.txt")))
+rows = max(open(f, encoding="utf-8").read().count("\n") + 1 for f in frames)
 entries = []
-for f in sorted(glob.glob(os.path.join(frames_dir, "*.txt"))):
+for f in frames:
     stem = os.path.splitext(os.path.basename(f))[0]
     hold = int(stem.split("_")[1]) / 100
     text = open(f, encoding="utf-8").read()
@@ -117,7 +120,7 @@ for f in sorted(glob.glob(os.path.join(frames_dir, "*.txt"))):
     text = re.sub(r"[A-Za-z]:\\[^ \n]*?TestDemoFrames\d+\\001\\api", r"C:\\work\\api", text)
     assert "AppData" not in text and "/tmp/" not in text, "a temporary path is still visible in " + f
     png = os.path.join(out_dir, stem + ".png")
-    render(text, png)
+    render(text, png, rows)
     entries.append((os.path.abspath(png).replace("\\", "/"), hold))
 
 with open(os.path.join(out_dir, "list.txt"), "w", encoding="utf-8") as fh:

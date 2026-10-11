@@ -86,6 +86,15 @@ baton check [project]    validate every project file; exit 1 on problems
 baton --dry-run          show what would run without running it
 ```
 
+## Adding a command
+
+`e` opens the project editor; `a` starts a command. Typing `{` in the
+command lists the placeholders the project already knows, the name is
+suggested from the command line, and `Ctrl+S` puts the new command in
+the list — nothing to edit by hand unless you prefer to.
+
+![Write a command with a placeholder, take the suggested name, save](docs/demo-add.gif)
+
 ## Keys
 
 A key keeps its meaning on every screen it appears on.
