@@ -7,15 +7,18 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) viewRunWorkflow(w int) string {
+func (m Model) viewRunWorkflow(w int, searchRow ...func(int)) string {
 	if splitPanels(w) && m.shortPanels() {
-		return m.viewShortWorkflowSplit(w)
+		return m.viewShortWorkflowSplit(w, searchRow...)
 	}
 	if !splitPanels(w) {
-		return m.viewRunWorkflowList(w)
+		return m.viewRunWorkflowList(w, searchRow...)
 	}
 	leftW := w / 3
 	var b strings.Builder
+	for _, hit := range searchRow {
+		hit(1)
+	}
 	b.WriteString(m.runSearchView(m.wfSearchTI) + "\n")
 	filtered := m.wfFiltered()
 	writeWindowedList(&b, max(1, m.termHeight()-5), len(filtered), m.listCursor, "No workflows.", func(i int) string {

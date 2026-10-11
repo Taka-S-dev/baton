@@ -276,6 +276,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			mouse.Y--
+			if mouse.Button == tea.MouseButtonLeft && mouse.Action == tea.MouseActionPress && m.runSearchHit(mouse.X, mouse.Y) {
+				m.runQueueFocused = false
+				m.stepsFocused = false
+				m.runHome.searching = true
+				return m, m.syncRunSearch()
+			}
 			if mouse.Button == tea.MouseButtonRight && m.screen == ScreenRunCommands {
 				return m.updateRunSelectMouse(mouse)
 			}

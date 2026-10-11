@@ -276,7 +276,7 @@ func (m Model) workflowLabel(idx int, hovered bool) string {
 	return strings.Join(styled, highlight("+")) + gray(tail)
 }
 
-func (m Model) viewRunWorkflowList(w int) string {
+func (m Model) viewRunWorkflowList(w int, searchRow ...func(int)) string {
 	var b strings.Builder
 	m.writeHeading(&b, "Run workflow", w)
 
@@ -295,6 +295,9 @@ func (m Model) viewRunWorkflowList(w int) string {
 	gap, below := "\n", 5
 	if m.compact() {
 		gap, below = "", 4
+	}
+	for _, hit := range searchRow {
+		hit(strings.Count(b.String(), "\n"))
 	}
 	b.WriteString("  " + m.runSearchView(m.wfSearchTI) + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n" + gap)
 	cur := m.listCursor
@@ -411,6 +414,9 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 	gap, below := "\n", 5
 	if m.compact() {
 		gap, below = "", 4
+	}
+	for _, hit := range hitRow {
+		hit(-2, strings.Count(b.String(), "\n"))
 	}
 	b.WriteString("  " + m.commandSearchLine(max(0, w-2), n) + "\n" + gap)
 

@@ -16,6 +16,9 @@ func (m Model) viewCompactCandidates(w int, hitRow ...func(int, int)) string {
 	title += fmt.Sprintf(" · %d selected", len(m.msSelected))
 	rows := max(1, m.termHeight()-2)
 	start := windowStart(rows, len(filtered), m.msCursor)
+	for _, hit := range hitRow {
+		hit(-2, 1)
+	}
 	search := m.commandSearchLine(w, len(filtered))
 	lines := []string{accentBold(ansi.Truncate(title, w, "…")), ansi.Truncate(search, w, "…")}
 	terms := strings.Fields(m.msSearchTI.Value())

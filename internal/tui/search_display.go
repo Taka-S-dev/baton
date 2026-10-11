@@ -111,3 +111,28 @@ func (m Model) commandSearchLine(w, matches int) string {
 	}
 	return search + strings.Repeat(" ", max(2, w-ansi.StringWidth(search)-ansi.StringWidth(meta))) + gray(meta)
 }
+
+// Use the same renderers for search placement and pointer targeting.
+func (m Model) runSearchHit(x, y int) bool {
+	w := m.viewWidth()
+	leftW := w
+	row := -1
+	if m.screen == ScreenRunCommands {
+		if splitPanels(w) {
+			leftW = w / 2
+		} else if m.runQueueFocused {
+			return false
+		}
+		m.viewMultiSelectCandidates(leftW, !splitPanels(w), func(index, y int) {
+			if index == -2 {
+				row = y
+			}
+		})
+	} else {
+		if splitPanels(w) {
+			leftW = w / 3
+		}
+		m.viewRunWorkflow(w, func(y int) { row = y })
+	}
+	return x >= 0 && x < leftW && y == row
+}

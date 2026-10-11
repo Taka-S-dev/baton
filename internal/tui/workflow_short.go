@@ -7,11 +7,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func (m Model) viewShortWorkflowSplit(w int) string {
+func (m Model) viewShortWorkflowSplit(w int, searchRow ...func(int)) string {
 	h := m.termHeight()
 	leftW := w / 3
 	rightW := w - leftW - 3
-	left := strings.Split(strings.TrimRight(m.viewRunWorkflowList(leftW), "\n"), "\n")
+	left := strings.Split(strings.TrimRight(m.viewRunWorkflowList(leftW, searchRow...), "\n"), "\n")
 	right := []string{gray("Execution steps")}
 	filtered := m.wfFiltered()
 	if m.listCursor >= 0 && m.listCursor < len(filtered) {

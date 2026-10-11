@@ -47,7 +47,12 @@ func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	selected := -1
 	headerY := -1
+	searchY := -1
 	rendered := m.viewMultiSelectCandidates(leftW, !split, func(index, y int) {
+		if index == -2 {
+			searchY = y
+			return
+		}
 		if index < 0 {
 			headerY = y
 			return
@@ -56,6 +61,10 @@ func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			selected = index
 		}
 	})
+	if msg.Y == searchY {
+		m.runQueueFocused = false
+		return m, m.msSearchTI.Focus()
+	}
 	if msg.Y == headerY {
 		lines := strings.Split(ansi.Strip(rendered), "\n")
 		if headerY >= 0 && headerY < len(lines) {
