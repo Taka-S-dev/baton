@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Taka-S-dev/baton/internal/store"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -14,6 +15,7 @@ import (
 // Names, rather than indices or pointers, survive edits and reordering safely.
 type runHomeState struct {
 	ready                        bool
+	searching                    bool
 	tab                          string
 	commandSearch, commandName   string
 	selected                     []string
@@ -79,6 +81,7 @@ func (m *Model) openRunHome() {
 		}
 	}
 	m.msEscArmed = false
+	m.runHome.searching = false
 	if m.runHome.tab == "workflows" {
 		m.screen = ScreenRunWorkflow
 		m.wfSearchTI = newMSTI("/ ")
@@ -109,6 +112,7 @@ func (m *Model) openRunHome() {
 		m.runQueueCursor = min(m.runHome.queueCursor, max(0, len(m.msSelected)-1))
 		m.runQueueFocused = m.runHome.queueFocused
 	}
+	m.syncRunSearch()
 }
 
 func (m Model) switchRunTab(tab string) (tea.Model, tea.Cmd) {
@@ -120,10 +124,7 @@ func (m Model) switchRunTab(tab string) (tea.Model, tea.Cmd) {
 			m.errMsg = "Could not remember run tab: " + err.Error()
 		}
 	}
-	if tab == "commands" {
-		return m, m.msSearchTI.Focus()
-	}
-	return m, m.wfSearchTI.Focus()
+	return m, nil
 }
 
 func (m *Model) openRunProjects() {
@@ -221,7 +222,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.captureRunHome()
 	if m.runHomeVisible() && !m.helpOpen && !m.msEscArmed && !m.pasteMenu && m.leaveAsk == leaveNone {
 		if key, ok := msg.(tea.KeyMsg); ok {
+			if m.runHome.searching && key.String() != "f1" && key.String() != "ctrl+c" {
+				return m.updateRunSearch(key)
+			}
 			switch key.String() {
+			case "/":
+				m.runQueueFocused = false
+				m.runHome.searching = true
+				return m, m.syncRunSearch()
 			case "f7":
 				return m.switchRunTab("workflows")
 			case "f8":
@@ -231,6 +239,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "f6":
 				m.openRunProjects()
 				return m, nil
+			}
+			if key.Type == tea.KeyRunes || key.Type == tea.KeySpace || key.Type == tea.KeyBackspace {
+				if !(m.screen == ScreenRunCommands && m.runQueueFocused && (key.String() == "J" || key.String() == "K" || key.String() == "x")) {
+					return m, nil
+				}
 			}
 		}
 		if mouse, ok := msg.(tea.MouseMsg); ok {
@@ -284,4 +297,56 @@ func (m Model) viewRunHome(body string, w int) string {
 		lines[i] = ansi.Truncate(lines[i], w, "…")
 	}
 	return m.runHomeHeader(w) + "\n" + strings.Join(lines, "\n")
+}
+
+func (m *Model) runSearchInput() *textinput.Model {
+	if m.screen == ScreenRunWorkflow {
+		return &m.wfSearchTI
+	}
+	return &m.msSearchTI
+}
+
+func (m *Model) syncRunSearch() tea.Cmd {
+	input := m.runSearchInput()
+	if m.runHome.searching {
+		input.Prompt = "Search / "
+		input.Placeholder = "type to filter · Enter done · Esc clear"
+		return input.Focus()
+	}
+	input.Prompt = "/ "
+	input.Placeholder = "Press / to search"
+	input.Blur()
+	return nil
+}
+
+func (m Model) updateRunSearch(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch key.String() {
+	case "enter", "esc":
+		if key.String() == "esc" {
+			m.runSearchInput().SetValue("")
+			m.msCursor, m.listCursor = 0, 0
+			m.updateStepsViewport()
+		}
+		m.runHome.searching = false
+		m.syncRunSearch()
+		return m, nil
+	case "up", "down":
+		if m.screen == ScreenRunWorkflow {
+			return m.updateRunWorkflow(key)
+		}
+		return m.updateMultiSelect(key)
+	}
+	input := m.runSearchInput()
+	before := input.Value()
+	updated, cmd := input.Update(key)
+	*input = updated
+	if input.Value() != before {
+		if m.screen == ScreenRunWorkflow {
+			m.listCursor = 0
+			m.updateStepsViewport()
+		} else {
+			m.msCursor = 0
+		}
+	}
+	return m, cmd
 }

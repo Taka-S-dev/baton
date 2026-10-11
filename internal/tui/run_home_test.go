@@ -49,8 +49,9 @@ func TestRunHomeTabKeepsSearchCursorAndOrder(t *testing.T) {
 	if got := store.LoadRunTab(m.projectDir); got != "commands" {
 		t.Fatalf("saved tab %q", got)
 	}
-	// Ordinary letters/numbers remain search input, not navigation shortcuts.
+	// Search explicitly owns letters and digits until Enter or Esc.
 	m.msSearchTI.SetValue("")
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
 	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e12pq")})
 	if m.screen != ScreenRunCommands || m.msSearchTI.Value() != "e12pq" {
 		t.Fatal("navigation stole search text")
@@ -210,5 +211,24 @@ func TestRunHomeHeaderGroupsAndVisibleActions(t *testing.T) {
 		if width >= 100 && (!strings.Contains(plain, "  │  ") || !strings.Contains(plain, "Edit · Projects… · F1 Help")) {
 			t.Fatalf("actions not separated: %q", plain)
 		}
+	}
+}
+
+func TestRunHomeSearchDoesNotRunOrLoseSelection(t *testing.T) {
+	m := homeTab(homeTestModel(t), '2')
+	m.msSelected = []int{0, 2}
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	if !m.runHome.searching || !m.msSearchTI.Focused() {
+		t.Fatal("search not focused")
+	}
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("build")})
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.screen != ScreenRunCommands || m.runHome.searching || m.msSearchTI.Focused() || m.msSearchTI.Value() != "build" {
+		t.Fatal("Enter must only finish search")
+	}
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = homeKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.msSearchTI.Value() != "" || len(m.msSelected) != 2 || m.msEscArmed {
+		t.Fatal("search cancellation changed execution selection")
 	}
 }

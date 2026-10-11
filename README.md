@@ -128,7 +128,7 @@ any-folder/                  (Windows, or portable install)
         └── commands.tsv
 ```
 
-If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `F7` / `F8` (or click a tab) to switch, `F4` to open the selected item in the project editor, and `Esc` to go back to the project picker (or click **Projects**). Ordinary typing always searches.
+If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `F7` / `F8` (or click a tab) to switch, `F4` to open the selected item in the project editor, and `Esc` to go back to the project picker (or click **Projects**). Press `/` to start searching. While searching, letters and digits are text; `Enter` finishes search without running a command, and `Esc` clears it.
 
 The last Run tab is remembered per project in the app-managed `.last_run_tab`. On first use, projects with workflows open Workflows; otherwise they open Commands. An empty project offers `F4` to add its first command. Switching Run tabs and returning from the editor preserve searches, cursors, and command execution order; deleted commands are removed from that selection. `baton r` remains the separate directory-scoped recent-command launcher.
 
