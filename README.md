@@ -410,7 +410,7 @@ The Run workspace has **Workflows** (`1`) and **Commands** (`2`) tabs. `e` opens
 
 ### Searching
 
-- Projects, Recent, the editor and Run lists: `/` starts or resumes search.
+- Projects, Recent, the editor, Run lists and workflow command pickers: `/` starts or resumes search.
 - `↓` focuses the current result without clearing the query; list actions such as `e` then work.
 - `Enter` opens the result or proceeds to input/review; with no result or queued command, search stays active.
 - In search, `Esc` clears text first, then exits when empty; in a result list it clears a retained filter before going back.

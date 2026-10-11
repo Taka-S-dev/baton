@@ -260,7 +260,7 @@ func TestUpdateMultiSelect_EscDiscardGuard(t *testing.T) {
 	a := mdl.Command{Name: "auth", Cmd: "make auth"}
 	m := msModel([]msItem{{cmd: &a}})
 	m.screen = ScreenRunCommands
-	m.msSearchTI.Focus()
+	m.msSearchTI.Blur()
 
 	nm, _ := m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyTab})
 	m = nm.(Model)
@@ -455,7 +455,7 @@ func TestUpdateMultiSelect_EnterActsOnHoveredRow(t *testing.T) {
 	b := mdl.Command{Name: "web", Cmd: "make web"}
 	m := msModel([]msItem{{cmd: &a}, {cmd: &b}})
 	m.screen = ScreenRunCommands
-	m.msSearchTI.Focus()
+	m.msSearchTI.Blur()
 
 	nm, _ := m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyDown})
 	m = nm.(Model)

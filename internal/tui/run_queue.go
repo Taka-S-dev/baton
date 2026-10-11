@@ -93,5 +93,5 @@ func (m Model) runSelectKeys() string {
 	if m.runQueueFocused {
 		return "↑↓ Select  J/K Reorder  Del Remove  Enter Review  F2 List  Esc List  F1 Help"
 	}
-	return "↑↓ Select  Tab Toggle  Enter Review  F2 Queue  F3 Sort  Esc Back  F1 Help"
+	return "↑↓ Select  Tab Toggle  Enter Review  F2 Queue  s Sort  / Search  Esc Back  F1 Help"
 }

@@ -33,7 +33,7 @@ func (m Model) helpLines(w int) []string {
 			if m.runHomeVisible() {
 				return "F2 Switch between candidates and execution queue · s Sort candidates"
 			}
-			return "F2 Switch between candidates and execution queue · F3 Sort candidates"
+			return "F2 Switch between candidates and execution queue · s Sort candidates"
 		}(), "Queue: J/K or Shift+↓/↑ Reorder · Del/x Remove from queue", "Enter Continue · Esc Back (keeps selection in the confirmation)", "Removing a queue entry does not delete its command.")
 	} else if m.screen == ScreenRunWorkflowSteps {
 		lines = append(lines, "↑↓ Choose step · Tab Select / deselect", "F2 Details / Steps on narrow screens · Enter Review · Esc Back", "Selections affect this run only; saved workflow is unchanged.", "Select at least one step before reviewing. Click a row to inspect; click its checkbox to toggle.")

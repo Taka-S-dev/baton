@@ -28,7 +28,8 @@ func (m *Model) setupMultiSelect() tea.Cmd {
 		m.msItems = append(m.msItems, msItem{cmd: &m.config.Commands[i]})
 	}
 	m.msSearchTI = newMSTI("/ ")
-	return m.msSearchTI.Focus()
+	m.msSearchTI.Blur()
+	return nil
 }
 
 func (m *Model) setupMultiSelectWithPreSelected(cmdNames []string) tea.Cmd {
@@ -89,9 +90,28 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.msSearchTI.SetValue("")
 		msg = tea.KeyMsg{Type: tea.KeyEsc}
 	}
-	if msg.String() == "f3" && !m.runHomeVisible() {
-		m.cycleCommandSort()
-		return m, nil
+	if !m.runHomeVisible() && !m.msEscArmed && !escArmed {
+		if msg.String() == "f2" || msg.String() == "ctrl+q" {
+			m.msSearchTI.Blur()
+			m.runQueueFocused = !m.runQueueFocused
+			return m, nil
+		}
+		if m.msSearchTI.Focused() && msg.String() != "tab" {
+			query := m.msSearchTI.Value()
+			handled, changed, _, cmd := updateSearchInput(&m.msSearchTI, &query, msg, n > 0 || (msg.String() == "enter" && len(m.msSelected) > 0))
+			if changed {
+				m.msCursor = 0
+			}
+			if handled {
+				return m, cmd
+			}
+		} else if msg.String() == "/" {
+			m.runQueueFocused = false
+			return m, startSearchInput(&m.msSearchTI, m.msSearchTI.Value())
+		} else if msg.String() == "s" && !m.runQueueFocused {
+			m.cycleCommandSort()
+			return m, nil
+		}
 	}
 	if msg.String() == "ctrl+q" || msg.String() == "f2" {
 		m.runQueueFocused = !m.runQueueFocused
@@ -217,13 +237,7 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.openRunProjects()
 	default:
-		prevSearch := m.msSearchTI.Value()
-		var cmd tea.Cmd
-		m.msSearchTI, cmd = m.msSearchTI.Update(msg)
-		if m.msSearchTI.Value() != prevSearch {
-			m.msCursor = 0
-		}
-		return m, cmd
+		return m, nil
 	}
 	return m, nil
 }

@@ -35,7 +35,7 @@ func searchInputView(input textinput.Model, query string, editing bool) string {
 
 func (m Model) runSearchView(input textinput.Model) string {
 	if !m.runHomeVisible() {
-		return input.View()
+		return searchInputView(input, input.Value(), input.Focused())
 	}
 	return searchInputView(input, input.Value(), m.runHome.searching)
 }
@@ -86,10 +86,7 @@ func (m Model) commandSearchLine(w, matches int) string {
 		return ""
 	}
 	count := fmt.Sprintf("%d/%d", matches, len(m.msItems))
-	sortKey := "F3"
-	if m.runHomeVisible() {
-		sortKey = "s"
-	}
+	sortKey := "s"
 	meta := count + " · " + m.commandSortLabel() + " · " + sortKey + " Sort"
 	// Keep at least 20 columns for search before dropping secondary metadata.
 	if w-ansi.StringWidth(meta)-2 < 20 {

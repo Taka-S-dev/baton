@@ -93,10 +93,6 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "1", "2", "3", "4":
 		m.switchTab(int(msg.String()[0] - '1'))
-	case "left":
-		m.switchTab((m.exploreTab + tabCount - 1) % tabCount)
-	case "right":
-		m.switchTab((m.exploreTab + 1) % tabCount)
 	case "/":
 		m.exploreSearching = true
 		cmd := startSearchInput(&m.exploreSearchTI, m.exploreSearch)

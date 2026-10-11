@@ -122,7 +122,7 @@ func TestExploreTabsHoldOneKindEach(t *testing.T) {
 }
 
 // TestExploreTabSwitching checks the ways between tabs: the number
-// keys, the arrows, and a click on the label — and that each tab keeps
+// keys and a click on the label — and that each tab keeps
 // its own place, so coming back lands where you were.
 func TestExploreTabSwitching(t *testing.T) {
 	m := exploreProject()
@@ -135,11 +135,15 @@ func TestExploreTabSwitching(t *testing.T) {
 		t.Fatalf("1 did not open the workflows tab")
 	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyRight})
-	m = press(m, tea.KeyMsg{Type: tea.KeyRight})
-	if m.exploreTab != tabLists {
-		t.Errorf("→ did not move to the next tab")
-	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyLeft})
+	if m.exploreTab != tabWorkflows {
+		t.Fatal("list arrows must not switch tabs")
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	if m.exploreTab != tabLists {
+		t.Errorf("3 did not open Lists")
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
 	if m.exploreTab != tabCommands || m.exploreCursor[tabCommands] != 1 {
 		t.Errorf("coming back did not land where the tab was left: tab=%d cursor=%d", m.exploreTab, m.exploreCursor[tabCommands])
 	}

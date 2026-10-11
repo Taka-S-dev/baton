@@ -498,7 +498,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 	joined := truncate(strings.Join(selNames, ", "), max(10, w-40))
 	b.WriteString(gap + "  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
 	b.WriteString(hline(w) + "\n")
-	keys := "Tab Select  Enter Review  F2 Queue  F3 Sort  Esc Back"
+	keys := "Tab Select  Enter Review  F2 Queue  s Sort  / Search  Esc Back"
 	if m.runHomeVisible() {
 		keys = m.runHomeKeys()
 	}
