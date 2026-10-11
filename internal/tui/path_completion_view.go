@@ -87,7 +87,7 @@ func (m Model) overlayPathCompletion(w int) string {
 			}
 			line = "   " + truncate(label, max(1, p.w-6))
 			if i == c.cursor {
-				line = sRowActive.Render(" ▶ " + truncate(label, max(1, p.w-6)))
+				line = pickerSelectedRow(" ▶ "+truncate(label, max(1, p.w-6)), p.w)
 			}
 		}
 		b.WriteString(line + "\n")

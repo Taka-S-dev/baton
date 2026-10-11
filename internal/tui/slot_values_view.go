@@ -104,7 +104,7 @@ func (m Model) overlaySlotValues(w int, background string, anchor int) string {
 			label := truncate(m.slotValueLabel(i, labelCol), max(1, p.w-6))
 			switch {
 			case i == sp.cursor:
-				line = sRowActive.Render(" ▶ " + label)
+				line = pickerSelectedRow(" ▶ "+label, p.w)
 			case i >= len(sp.filtered):
 				line = "   " + dim(label)
 			default:
@@ -257,4 +257,13 @@ func (sp *slotPickState) valueSkipRow() int {
 		n++
 	}
 	return n
+}
+
+// pickerSelectedRow renders the cursor row of a picker box across its
+// whole inner width, so the highlight reaches both borders rather than
+// stopping where the label ends.
+func pickerSelectedRow(text string, width int) string {
+	inner := max(0, width-2)
+	text = ansi.Truncate(text, inner, "…")
+	return sRowActive.Render(text + strings.Repeat(" ", max(0, inner-ansi.StringWidth(text))))
 }
