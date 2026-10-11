@@ -56,7 +56,8 @@ func SaveConfig(projectDir string, cfg model.Config) error {
 }
 
 // writeFileAtomic writes to a temp file then renames it over the target,
-// so a crash mid-write never leaves a truncated file.
+// so baton exiting mid-write never leaves a truncated file. There is no
+// fsync, so power loss is not covered.
 func writeFileAtomic(path string, data []byte) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0644); err != nil {
