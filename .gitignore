@@ -13,6 +13,7 @@ projects/
 !go.sum
 !/README.md
 !/AGENTS.md
+!/docs/*.md
 !projects.example/**/*.md
 !.github/workflows/*.yml
 !LICENSE
