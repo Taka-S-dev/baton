@@ -16,6 +16,8 @@ plain TSV or JSON file, `{placeholders}` are filled from lists at run
 time, and sequences are saved as workflows. Windows (cmd / PowerShell),
 Linux and macOS behave the same.
 
+![Pick two commands, answer a placeholder, review the run](docs/demo.gif)
+
 ```
 [1 Workflows] [2 Commands] · api
 Select commands · 2 selected                       │ Run queue · 2 selected
