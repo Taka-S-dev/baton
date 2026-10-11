@@ -275,6 +275,11 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.recentSearchTI, cmd = m.recentSearchTI.Update(msg)
 			return m, cmd
 		}
+		if searchBlink && m.screen == ScreenExplore && m.cf != nil && m.nameInput.Focused() {
+			var cmd tea.Cmd
+			m.nameInput, cmd = m.nameInput.Update(msg)
+			return m, cmd
+		}
 		if searchBlink && m.screen == ScreenExplore && m.exploreSearching && m.exploreListFocused() {
 			var cmd tea.Cmd
 			m.exploreSearchTI, cmd = m.exploreSearchTI.Update(msg)
