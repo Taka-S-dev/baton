@@ -11,32 +11,62 @@ func (m Model) helpHint() string {
 }
 
 func (m Model) helpGeometry(w int) actionPopupLayout {
-	return actionPopupLayout{w: min(72, w), h: min(24, max(3, m.termHeight())), x: max(0, (w-min(72, w))/2), y: max(0, (m.termHeight()-min(24, max(3, m.termHeight())))/2)}
+	pw, ph := min(72, w), min(24, max(3, m.termHeight()))
+	return actionPopupLayout{w: pw, h: ph, x: max(0, (w-pw)/2), y: max(0, (m.termHeight()-ph)/2)}
 }
 
 func (m Model) helpLines(w int) []string {
 	lines := []string{"Current screen"}
 	if m.runHomeVisible() {
-		lines = append(lines, "1 Workflows · 2 Commands · click a tab to switch", "e Edit selected item · p Projects · q Quit · Esc Back", "Esc first clears search or leaves queue focus; selected commands require discard confirmation. Press p to open the project picker directly.", "/ Start search · Enter Select / review · Esc Clear text, then exit search", "While searching, letters and digits are text; Enter selects the result; execution still requires review.", "No result: Enter keeps search active. Tab toggles command selection.", "Down focuses search results; e edits the selected result. / resumes search.", "Tab changes preserve search, cursor and command execution order.")
+		lines = append(lines,
+			"1 Workflows · 2 Commands · click a tab to switch",
+			"e Edit selected item · p Projects · q Quit · Esc Back",
+			"Esc first clears search or leaves queue focus; selected commands require discard confirmation. Press p to open the project picker directly.",
+			"/ Start search · Enter Select / review · Esc Clear text, then exit search",
+			"While searching, letters and digits are text; Enter selects the result; execution still requires review.",
+			"No result: Enter keeps search active. Tab toggles command selection.",
+			"Down focuses search results; e edits the selected result. / resumes search.",
+			"Tab changes preserve search, cursor and command execution order.",
+		)
 	}
 	if m.screen == ScreenRecent {
-		lines = append(lines, "/ Start search · ↑↓ Move · Enter Select", "Search: ↓ Results · Enter Select · Esc Clear text, then exit search", "p Projects · q Quit · Esc Clear filter / Quit · Ctrl+R Refresh", "Delete Remove from this directory’s history", "Ctrl+Z Undo the last removal", "Command definitions are never deleted.", "F1 / Esc Close help")
+		lines = append(lines,
+			"/ Start search · ↑↓ Move · Enter Select",
+			"Search: ↓ Results · Enter Select · Esc Clear text, then exit search",
+			"p Projects · q Quit · Esc Clear filter / Quit · Ctrl+R Refresh",
+			"Delete Remove from this directory’s history",
+			"Ctrl+Z Undo the last removal",
+			"Command definitions are never deleted.",
+			"F1 / Esc Close help",
+		)
 	} else if m.screen == ScreenProjectSelect {
-		lines = append(lines, "a Add project · Enter Open · / Search", "r Refresh · Space / right-click Actions", "o Open folder · c Copy path · Del/x Delete", "Deletion moves settings into .baton-trash; working directories are untouched.", "Restore by moving the archived folder back under projects.", "Esc closes a form or clears search; q quits.")
+		lines = append(lines,
+			"a Add project · Enter Open · / Search",
+			"r Refresh · Space / right-click Actions",
+			"o Open folder · c Copy path · Del/x Delete",
+			"Deletion moves settings into .baton-trash; working directories are untouched.",
+			"Restore by moving the archived folder back under projects.",
+			"Esc closes a form or clears search; q quits.",
+		)
 	} else if m.screen == ScreenRunCommands || m.screen == ScreenCreateWorkflow || m.screen == ScreenEditWorkflowCommands {
 		lines = append(lines, func() string {
 			if m.runHomeVisible() {
 				return "/ Search · ↑↓ Move · Tab Select / deselect"
 			}
 			return "Type to filter · ↑↓ Move · Tab Select / deselect"
-		}(), func() string {
-			if m.runHomeVisible() {
-				return "F2 Switch between candidates and execution queue · s Sort candidates"
-			}
-			return "F2 Switch between candidates and execution queue · s Sort candidates"
-		}(), "Queue: J/K or Shift+↓/↑ Reorder · Del/x Remove from queue", "Enter Continue · Esc Back (keeps selection in the confirmation)", "Removing a queue entry does not delete its command.")
+		}(),
+			"F2 Switch between candidates and execution queue · s Sort candidates",
+			"Queue: J/K or Shift+↓/↑ Reorder · Del/x Remove from queue",
+			"Enter Continue · Esc Back (keeps selection in the confirmation)",
+			"Removing a queue entry does not delete its command.",
+		)
 	} else if m.screen == ScreenRunWorkflowSteps {
-		lines = append(lines, "↑↓ Choose step · Tab Select / deselect", "F2 Details / Steps on narrow screens · Enter Review · Esc Back", "Selections affect this run only; saved workflow is unchanged.", "Select at least one step before reviewing. Click a row to inspect; click its checkbox to toggle.")
+		lines = append(lines,
+			"↑↓ Choose step · Tab Select / deselect",
+			"F2 Details / Steps on narrow screens · Enter Review · Esc Back",
+			"Selections affect this run only; saved workflow is unchanged.",
+			"Select at least one step before reviewing. Click a row to inspect; click its checkbox to toggle.",
+		)
 	} else if m.screen == ScreenRunWorkflow {
 		lines = append(lines, func() string {
 			if m.runHomeVisible() {
@@ -46,9 +76,22 @@ func (m Model) helpLines(w int) []string {
 		}(), "Enter Continue to inputs and execution review", "Tab / → Choose steps for this run · F2 Details · Esc Back")
 	} else if m.screen == ScreenSlotPick {
 		if m.sp != nil && m.sp.pathDef.PathKind != "" {
-			lines = append(lines, "Reserved path slot: Tab / Ctrl+Space opens choices", "Type to filter · ↑↓ Choose · → Open folder", "Single value: Tab inserts · Multiple values: Tab checks", "File pickers show folders for navigation only. Extensions filter files.", "Enter confirms and advances to the next input or execution review; it never runs the command.", "Paths use workdir, or the launch directory when it is empty.", "Template creation: Ctrl+K keeps this slot interactive.", "Values are literal; quote single-value slots when paths may contain spaces.")
+			lines = append(lines,
+				"Reserved path slot: Tab / Ctrl+Space opens choices",
+				"Type to filter · ↑↓ Choose · → Open folder",
+				"Single value: Tab inserts · Multiple values: Tab checks",
+				"File pickers show folders for navigation only. Extensions filter files.",
+				"Enter confirms and advances to the next input or execution review; it never runs the command.",
+				"Paths use workdir, or the launch directory when it is empty.",
+				"Template creation: Ctrl+K keeps this slot interactive.",
+				"Values are literal; quote single-value slots when paths may contain spaces.",
+			)
 		} else {
-			lines = append(lines, "Type to filter / enter a value · ↑↓ Choose · Enter Confirm", "Tab toggles multiple selections; single-value slots move to the next row.", "File choices require a reserved slot such as {@file:.go}.")
+			lines = append(lines,
+				"Type to filter / enter a value · ↑↓ Choose · Enter Confirm",
+				"Tab toggles multiple selections; single-value slots move to the next row.",
+				"File choices require a reserved slot such as {@file:.go}.",
+			)
 		}
 	} else if m.pasteMenu {
 		for _, a := range m.contextActions {
@@ -73,9 +116,15 @@ func (m Model) helpLines(w int) []string {
 			lines = append(lines, "Ctrl+V Paste · Right-click: Paste / Copy value")
 		}
 	} else {
-		lines = append(lines, "Use the shortcuts shown at the bottom of this screen.", "Esc Back")
+		lines = append(lines,
+			"Use the shortcuts shown at the bottom of this screen.",
+			"Esc Back",
+		)
 	}
-	lines = append(lines, "", "Concepts")
+	lines = append(lines,
+		"",
+		"Concepts",
+	)
 	lines = append(lines, conceptDiagram(max(1, w-4))...)
 	lines = append(lines, "",
 		"Workflow: an ordered sequence of command references.",
