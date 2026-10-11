@@ -30,6 +30,8 @@ projects/
 projects.example/**/.last_workflow
 projects.example/**/workflows.json
 projects.example/**/commands.local.json
+projects.example/.baton-recent/
+projects.example/.baton-trash/
 
 # Exclude binaries
 *.exe
