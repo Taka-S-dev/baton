@@ -6,6 +6,7 @@
 
 # Re-ignore directories that should never be committed
 projects/
+.gocache/
 
 # Source and project files
 !*.go
