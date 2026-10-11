@@ -29,7 +29,7 @@ func slotValuesFixture(t *testing.T) Model {
 func TestSlotValuesShareThePickerBox(t *testing.T) {
 	m := slotValuesFixture(t)
 	view := stripStyle(m.View())
-	for _, want := range []string{"{env} · 2 candidates", "Search / Filter values…", "▶ dev", "prod  ·  production", "Type a value above", "Enter Select", "$ deploy --env dev"} {
+	for _, want := range []string{"{env} · 2 candidates", "Search / Filter or type a value…", "▶ dev", "prod  ·  production", "Enter Select", "$ deploy --env dev"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("picker is missing %q:\n%s", want, view)
 		}
@@ -131,7 +131,66 @@ func TestSlotValuesShowMoreCandidates(t *testing.T) {
 	}
 }
 
+func TestThreeSlotValuesVisibleOnShortScreens(t *testing.T) {
+	for _, size := range [][2]int{{140, 8}, {140, 12}, {70, 10}} {
+		m := slotValuesFixture(t)
+		m.width, m.height = size[0], size[1]
+		m.sp.entries = []mdl.ListEntry{{Value: "dev"}, {Value: "staging"}, {Value: "prod"}}
+		m.sp.applyFilter()
+		m.sp.cursor = 2
+		view := stripStyle(m.View())
+		for _, value := range []string{"dev", "staging", "▶ prod"} {
+			if !strings.Contains(view, value) {
+				t.Fatalf("%v hides %s: %s", size, value, view)
+			}
+		}
+		if frameRows(view) > size[1] {
+			t.Fatal("overflow")
+		}
+		if strings.Contains(view, "Type a value above") {
+			t.Fatal("redundant input hint")
+		}
+	}
+}
 
+func TestSlotValuesExcludeEmptyTypedRow(t *testing.T) {
+	m := slotValuesFixture(t)
+	if m.slotValueRows() != 2 {
+		t.Fatal("empty custom value must not consume a row")
+	}
+	for i := 0; i < 6; i++ {
+		next, _ := m.updateSlotPick(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(Model)
+		if m.sp.cursor >= len(m.sp.filtered) {
+			t.Fatal("cursor reached empty row")
+		}
+	}
+	m.sp.search = "custom"
+	m.sp.applyFilter()
+	if m.slotValueRows() != 1 || m.slotValueLabel(0, 0) == "" {
+		t.Fatal("typed value missing")
+	}
+	m.sp.search = ""
+	m.sp.cursor = 10
+	m.sp.applyFilter()
+	if m.sp.cursor >= len(m.sp.filtered) {
+		t.Fatal("filter clear left invalid cursor")
+	}
+	m.sp.canSkip = true
+	if m.slotValueRows() != 3 || m.sp.valueSkipRow() != 2 {
+		t.Fatal("skip row address wrong")
+	}
+	m.sp.canSkip = false
+	m.sp.entries = nil
+	m.sp.applyFilter()
+	for _, key := range []tea.KeyType{tea.KeyUp, tea.KeyDown, tea.KeyTab, tea.KeyEnter} {
+		next, _ := m.updateSlotPick(tea.KeyMsg{Type: key})
+		m = next.(Model)
+		if m.screen != ScreenSlotPick {
+			t.Fatal("empty picker must stay open")
+		}
+	}
+}
 
 func TestPickerLayoutsMatch(t *testing.T) {
 	for _, size := range [][2]int{{140, 10}, {100, 24}, {70, 10}, {60, 24}} {

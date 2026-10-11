@@ -400,18 +400,28 @@ func (m Model) updateSlotPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if sp.pathDef.PathKind != "" && (msg.String() == "ctrl+@" || msg.String() == "ctrl+space" || msg.String() == "tab" || (msg.String() == "enter" && sp.completedPath == "" && len(sp.picked) == 0)) {
 		return m, m.startPathCompletion()
 	}
-	skipRow := len(sp.filtered) + 1
+	skipRow := sp.valueSkipRow()
 	total := skipRow
 	if sp.canSkip {
 		total++
 	}
 
+	sp.cursor = min(max(0, sp.cursor), max(0, total-1))
 	switch msg.String() {
 	case "up":
+		if total == 0 {
+			return m, nil
+		}
 		sp.cursor = (sp.cursor - 1 + total) % total
 	case "down":
+		if total == 0 {
+			return m, nil
+		}
 		sp.cursor = (sp.cursor + 1) % total
 	case "tab", "ctrl+t":
+		if total == 0 {
+			return m, nil
+		}
 		if !sp.variadic {
 			sp.cursor = (sp.cursor + 1) % total
 			break

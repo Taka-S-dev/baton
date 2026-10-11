@@ -20,7 +20,7 @@ const slotValueRowOffset = 3 // border, search, separator
 // slotValueRows is how many rows the picker lists: the matching
 // entries, the typed value, and the skip row while creating a command.
 func (m Model) slotValueRows() int {
-	n := len(m.sp.filtered) + 1
+	n := m.sp.valueSkipRow()
 	if m.sp.canSkip {
 		n++
 	}
@@ -48,9 +48,12 @@ func (m Model) slotValuesLayout(w, anchor int) actionPopupLayout {
 func (m Model) slotValueLabel(i, labelCol int) string {
 	sp := m.sp
 	switch {
-	case sp.canSkip && i == len(sp.filtered)+1:
+	case sp.canSkip && i == sp.valueSkipRow():
 		return "→ skip — resolve at run time"
 	case i == len(sp.filtered):
+		if sp.search == "" {
+			return ""
+		}
 		return sp.typedValueLabel()
 	}
 	e := sp.filtered[i]
@@ -75,7 +78,7 @@ func (m Model) overlaySlotValues(w int, background string, anchor int) string {
 
 	input := sp.input
 	input.Prompt = "Search / "
-	input.Placeholder = "Filter values…"
+	input.Placeholder = "Filter or type a value…"
 	if input.Value() != sp.search {
 		input.SetValue(sp.search)
 		input.CursorEnd()
@@ -247,3 +250,11 @@ func (m Model) updateSlotValuesMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// Empty custom input is not a selectable row in a list picker.
+func (sp *slotPickState) valueSkipRow() int {
+	n := len(sp.filtered)
+	if sp.search != "" || sp.pathDef.PathKind != "" {
+		n++
+	}
+	return n
+}

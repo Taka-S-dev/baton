@@ -172,6 +172,15 @@ func (s *slotPickState) isPicked(v string) bool {
 }
 
 func (s *slotPickState) applyFilter() {
+	defer func() {
+		if s.pathDef.PathKind == "" {
+			total := s.valueSkipRow()
+			if s.canSkip {
+				total++
+			}
+			s.cursor = min(max(0, s.cursor), max(0, total-1))
+		}
+	}()
 	if s.search != s.completedPath {
 		s.completedPath = ""
 	}
