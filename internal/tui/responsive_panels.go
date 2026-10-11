@@ -24,6 +24,7 @@ func joinPanels(left, right string, w, leftW, h int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
 func (m Model) shortRunQueue(w int) string {
 	n := len(m.msSelected)
 	rows := max(1, m.termHeight()-1)
@@ -47,6 +48,7 @@ func (m Model) shortRunQueue(w int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
 func (m Model) shortWorkflowSteps(w int, hitRow ...func(int, int)) string {
 	p := m.wfp
 	if p == nil || p.wfIdx >= len(m.workflows) {
@@ -74,6 +76,7 @@ func (m Model) shortWorkflowSteps(w int, hitRow ...func(int, int)) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
 func (m Model) shortWorkflowDetail(w int) string {
 	lines := []string{gray("Command details")}
 	p := m.wfp

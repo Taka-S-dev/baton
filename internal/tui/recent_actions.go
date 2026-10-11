@@ -29,6 +29,7 @@ func recentAge(used, now time.Time) string {
 	}
 	return used.Local().Format("2006-01-02")
 }
+
 func recentMatchMask(text, query string) []bool {
 	r := []rune(text)
 	lower := []rune(strings.Map(unicode.ToLower, text))
@@ -45,6 +46,7 @@ func recentMatchMask(text, query string) []bool {
 	}
 	return mask
 }
+
 func recentHighlight(text, query string, selected bool) string {
 	return recentHighlightMask(text, recentMatchMask(text, query), selected)
 }
@@ -75,6 +77,7 @@ func recentHighlightMask(text string, mask []bool, selected bool) string {
 	}
 	return b.String()
 }
+
 func (m Model) removeRecentSelection() (tea.Model, tea.Cmd) {
 	filtered := m.recentFiltered()
 	if m.recentCursor >= len(filtered) {
@@ -92,6 +95,7 @@ func (m Model) removeRecentSelection() (tea.Model, tea.Cmd) {
 	m.recentNotice = "Removed from history: " + row.ref.Command
 	return m, nil
 }
+
 func (m Model) undoRecentRemoval() (tea.Model, tea.Cmd) {
 	if m.recentUndo == nil {
 		return m, nil

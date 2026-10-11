@@ -10,6 +10,7 @@ import (
 func pathFocusFile(projectsDir, base, project, command, slot string) string {
 	return filepath.Join(projectsDir, ".baton-recent", "path-focus", recentHash(recentPathKey(base)+"\x00"+recentPathKey(project)+"\x00"+command+"\x00"+slot)+".json")
 }
+
 func SavePathFocus(projectsDir, base, project, command, slot, value string) error {
 	path := pathFocusFile(projectsDir, base, project, command, slot)
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -33,6 +34,7 @@ func SavePathFocus(projectsDir, base, project, command, slot, value string) erro
 	}
 	return os.Rename(f.Name(), path)
 }
+
 func LoadPathFocus(projectsDir, base, project, command, slot string) string {
 	data, err := os.ReadFile(pathFocusFile(projectsDir, base, project, command, slot))
 	if err != nil {

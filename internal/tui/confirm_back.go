@@ -31,6 +31,7 @@ func (m *Model) rememberConfirmBack() {
 	back.sp = &s
 	m.confirmBack = &back
 }
+
 func (m Model) backFromConfirm() (tea.Model, tea.Cmd) {
 	if m.confirmBack != nil {
 		back := *m.confirmBack
@@ -42,12 +43,14 @@ func (m Model) backFromConfirm() (tea.Model, tea.Cmd) {
 	m.gotoMainMenu()
 	return m, nil
 }
+
 func (m Model) confirmBackLabel() string {
 	if m.confirmBack != nil {
 		return "Back"
 	}
 	return "Cancel"
 }
+
 func (m Model) confirmWorkdir(dir string) string {
 	base := m.launchDir
 	if base == "" {

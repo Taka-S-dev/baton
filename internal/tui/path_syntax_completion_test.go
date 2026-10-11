@@ -18,6 +18,7 @@ func TestReservedPathSyntaxCandidates(t *testing.T) {
 		}
 	}
 }
+
 func TestReservedSyntaxInsertionInCommandAndWorkdir(t *testing.T) {
 	for _, field := range []int{1, 2} {
 		m := Model{cf: &commandFormState{fieldIdx: field}, nameInput: newMSTI("")}

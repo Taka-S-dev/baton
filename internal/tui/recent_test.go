@@ -23,6 +23,7 @@ func recentFixture(t *testing.T) (string, string) {
 	writeRecentCommand(t, project, "echo {@file:.go}", "")
 	return root, project
 }
+
 func writeRecentCommand(t *testing.T, project, cmd, dir string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(project, "commands.tsv"), []byte("name\tgroup\tworkdir\tcmd\tshell\tslots\nchoose\t\t"+dir+"\t"+cmd+"\t\t\n"), 0600); err != nil {
@@ -33,6 +34,7 @@ func writeRecentCommand(t *testing.T, project, cmd, dir string) {
 		t.Fatalf("invalid fixture: %v %v", err, p.Warnings)
 	}
 }
+
 func TestRecentStartupLatestDefinitionAndFreshInputs(t *testing.T) {
 	root, project := recentFixture(t)
 	cwd, err := os.Getwd()
@@ -79,6 +81,7 @@ func TestRecentStartupLatestDefinitionAndFreshInputs(t *testing.T) {
 		t.Fatal("confirm cancel did not return")
 	}
 }
+
 func TestRecentMissingCommandAndEmptyBrowse(t *testing.T) {
 	root, project := recentFixture(t)
 	cwd, _ := os.Getwd()
@@ -109,6 +112,7 @@ func TestRecentMissingCommandAndEmptyBrowse(t *testing.T) {
 		t.Fatal("empty browse failed")
 	}
 }
+
 func TestRecentRecordingOnlyForExecutedSteps(t *testing.T) {
 	root, project := recentFixture(t)
 	cwd := t.TempDir()

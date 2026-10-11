@@ -25,6 +25,7 @@ func TestConfirmBackPreservesSelectedFile(t *testing.T) {
 		t.Fatal("edited input did not replace prior value")
 	}
 }
+
 func TestConfirmButtonsStayAtSameRow(t *testing.T) {
 	m := Model{width: 100, height: 36, launchDir: t.TempDir()}
 	cmd := mdl.Command{Name: "test", Cmd: "echo test"}

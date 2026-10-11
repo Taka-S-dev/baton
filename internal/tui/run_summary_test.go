@@ -40,6 +40,7 @@ func TestLauncherSuccessQuitsAfterSummary(t *testing.T) {
 		}
 	}
 }
+
 func TestLauncherFailureKeepsRetry(t *testing.T) {
 	m := Model{exitAfterRun: true, screen: ScreenRunning, running: &runningState{}}
 	nm, cmd := m.handleRunnerDone(runner.DoneMsg{Err: errors.New("failed")})
@@ -47,6 +48,7 @@ func TestLauncherFailureKeepsRetry(t *testing.T) {
 		t.Fatal("failure must offer retry")
 	}
 }
+
 func TestSingleStepHeaderHasNoProgressFraction(t *testing.T) {
 	got := stepHeader(1, 1, "build", mdl.Command{Cmd: "go build ."})
 	if strings.Contains(got, "1/1") || !strings.Contains(got, "── build") {
@@ -76,6 +78,7 @@ func TestCompletionOutputLeavesFullProgressBar(t *testing.T) {
 		}
 	}
 }
+
 func TestPartialProgressLabelsCompletedSteps(t *testing.T) {
 	got := stripStyle(progressBar(1, 2, 24))
 	if !strings.Contains(got, strings.Repeat("█", 12)+strings.Repeat("─", 12)) || !strings.Contains(got, "1/2 steps") || !strings.Contains(got, "50%") {

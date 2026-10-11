@@ -20,6 +20,7 @@ type pathCandidate struct {
 	directory bool
 	parent    bool
 }
+
 type pathCompletion struct {
 	base, query                       string
 	focusValue                        string
@@ -33,6 +34,7 @@ type pathCompletion struct {
 	originalSearch, originalCompleted string
 	originalCursor                    int
 }
+
 type pathCompletionResult struct {
 	owner   *slotPickState
 	request *pathCompletion
@@ -348,6 +350,7 @@ func (p *pathCompletion) selected(value string) bool {
 	}
 	return false
 }
+
 func (p *pathCompletion) toggle(value string) {
 	p.touched = true
 	for i, v := range p.draft {
@@ -370,6 +373,7 @@ func matchesPathExtensions(name string, extensions []string) bool {
 	}
 	return false
 }
+
 func (m Model) pathCandidateSelectable(c pathCandidate) bool {
 	return !c.parent && (m.sp.pathDef.PathKind != "file" || !c.directory)
 }
@@ -415,6 +419,7 @@ func completionParent(base, query string) (string, string, bool) {
 	}
 	return format(parent), format(current), true
 }
+
 func (m Model) parentPathCompletion() tea.Cmd {
 	parent, focus, ok := completionParent(m.sp.completion.base, m.sp.search)
 	if !ok {

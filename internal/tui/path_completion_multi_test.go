@@ -16,12 +16,14 @@ func multiCompletion(t *testing.T) Model {
 	m.sp.completion = nil
 	return m
 }
+
 func queryCompletion(m Model, text string) Model {
 	m, cmd := completionKey(m, tea.KeyMsg{Type: tea.KeyCtrlU})
 	m = completionResult(m, cmd)
 	m, cmd = completionKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(text)})
 	return completionResult(m, cmd)
 }
+
 func TestDropdownMultiSelectionAcrossFilters(t *testing.T) {
 	m := multiCompletion(t)
 	m.sp.search = "test.go"
@@ -48,6 +50,7 @@ func TestDropdownMultiSelectionAcrossFilters(t *testing.T) {
 		t.Fatal("selected values did not reach execution review")
 	}
 }
+
 func TestDropdownMultiEscapeKeepsSelections(t *testing.T) {
 	m := multiCompletion(t)
 	m.sp.search = "test.go"
@@ -85,6 +88,7 @@ func TestDropdownMultiEscapeKeepsSelections(t *testing.T) {
 		t.Fatal("empty selection should not execute")
 	}
 }
+
 func TestDropdownMultiFolderAndMouse(t *testing.T) {
 	m := multiCompletion(t)
 	m.sp.search = "testd"

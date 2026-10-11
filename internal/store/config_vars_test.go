@@ -58,6 +58,7 @@ func TestSaveConfigWithVarsRollback(t *testing.T) {
 		})
 	}
 }
+
 func TestSaveConfigWithVarsSuccessAndEmptyVars(t *testing.T) {
 	d := t.TempDir()
 	cfg := model.Config{Commands: []model.Command{{Name: "new", Cmd: "echo hi"}}}
@@ -82,6 +83,7 @@ func TestSaveConfigWithVarsSuccessAndEmptyVars(t *testing.T) {
 		t.Fatalf("failed to empty vars: %v %v", vars, warnings)
 	}
 }
+
 func TestSaveConfigWithVarsRejectsUnreadableTarget(t *testing.T) {
 	d := t.TempDir()
 	if err := slot.SaveVars(d, map[string]string{"root": "old"}); err != nil {

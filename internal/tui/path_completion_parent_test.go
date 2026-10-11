@@ -32,6 +32,7 @@ func TestParentNavigationPreservesSelectionAndFocus(t *testing.T) {
 		}
 	}
 }
+
 func TestCompletionParentPaths(t *testing.T) {
 	base := t.TempDir()
 	for _, tc := range []struct{ query, want string }{{"testdir/ch", ""}, {"src/nested/", "src/"}, {"../", "../../"}, {"../../", "../../../"}} {

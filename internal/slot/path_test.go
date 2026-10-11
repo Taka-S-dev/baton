@@ -30,6 +30,7 @@ func TestReservedPathSlotsStaySeparate(t *testing.T) {
 		t.Fatal("path slot not a template")
 	}
 }
+
 func TestPathSlotValuesRoundTrip(t *testing.T) {
 	d := PathDefinition("{@file...:.go,.mod}")
 	if !d.Variadic || d.PathKind != "file" || len(d.Extensions) != 2 || d.Placeholder() != "{@file...:.go,.mod}" {
@@ -51,6 +52,7 @@ func TestPathSlotValuesRoundTrip(t *testing.T) {
 		t.Fatalf("saved values detached: %s", got.Cmd)
 	}
 }
+
 func TestPathSyntaxValidation(t *testing.T) {
 	for _, ref := range []string{"{@file}", "{@dir}", "{@file...:.go,.mod}", "{@file:.tar.gz}"} {
 		if got := PathErrors(ref); len(got) > 0 {

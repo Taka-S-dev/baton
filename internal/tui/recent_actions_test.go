@@ -41,6 +41,7 @@ func TestRecentRemoveUndoIsScopedAndPreservesSearch(t *testing.T) {
 		t.Fatal("undo state")
 	}
 }
+
 func TestRecentMatchMaskUnicodeAndRepeatedTerms(t *testing.T) {
 	text := "日本Go go"
 	mask := recentMatchMask(text, "日本 GO")
@@ -53,6 +54,7 @@ func TestRecentMatchMaskUnicodeAndRepeatedTerms(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
 func TestRecentAge(t *testing.T) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
@@ -64,6 +66,7 @@ func TestRecentAge(t *testing.T) {
 		}
 	}
 }
+
 func TestRecentViewShowsMatchCountAndRemovalHint(t *testing.T) {
 	m := Model{width: 100, height: 30, recentSearch: "build", recentRows: []recentRow{{ref: store.RecentEntry{Command: "build", Project: "Go", UsedAt: time.Now()}}, {ref: store.RecentEntry{Command: "test", Project: "Go"}}}}
 	got := stripStyle(m.viewRecent(100))

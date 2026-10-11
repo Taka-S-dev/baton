@@ -27,6 +27,7 @@ func completionFixture(t *testing.T) string {
 	}
 	return d
 }
+
 func completionModel(t *testing.T, dir string) Model {
 	t.Helper()
 	cmd := mdl.Command{Name: "build", Cmd: "echo {@file}", Dir: dir}
@@ -35,10 +36,12 @@ func completionModel(t *testing.T, dir string) Model {
 	m.sp.completion = nil
 	return m
 }
+
 func completionKey(m Model, key tea.KeyMsg) (Model, tea.Cmd) {
 	nm, cmd := m.Update(key)
 	return nm.(Model), cmd
 }
+
 func completionResult(m Model, cmd tea.Cmd) Model {
 	if cmd == nil {
 		return m

@@ -24,6 +24,7 @@ func TestLoadTSVRejectsInvalidRows(t *testing.T) {
 		})
 	}
 }
+
 func TestTSVMutationsStopOnReadFailure(t *testing.T) {
 	for _, action := range []string{"append", "update", "delete"} {
 		t.Run(action, func(t *testing.T) {

@@ -72,6 +72,7 @@ func (m *Model) focusRecentCommand() {
 		}
 	}
 }
+
 func (m Model) recentFiltered() []int {
 	var result []int
 	terms := strings.Fields(strings.ToLower(m.recentSearch))
@@ -82,6 +83,7 @@ func (m Model) recentFiltered() []int {
 	}
 	return result
 }
+
 func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() != "delete" && msg.String() != "ctrl+z" {
 		m.recentNotice = ""
@@ -170,6 +172,7 @@ func (m Model) recentGeometry(w int) recentLayout {
 	rows := min(max(1, n), min(8, max(1, m.termHeight()-14)))
 	return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: windowStart(rows, n, min(m.recentCursor, max(0, n-1))), listY: 5, browseY: 10 + rows}
 }
+
 func (m Model) viewRecent(w int) string {
 	if splitPanels(w) && m.shortPanels() {
 		return joinPanels(m.viewRecentCompact(w), m.recentSidePreview(w-w/2-3), w, w/2, m.termHeight())
@@ -266,6 +269,7 @@ func (m Model) viewRecent(w int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
 func (m Model) updateRecentMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:

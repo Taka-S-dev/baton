@@ -28,6 +28,7 @@ func TestPathReadinessOnlyAfterSelection(t *testing.T) {
 		t.Fatal("editing left stale completion mark")
 	}
 }
+
 func TestPathReadinessCountsLaterInputs(t *testing.T) {
 	cmd := mdl.Command{Name: "build", Cmd: "echo {@file:.go} {mode}", Dir: completionFixture(t)}
 	nm, read := (Model{width: 120, height: 40}).startResolveFlow([]msItem{{cmd: &cmd}})

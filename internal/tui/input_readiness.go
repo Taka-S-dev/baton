@@ -11,6 +11,7 @@ func (m Model) pathInputReady() bool {
 	s := m.sp
 	return s != nil && !s.previewOnly && s.completion == nil && (len(s.picked) > 0 || (s.completedPath != "" && s.completedPath == s.search))
 }
+
 func (m Model) inputProgress() (done, total int) {
 	if m.resolve == nil {
 		return 0, 0
@@ -30,6 +31,7 @@ func (m Model) inputProgress() (done, total int) {
 	}
 	return
 }
+
 func (m Model) inputProgressLabel() string {
 	if m.sp == nil || m.sp.pathDef.PathKind == "" || m.sp.previewOnly {
 		return ""
@@ -43,6 +45,7 @@ func (m Model) inputProgressLabel() string {
 	}
 	return fmt.Sprintf("Inputs %d/%d complete", done, total)
 }
+
 func (m Model) pathInputKeys() string {
 	enter := "choose"
 	if m.pathInputReady() {

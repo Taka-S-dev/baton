@@ -24,6 +24,7 @@ func (m Model) confirmCommonDirectory() (string, bool) {
 	}
 	return dir, len(m.confirmRunItems) > 0
 }
+
 func (m Model) viewCompactConfirm(w int) string {
 	n := len(m.confirmRunItems)
 	h := m.termHeight()

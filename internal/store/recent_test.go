@@ -33,6 +33,7 @@ func TestRecentIsolationDedupAndOrder(t *testing.T) {
 		t.Fatal("empty history failed")
 	}
 }
+
 func TestRecentConcurrentReferencesAndCorruption(t *testing.T) {
 	root := t.TempDir()
 	var wg sync.WaitGroup

@@ -44,6 +44,7 @@ func TestRecentCompactFitsAndKeepsFocusedRowVisible(t *testing.T) {
 		}
 	}
 }
+
 func TestRecentCompactEmptyAndTiny(t *testing.T) {
 	for height := 1; height < 18; height++ {
 		m := Model{width: 40, height: height, recentSearch: "missing"}

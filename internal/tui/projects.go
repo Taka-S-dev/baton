@@ -269,6 +269,7 @@ func (m Model) showProjectAdd() bool {
 	}
 	return true
 }
+
 func (m Model) projectAddY(w int) int {
 	if !m.showProjectAdd() {
 		return -1

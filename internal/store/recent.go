@@ -28,6 +28,7 @@ func recentPathKey(path string) string {
 	}
 	return path
 }
+
 func recentHash(s string) string { sum := sha256.Sum256([]byte(s)); return hex.EncodeToString(sum[:]) }
 func recentDirectory(projectsDir, cwd string) string {
 	return filepath.Join(projectsDir, ".baton-recent", recentHash(recentPathKey(cwd)))
@@ -71,6 +72,7 @@ func RecordRecent(projectsDir, cwd, project, command string, now time.Time) erro
 	}
 	return os.Rename(tmp, filepath.Join(dir, recentHash(recentPathKey(project)+"\x00"+command)+".json"))
 }
+
 func LoadRecent(projectsDir, cwd string) ([]RecentEntry, error) {
 	cwd, err := filepath.Abs(cwd)
 	if err != nil {
@@ -134,6 +136,7 @@ func RemoveRecent(projectsDir string, entry RecentEntry) error {
 	}
 	return err
 }
+
 func RestoreRecent(projectsDir string, entry RecentEntry) error {
 	entries, err := LoadRecent(projectsDir, entry.Directory)
 	if err != nil {

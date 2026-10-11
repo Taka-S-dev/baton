@@ -15,6 +15,7 @@ func TestNaturalPathOrder(t *testing.T) {
 		t.Fatal(names)
 	}
 }
+
 func TestCompletionFitsShortScreen(t *testing.T) {
 	for _, height := range []int{7, 10, 14, 17} {
 		m := multiCompletion(t)
