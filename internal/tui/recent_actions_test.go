@@ -8,6 +8,8 @@ import (
 
 	"github.com/Taka-S-dev/baton/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func TestRecentRemoveUndoIsScopedAndPreservesSearch(t *testing.T) {
@@ -69,5 +71,30 @@ func TestRecentViewShowsMatchCountAndRemovalHint(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatal(got)
 		}
+	}
+}
+
+// TestRecentCommandLineColoursPlaceholders: the selected command shows
+// its placeholders in the slot colour like every other command preview,
+// and a search match inside one is drawn as a match instead.
+func TestRecentCommandLineColoursPlaceholders(t *testing.T) {
+	old := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(old) })
+	m := Model{vars: map[string]string{"root": "C:/w"}}
+	cmd := "go build -o {@file:.exe} {$root} {$missing}"
+	idle := m.recentCommandLine(cmd, "")
+	if !strings.Contains(idle, slotVar("{@file:.exe}")) || !strings.Contains(idle, sFixedVar.Render("{$root}")) {
+		t.Errorf("placeholders are not coloured: %q", idle)
+	}
+	if stripStyle(idle) != cmd {
+		t.Errorf("text changed: %q", stripStyle(idle))
+	}
+	found := m.recentCommandLine(cmd, "exe")
+	if strings.Contains(found, slotVar("{@file:.exe}")) || !strings.Contains(found, sHighlight.Bold(true).Render("exe")) {
+		t.Errorf("a match inside the placeholder is not shown as a match: %q", found)
+	}
+	if stripStyle(found) != cmd {
+		t.Errorf("text changed while searching: %q", stripStyle(found))
 	}
 }

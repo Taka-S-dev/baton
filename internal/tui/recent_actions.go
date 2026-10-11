@@ -46,8 +46,13 @@ func recentMatchMask(text, query string) []bool {
 	return mask
 }
 func recentHighlight(text, query string, selected bool) string {
+	return recentHighlightMask(text, recentMatchMask(text, query), selected)
+}
+
+// recentHighlightMask draws text with the runes the mask marks as
+// matches, so a caller can split one text and keep the matches aligned.
+func recentHighlightMask(text string, mask []bool, selected bool) string {
 	r := []rune(text)
-	mask := recentMatchMask(text, query)
 	var b strings.Builder
 	for i := 0; i < len(r); {
 		j := i + 1

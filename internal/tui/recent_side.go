@@ -15,7 +15,7 @@ func (m Model) recentSidePreview(w int) string {
 		if row.problem != "" {
 			lines = append(lines, warn(row.problem))
 		} else {
-			lines = append(lines, "$ "+recentHighlight(row.command.Cmd, m.recentSearch, false), gray("In: "+m.confirmWorkdir(row.command.Dir)))
+			lines = append(lines, "$ "+m.recentCommandLine(row.command.Cmd, m.recentSearch), gray("In: "+m.confirmWorkdir(row.command.Dir)))
 		}
 	} else {
 		lines = append(lines, gray("Browse projects to choose a command."))

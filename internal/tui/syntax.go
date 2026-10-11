@@ -2,7 +2,9 @@ package tui
 
 import (
 	"regexp"
+	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/charmbracelet/lipgloss"
@@ -102,5 +104,27 @@ func (m Model) selectedSyntaxRow(text string, width int) string {
 		end = at[1]
 	}
 	b.WriteString(sRowActive.Render(text[end:]))
+	return b.String()
+}
+
+// recentCommandLine draws a command with its placeholders coloured as
+// everywhere else, and the search matches on top. A match inside a
+// placeholder shows as a match: that is what was typed to find it.
+func (m Model) recentCommandLine(text, query string) string {
+	mask := recentMatchMask(text, query)
+	r := []rune(text)
+	var b strings.Builder
+	end := 0 // in runes, as the mask is
+	for _, at := range syntaxToken.FindAllStringIndex(text, -1) {
+		start, stop := utf8.RuneCountInString(text[:at[0]]), utf8.RuneCountInString(text[:at[1]])
+		b.WriteString(recentHighlightMask(string(r[end:start]), mask[end:start], false))
+		if slices.Contains(mask[start:stop], true) {
+			b.WriteString(recentHighlightMask(string(r[start:stop]), mask[start:stop], false))
+		} else {
+			b.WriteString(m.syntaxText(string(r[start:stop])))
+		}
+		end = stop
+	}
+	b.WriteString(recentHighlightMask(string(r[end:]), mask[end:], false))
 	return b.String()
 }

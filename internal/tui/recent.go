@@ -233,7 +233,7 @@ func (m Model) viewRecent(w int) string {
 		if entry.problem != "" {
 			cmdLine = warn(entry.problem)
 		} else {
-			cmdLine = "$ " + recentHighlight(entry.command.Cmd, m.recentSearch, false)
+			cmdLine = "$ " + m.recentCommandLine(entry.command.Cmd, m.recentSearch)
 			dir := entry.command.Dir
 			if dir == "" {
 				dir = m.launchDir
