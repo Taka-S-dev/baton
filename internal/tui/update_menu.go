@@ -10,65 +10,6 @@ import (
 
 func (m Model) updateProjectSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) { return m.updateProjects(msg) }
 
-// ── Main menu ─────────────────────────────────────────────────────────────────
-
-func (m Model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "up", "down":
-		m.moveListCursor(msg.String(), len(m.listItems))
-	case "enter":
-		m.mainMenuCursor = m.listCursor
-		switch m.listItems[m.listCursor] {
-		case "Edit project":
-			m.gotoExplore()
-		case "Run workflow":
-			m.screen = ScreenRunWorkflow
-			names := make([]string, len(m.workflows))
-			for i, w := range m.workflows {
-				names[i] = w.Name
-			}
-			m.listItems = names
-			m.listCursor = 0
-			m.stepsFocused = false
-			m.wfSearchTI = newMSTI("/ ")
-			if m.lastWorkflow != "" {
-				for i, w := range m.workflows {
-					if w.Name == m.lastWorkflow {
-						m.listCursor = i
-						break
-					}
-				}
-			}
-			m.updateStepsViewport()
-			return m, m.wfSearchTI.Focus()
-		case "Run commands":
-			m.screen = ScreenRunCommands
-			return m, m.setupMultiSelect()
-		case "Manage workflows":
-			m.gotoWorkflowMgmt()
-		case "Manage commands":
-			m.screen = ScreenManageCommands
-			m.listCursor = 0
-		case "Manage lists":
-			m.gotoManageLists()
-		case "Manage vars":
-			m.gotoVarsMgmt()
-		case "Switch project":
-			m.screen = ScreenProjectSelect
-			m.refreshProjects()
-			m.listItems = m.projects
-			m.listCursor = 0
-		case "Exit":
-			return m, tea.Quit
-		}
-	// q quits from the project list, which is the screen baton opens on,
-	// so it quits from the menu behind it too.
-	case "esc", "q":
-		return m, tea.Quit
-	}
-	return m, nil
-}
-
 // ── Switch config ─────────────────────────────────────────────────────────────
 
 func (m Model) updateSwitchConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -83,7 +24,7 @@ func (m Model) updateSwitchConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.gotoPostLoad()
 		}
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoRunHome()
 	}
 	return m, nil
 }

@@ -7,13 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestUnifiedEditorMenu(t *testing.T) {
-	items := strings.Join(mainMenuItems(), "|")
-	if strings.Contains(items, "Manage") || !strings.Contains(items, "Edit project") {
-		t.Fatal(items)
-	}
-}
-
 func TestNarrowWorkflowDetailsPreserveDraft(t *testing.T) {
 	m := exploreProject()
 	m.width = 60

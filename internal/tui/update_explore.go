@@ -145,7 +145,7 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		if !m.backExploreLink() {
-			m.gotoMainMenu()
+			m.gotoRunHome()
 		}
 	}
 	return m, nil

@@ -25,7 +25,6 @@ type Screen int
 
 const (
 	ScreenProjectSelect Screen = iota
-	ScreenMainMenu
 	ScreenRunWorkflow
 	ScreenRunCommands
 	ScreenSlotPick
@@ -506,7 +505,7 @@ type Model struct {
 	cf *commandFormState
 
 	// Rename repair: renames detected at load by matching the command
-	// snapshot, offered on the repair screen before the main menu.
+	// snapshot, offered on the repair screen before the Run workspace.
 	// snapOld is the snapshot as loaded, minus declined proposals — its
 	// stale entries are carried forward for names still referenced, so
 	// an unresolved rename stays detectable on a later start.
@@ -556,11 +555,10 @@ type Model struct {
 	exploreDragging bool
 
 	editTargetIdx  int
-	mainMenuCursor int
 	lastWorkflow   string
 	errMsg         string
 	successMsg     string   // transient "it worked" note, cleared on the next keypress
-	loadWarnings   []string // diagnostics; recomputed on every return to the main menu
+	loadWarnings   []string // diagnostics; recomputed on every return to Run home
 	bannerRows     int      // rows the messages above take; View sets it before building the frame
 	deleteConfirm  bool
 	deleteSelected []int
@@ -652,18 +650,17 @@ func (m *Model) loadProject(projectDir string) error {
 	m.snapOld = config.LoadSnapshot(projectDir)
 	m.renames = config.DetectRenames(p.Config, p.Workflows, p.Vars, m.snapOld)
 	m.renameBtn = 1
-	m.mainMenuCursor = m.defaultMainMenuCursor()
 	return nil
 }
 
 // gotoPostLoad enters the rename-repair offer when loading detected
-// hand-edited renames, otherwise the main menu.
+// hand-edited renames, otherwise the Run workspace.
 func (m *Model) gotoPostLoad() {
 	if len(m.renames) > 0 {
 		m.gotoRenameRepair()
 		return
 	}
-	m.gotoMainMenu()
+	m.gotoRunHome()
 }
 
 // writeSnapshot records every command's name and fingerprint for the
@@ -733,7 +730,7 @@ func (m *Model) gotoManageLists() {
 	m.listCursor = 0
 }
 
-func (m *Model) gotoMainMenu() {
+func (m *Model) gotoRunHome() {
 	if m.recentActive {
 		m.gotoRecent()
 		return

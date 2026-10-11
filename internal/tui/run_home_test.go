@@ -65,7 +65,7 @@ func TestRunHomeEditorRebuildsSelectionByName(t *testing.T) {
 	// The editor can overwrite the shared picker and remove a command.
 	m.config.Base = m.config.Base[:2]
 	m.setupMultiSelect()
-	m.gotoMainMenu()
+	m.gotoRunHome()
 	if m.screen != ScreenRunCommands || m.msSearchTI.Value() != "build" {
 		t.Fatal("editor return lost search")
 	}

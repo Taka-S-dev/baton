@@ -54,7 +54,7 @@ func (m *Model) updateManageCommands(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.deleteSelected = nil
 		}
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoRunHome()
 	}
 	return m, nil
 }

@@ -183,9 +183,6 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenRecent {
 		return m.updateRecentMouse(mouse)
 	}
-	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenMainMenu {
-		return m.updateMainMenuMouse(mouse)
-	}
 	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenProjectSelect {
 		if m.projectMode != "" && m.projectMode != "search" {
 			if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
@@ -316,8 +313,6 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRecent(msg)
 		case ScreenProjectSelect:
 			return m.updateProjectSelect(msg)
-		case ScreenMainMenu:
-			return m.updateMainMenu(msg)
 		case ScreenRunWorkflow:
 			return m.updateRunWorkflow(msg)
 		case ScreenRunWorkflowSteps:
@@ -342,7 +337,7 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.running = nil
-				m.gotoMainMenu()
+				m.gotoRunHome()
 				return m, tea.EnterAltScreen
 			}
 			return m, nil

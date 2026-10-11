@@ -2,8 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -95,8 +93,6 @@ func (m Model) renderScreen(w int) string {
 		view = m.viewRecent(w)
 	case ScreenProjectSelect:
 		view = m.viewProjectSelect(w)
-	case ScreenMainMenu:
-		view = m.viewMainMenu(w)
 	case ScreenRunWorkflow:
 		view = m.viewRunWorkflow(w)
 	case ScreenRunWorkflowSteps:
@@ -174,256 +170,7 @@ func (m Model) renderScreen(w int) string {
 	return view
 }
 
-// ── Project select / main menu ───────────────────────────────────────────────
-
-// logoBox renders the boxed app name. The name defaults to BATON and can be
-// overridden with the BATON_DISPLAY_NAME environment variable (ASCII
-// recommended — wide characters break the box alignment).
-func logoBox() []string {
-	name := os.Getenv("BATON_DISPLAY_NAME")
-	if name == "" {
-		name = "BATON"
-	}
-	runes := []rune(strings.ToUpper(name))
-	parts := make([]string, len(runes))
-	for i, r := range runes {
-		parts[i] = string(r)
-	}
-	label := strings.Join(parts, " ")
-	innerW := len([]rune(label)) + 4
-	return []string{
-		"  ┌" + strings.Repeat("─", innerW) + "┐",
-		"  │  " + bold(white(label)) + "  │",
-		"  └" + strings.Repeat("─", innerW) + "┘",
-	}
-}
-
 func (m Model) viewProjectSelect(w int) string { return m.viewProjects(w) }
-
-type menuItemInfo struct {
-	desc      string
-	shortcuts [][2]string
-}
-
-// mainMenuGroups is the single source of truth for the main menu.
-// viewMainMenu renders it and gotoMainMenu flattens it into listItems,
-// so the rendered rows and the Enter dispatch can never drift apart.
-type menuGroup struct {
-	label string
-	items []string
-}
-
-var mainMenuGroups = []menuGroup{
-	{"Run", []string{"Run workflow", "Run commands"}},
-	{"Project", []string{"Edit project", "Switch project"}},
-	{"", []string{"Exit"}},
-}
-
-func mainMenuItems() []string {
-	var items []string
-	for _, g := range mainMenuGroups {
-		items = append(items, g.items...)
-	}
-	return items
-}
-
-var menuItemInfos = map[string]menuItemInfo{
-	"Edit project":     {desc: "Edit workflows, commands, shared lists and variables.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Run workflow":     {desc: "Run a saved workflow.", shortcuts: [][2]string{{"Enter", "Run"}, {"Esc", "Back"}}},
-	"Run commands":     {desc: "Choose commands, order and inputs, then review before running.", shortcuts: [][2]string{{"Tab", "Select"}, {"Enter", "Run"}, {"Esc", "Back"}}},
-	"Manage workflows": {desc: "Create, edit or delete workflows.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage commands":  {desc: "Create commands from templates, edit or delete them.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage lists":     {desc: "Create, edit or delete selection lists for placeholders.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Manage vars":      {desc: "Project variables ({$name}): change one value to move every reference at once.", shortcuts: [][2]string{{"Enter", "Open"}, {"Esc", "Back"}}},
-	"Switch project":   {desc: "Switch to a different project.", shortcuts: [][2]string{{"Enter", "Switch"}, {"Esc", "Back"}}},
-	"Exit":             {desc: "Quit.", shortcuts: [][2]string{{"Enter", "Quit"}}},
-}
-
-func (m Model) viewMainMenuContent(w int) string {
-	groups := mainMenuGroups
-
-	leftW := 32
-	showRight := w >= leftW+30
-
-	// The menu items are the one part that cannot go, so the frame is
-	// built from the height they leave: the logo, then the group
-	// headings, then the panel's lower sections drop out as the terminal
-	// gets shorter. Without this the frame stayed 21 lines tall and an
-	// editor panel scrolled it on every repaint.
-	items, labels := 0, 0
-	for _, g := range groups {
-		items += len(g.items)
-		if g.label != "" {
-			labels++
-		}
-	}
-	maxShortcuts := 0
-	for _, info := range menuItemInfos {
-		if len(info.shortcuts) > maxShortcuts {
-			maxShortcuts = len(info.shortcuts)
-		}
-	}
-	const logoRows, extrasRows = 4, 8
-	groupRows := labels + len(groups) + 2 // headings, a blank per group, the project line and its blank
-	panelRows := 5 + maxShortcuts         // heading, rule, description, blank, "Keys", the keys
-
-	avail := m.termHeight() - 2 // the rule and the key line below
-	need := max(items, panelRows)
-	withGroups := avail >= max(items+groupRows, panelRows)
-	if withGroups {
-		need = max(items+groupRows, panelRows)
-	}
-	withLogo := m.roomForLogo() && avail >= need+logoRows
-	if withLogo {
-		need += logoRows
-	}
-	withPanelExtras := avail >= need+extrasRows
-
-	// Below a certain height not even the items fit, and the frame used
-	// to grow past the terminal and lose its top rows to the scroll. The
-	// menu scrolls instead, like every other list: a window around the
-	// cursor and one line counting what is off it.
-	first, shown := 0, items
-	if avail < items {
-		shown = max(1, avail-1)
-		first = min(max(0, m.listCursor-shown/2), items-shown)
-	}
-	// The panel keeps its keys; the description is what it gives up.
-	withPanelDesc := avail >= panelRows
-
-	// Build left pane lines
-	var leftLines []string
-	if withLogo {
-		leftLines = append(leftLines, "")
-		leftLines = append(leftLines, logoBox()...)
-	}
-	if m.projectDir != "" && withGroups {
-		leftLines = append(leftLines, "  "+gray("project: ")+white(filepath.Base(m.projectDir)))
-		leftLines = append(leftLines, "")
-	}
-
-	idx := 0
-	for _, g := range groups {
-		if g.label != "" && withGroups {
-			leftLines = append(leftLines, "  "+gray(strings.ToUpper(g.label)))
-		}
-		for _, item := range g.items {
-			if idx >= first && idx < first+shown {
-				if idx == m.listCursor {
-					leftLines = append(leftLines, "    "+sRowActive.Width(max(1, min(leftW, w)-6)).Render("▶ "+item))
-				} else {
-					leftLines = append(leftLines, "      "+item)
-				}
-			}
-			idx++
-		}
-		if withGroups {
-			leftLines = append(leftLines, "")
-		}
-	}
-	if shown < items {
-		var marks []string
-		if first > 0 {
-			marks = append(marks, fmt.Sprintf("↑ %d more", first))
-		}
-		if first+shown < items {
-			marks = append(marks, fmt.Sprintf("↓ %d more", items-first-shown))
-		}
-		leftLines = append(leftLines, "  "+dim(strings.Join(marks, "   ")))
-	}
-
-	if !showRight {
-		var b strings.Builder
-		for _, l := range leftLines {
-			b.WriteString(l + "\n")
-		}
-		b.WriteString(hline(w) + "\n")
-		b.WriteString("  " + gray("↑↓ Move  Enter Select  Esc Quit") + "\n")
-		return b.String()
-	}
-
-	// Build right pane lines
-	rightW := w - leftW - 2
-	var rightLines []string
-	if withLogo {
-		// Align the panel with the menu, which the logo has pushed down.
-		rightLines = append(rightLines, "", "", "", "")
-	}
-
-	selected := ""
-	flatIdx := 0
-	for _, g := range groups {
-		for _, item := range g.items {
-			if flatIdx == m.listCursor {
-				selected = item
-			}
-			flatIdx++
-		}
-	}
-
-	// The pane is padded to maxShortcuts for every item, so moving the
-	// cursor never changes the frame height and the footer stays put.
-	if info, ok := menuItemInfos[selected]; ok {
-		rightLines = append(rightLines, white(selected))
-		if withPanelDesc {
-			description := info.desc
-			if selected == "Run workflow" && len(m.workflows) == 0 {
-				description = "No workflows. Add one in Edit project → Workflows."
-			}
-			desc := truncate(description, max(10, rightW-2))
-			rightLines = append(rightLines, gray(strings.Repeat("─", min(rightW-2, 24))))
-			rightLines = append(rightLines, dim(desc))
-			rightLines = append(rightLines, "")
-		}
-		rightLines = append(rightLines, gray("Keys"))
-		shortcuts := [][2]string{{"↑↓", "Move"}, {"Enter", "Open"}, {"Esc", "Quit"}}
-		if selected == "Exit" {
-			shortcuts[1][1] = "Quit"
-		}
-		for _, sc := range shortcuts {
-			rightLines = append(rightLines, fmt.Sprintf("  %-8s %s", white(sc[0]), gray(sc[1])))
-		}
-		for i := len(shortcuts); i < maxShortcuts; i++ {
-			rightLines = append(rightLines, "")
-		}
-		if withPanelExtras {
-			rightLines = append(rightLines, "")
-			rightLines = append(rightLines, gray("Project summary"))
-			rightLines = append(rightLines, fmt.Sprintf("  commands: %d", len(m.config.Base)+len(m.config.Commands)))
-			if m.configFile != "" {
-				rightLines = append(rightLines, "  "+gray("file:    ")+dim(truncate(m.configFile, max(1, rightW-12))))
-			}
-			rightLines = append(rightLines, "")
-			rightLines = append(rightLines, gray("Stats"))
-			rightLines = append(rightLines, fmt.Sprintf("  "+gray("workflows: ")+white("%d"), len(m.workflows)))
-			rightLines = append(rightLines, fmt.Sprintf("  "+gray("lists:     ")+white("%d"), len(m.lists)))
-		}
-	}
-
-	// Merge left + right. The panel is padded to a constant height, so on
-	// a terminal too short even for that it is cut rather than allowed to
-	// push the frame past the last row — the menu is what must be seen.
-	n := min(max(len(leftLines), len(rightLines)), max(1, avail))
-	var b strings.Builder
-	dividerCol := leftW
-	for i := 0; i < n; i++ {
-		l := ""
-		if i < len(leftLines) {
-			l = leftLines[i]
-		}
-		r := ""
-		if i < len(rightLines) {
-			r = rightLines[i]
-		}
-		lVis := lipgloss.Width(l)
-		pad := strings.Repeat(" ", max(0, dividerCol-lVis))
-		b.WriteString(l + pad + gray("│") + " " + r + "\n")
-	}
-
-	b.WriteString(hline(w) + "\n")
-	b.WriteString("  " + gray("↑↓ Move  Enter Select  Esc Quit") + "\n")
-	return b.String()
-}
 
 // ── Generic single-select ────────────────────────────────────────────────────
 
@@ -1096,7 +843,7 @@ func (m Model) termHeight() int {
 }
 
 // bannerLines renders what goes under the frame: an error, a success
-// note, and the warnings the main menu carries from load. They are
+// note, and the warnings the Run workspace carries from load. They are
 // returned rather than written so the frame can be budgeted against the
 // height they leave — see View.
 func (m Model) bannerLines() []string {
@@ -1107,9 +854,9 @@ func (m Model) bannerLines() []string {
 	if m.successMsg != "" {
 		out = append(out, success("  ✓ "+m.successMsg))
 	}
-	if len(m.loadWarnings) > 0 && (m.screen == ScreenMainMenu || m.runHomeVisible()) {
+	if len(m.loadWarnings) > 0 && m.runHomeVisible() {
 		// The warnings are a pointer to `baton check`, not the report
-		// itself, so they never take more of the terminal than the menu
+		// itself, so they never take more of the terminal than the workspace
 		// they are pointing away from.
 		maxShown := 4
 		if m.height > 0 {
@@ -1182,12 +929,6 @@ const shortMenu = 6
 // between sections have to become list rows instead. Spacing is the
 // cheapest thing to give up: it carries no information.
 func (m Model) compact() bool { return m.termHeight() < 20 }
-
-// roomForLogo reports whether the frame can spare the five lines the
-// logo and its tagline occupy. A short terminal — the editor panel is
-// usually about ten lines — has to spend them on the list instead, or
-// the frame grows past the terminal and every repaint scrolls it.
-func (m Model) roomForLogo() bool { return m.termHeight() >= 20 }
 
 // writeWindowedList renders a cursor-following window over n rows above
 // one line carrying what is hidden in either direction, padded to

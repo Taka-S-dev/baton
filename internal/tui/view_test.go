@@ -255,21 +255,6 @@ func TestViewConfirmRun_ShowsWhatWillRun(t *testing.T) {
 	}
 }
 
-// TestViewMainMenu_StableHeight checks the two-pane menu keeps a constant
-// frame height while the cursor moves: the right pane's shortcut list
-// varies per item and must be padded, or the footer bounces around.
-func TestViewMainMenu_StableHeight(t *testing.T) {
-	m := Model{width: 100, height: 30, projectDir: "proj"}
-	lines := frameLines
-	first := lines(m.viewMainMenu(100))
-	for i := range mainMenuItems() {
-		m.listCursor = i
-		if got := lines(m.viewMainMenu(100)); got != first {
-			t.Fatalf("cursor=%d: height %d != %d — pad the right pane to a constant height", i, got, first)
-		}
-	}
-}
-
 // TestViewMultiSelect_ScrollMarkersAndCounter checks the overflow hints:
 // the search row shows a filtered/total counter and the scroll markers
 // carry the hidden-row counts instead of a bare "...".
@@ -563,7 +548,7 @@ func TestViewCommandNameInput_StableValueOrder(t *testing.T) {
 // takes the top of the frame with it. The menus shed the logo, their
 // headings and finally their own entries; the list screens shed their
 // spacing, their hover preview and the rule under their title. Seven
-// lines hold every screen, and the main menu goes lower still.
+// lines hold every screen.
 func TestViewsFitShortTerminals(t *testing.T) {
 	cmds := make([]mdl.Command, 8)
 	var items []msItem
@@ -582,7 +567,7 @@ func TestViewsFitShortTerminals(t *testing.T) {
 		names, refs := m.editableCommands()
 		m.editRefs = refs
 		m.setPickBase(names, m.commandPickTexts(refs))
-		if sc == ScreenProjectSelect || sc == ScreenMainMenu {
+		if sc == ScreenProjectSelect {
 			m.listItems = m.projects
 		}
 		m.updateStepsViewport()
@@ -599,14 +584,10 @@ func TestViewsFitShortTerminals(t *testing.T) {
 	}
 	check(7, map[string]Screen{
 		"project select": ScreenProjectSelect,
-		"main menu":      ScreenMainMenu,
 		"run commands":   ScreenRunCommands,
 		"run workflow":   ScreenRunWorkflow,
 		"edit pick":      ScreenEditCommandPick,
 	})
-	// The main menu scrolls its own entries, so it has no floor of its
-	// own: it was the screen that lost its top rows in a four-line panel.
-	check(4, map[string]Screen{"main menu": ScreenMainMenu})
 
 	// Fitting is not enough: a scrolling screen that stops one row short
 	// wastes the bottom line of the terminal on nothing, which is what a
@@ -647,27 +628,9 @@ func TestSubmenusShowEveryChoice(t *testing.T) {
 	}
 }
 
-// TestMainMenuKeepsCursorVisible checks the scrolled main menu. A panel
 // too short for eight entries used to render all of them and let the
 // terminal scroll the top ones away — including, at four lines, every
 // entry above the cursor.
-func TestMainMenuKeepsCursorVisible(t *testing.T) {
-	entries := mainMenuItems()
-	for h := 4; h <= 20; h++ {
-		for cur := range entries {
-			m := Model{width: 110, height: h, screen: ScreenMainMenu, projectDir: "p"}
-			m.listItems = entries
-			m.listCursor = cur
-			view := m.View()
-			if !strings.Contains(view, entries[cur]) {
-				t.Fatalf("height %d: the cursor is on %q, which is not on screen\n%s", h, entries[cur], view)
-			}
-			if got := frameLines(view); got > h {
-				t.Errorf("height %d: the menu renders %d lines", h, got)
-			}
-		}
-	}
-}
 
 // frameLines is how many terminal lines a view occupies. View trims the
 // frame's trailing newline — it would carry the cursor onto a further
@@ -681,12 +644,11 @@ func frameLines(s string) int {
 // TestBannersStayInsideTheTerminal checks the messages under the frame.
 // They used to be appended after the frame had been built to the full
 // terminal height, so the first error pushed the frame past the last row
-// and the terminal scrolled the top of it away — worst on the main menu,
+// and the terminal scrolled the top of it away — worst on the Run workspace,
 // where the load warnings can run to several lines.
 func TestBannersStayInsideTheTerminal(t *testing.T) {
 	screens := map[string]Screen{
 		"project select": ScreenProjectSelect,
-		"main menu":      ScreenMainMenu,
 		"run commands":   ScreenRunCommands,
 		"run workflow":   ScreenRunWorkflow,
 		"edit pick":      ScreenEditCommandPick,
@@ -709,7 +671,7 @@ func TestBannersStayInsideTheTerminal(t *testing.T) {
 			names, refs := m.editableCommands()
 			m.editRefs = refs
 			m.setPickBase(names, m.commandPickTexts(refs))
-			if sc == ScreenProjectSelect || sc == ScreenMainMenu {
+			if sc == ScreenProjectSelect {
 				m.listItems = m.projects
 			}
 			m.updateStepsViewport()

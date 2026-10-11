@@ -40,7 +40,7 @@ func (m Model) backFromConfirm() (tea.Model, tea.Cmd) {
 		back.screen = ScreenSlotPick
 		return back, nil
 	}
-	m.gotoMainMenu()
+	m.gotoRunHome()
 	return m, nil
 }
 

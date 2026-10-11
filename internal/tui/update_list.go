@@ -89,7 +89,7 @@ func (m Model) updateNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case nameInputWorkflow:
 			m.gotoWorkflowMgmt()
 		default:
-			m.gotoMainMenu()
+			m.gotoRunHome()
 		}
 		return m, nil
 	}
@@ -118,7 +118,7 @@ func (m Model) updateManageLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.listCursor = 0
 		}
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoRunHome()
 	}
 	return m, nil
 }

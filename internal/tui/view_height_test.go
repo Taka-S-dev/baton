@@ -76,7 +76,6 @@ var screenFloors = map[Screen]struct {
 	floor int
 }{
 	ScreenProjectSelect:         {"project select", 7},
-	ScreenMainMenu:              {"main menu", 4},
 	ScreenRunCommands:           {"run commands", 7},
 	ScreenRunWorkflow:           {"run workflow", 7},
 	ScreenRunWorkflowSteps:      {"run workflow steps", 8},

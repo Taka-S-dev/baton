@@ -166,11 +166,11 @@ func (m Model) updateRetry(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 1:
 			return m.startRunningRetry(r.items, 0, r.label, r.retryCount+1)
 		case 2:
-			m.gotoMainMenu()
+			m.gotoRunHome()
 			return m, tea.EnterAltScreen
 		}
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoRunHome()
 		return m, tea.EnterAltScreen
 	}
 	return m, nil

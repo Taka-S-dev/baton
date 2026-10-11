@@ -111,7 +111,7 @@ func (m Model) updateWorkflowMgmt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateStepsViewport()
 		}
 	case "esc":
-		m.gotoMainMenu()
+		m.gotoRunHome()
 	}
 	return m, nil
 }

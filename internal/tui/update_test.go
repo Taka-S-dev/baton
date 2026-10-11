@@ -16,7 +16,6 @@ import (
 // sized for the old terminal. Every screen must see it.
 func TestUpdate_ResizeReachesEveryScreen(t *testing.T) {
 	screens := []Screen{
-		ScreenMainMenu,
 		ScreenRunWorkflow,    // wfSearchTI
 		ScreenRunCommands,    // msSearchTI
 		ScreenCreateWorkflow, // msSearchTI

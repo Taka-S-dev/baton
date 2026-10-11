@@ -71,7 +71,7 @@ func (m *Model) applyRenames() {
 	} else {
 		m.successMsg = fmt.Sprintf("updated references for %d renamed command(s)", count)
 	}
-	m.gotoMainMenu()
+	m.gotoRunHome()
 }
 
 // declineRenames keeps every file untouched. The stale snapshot entries
@@ -82,5 +82,5 @@ func (m *Model) declineRenames() {
 		delete(m.snapOld, r.Old)
 	}
 	m.renames = nil
-	m.gotoMainMenu()
+	m.gotoRunHome()
 }
