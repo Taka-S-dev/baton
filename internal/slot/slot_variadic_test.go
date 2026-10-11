@@ -80,13 +80,6 @@ func TestPlaceholder_Text(t *testing.T) {
 	}
 }
 
-func TestHighlightSlot_VariadicResolvedReplaced(t *testing.T) {
-	out := slot.HighlightSlot("up {services...}", "", map[string]string{"services": "api web"})
-	if out != "up api web" {
-		t.Errorf("got %q", out)
-	}
-}
-
 func TestVariadicInvisibleToVars(t *testing.T) {
 	// {name...} must never be captured by a project variable of the same name.
 	out := slot.ApplyVars("up {services...}", map[string]string{"services": "X"})

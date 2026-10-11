@@ -271,21 +271,6 @@ func PruneCommandValues(vars map[string]string, keep func(cmdName string) bool) 
 	}
 }
 
-// HighlightSlot replaces resolved slots with their values and highlights the
-// current slot with cyan markers, for display in the context panel.
-func HighlightSlot(text, currentSlot string, resolved map[string]string) string {
-	return Pattern.ReplaceAllStringFunc(text, func(m string) string {
-		name := RefName(m)
-		if v, ok := resolved[name]; ok {
-			return v
-		}
-		if name == currentSlot {
-			return "\x1b[1;96m" + m + "\x1b[0m"
-		}
-		return m
-	})
-}
-
 // LoadLists loads all .tsv files from listsDir.
 func LoadLists(listsDir string) map[string][]model.ListEntry {
 	result := make(map[string][]model.ListEntry)

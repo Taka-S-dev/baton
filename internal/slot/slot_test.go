@@ -118,34 +118,6 @@ func TestApply_UnknownKeyIgnored(t *testing.T) {
 	}
 }
 
-// ── HighlightSlot ─────────────────────────────────────────────────────────────
-
-func TestHighlightSlot_ResolvedReplaced(t *testing.T) {
-	out := slot.HighlightSlot("deploy {env}", "env", map[string]string{"env": "prod"})
-	if out != "deploy prod" {
-		t.Errorf("got %q", out)
-	}
-}
-
-func TestHighlightSlot_CurrentSlotHighlighted(t *testing.T) {
-	out := slot.HighlightSlot("deploy {env}", "env", map[string]string{})
-	if out == "deploy {env}" {
-		t.Error("current slot should be highlighted (ANSI), not plain")
-	}
-}
-
-func TestHighlightSlot_UnresolvedOtherSlotUnchanged(t *testing.T) {
-	out := slot.HighlightSlot("{a} and {b}", "a", map[string]string{})
-	// {b} is unresolved and not current — should remain as-is
-	if out == "... and ..." {
-		t.Error("unexpected replacement")
-	}
-	// {a} gets ANSI, {b} stays literal
-	if len(out) <= len("{a} and {b}") {
-		t.Error("expected ANSI escape in output")
-	}
-}
-
 // ── LoadLists / SaveList ──────────────────────────────────────────────────────
 
 func TestSaveAndLoadList(t *testing.T) {
