@@ -21,8 +21,9 @@ type Command struct {
 }
 
 // Config holds all commands for a project.
-// Base is the hand-written layer (commands.json / commands.tsv) and is
-// never written back; Commands is the app-managed layer
+// Base is the hand-written layer: commands.json, which baton never
+// writes, and commands.tsv, whose rows the TUI appends, rewrites or
+// deletes one at a time. Commands is the app-managed layer
 // (commands.local.json). Whether an entry acts as a template is a
 // per-row property (it has {slot} placeholders), not a property of the
 // file it lives in.

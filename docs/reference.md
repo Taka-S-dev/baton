@@ -141,7 +141,8 @@ A project has two command layers:
 
 | File | Written by | Contents |
 |------|-----------|----------|
-| `commands.json` / `commands.tsv` | Shared: you edit freely, and the TUI appends new rows (**Write directly**) or rewrites/deletes **exactly the row you target** via Edit/Delete command. Lines you didn't touch are preserved byte-for-byte, and every write re-reads the file first | Command definitions — plain ones, and slotted ones that double as templates |
+| `commands.tsv` | Shared: you edit freely, and the TUI appends new rows (**Write directly**) or rewrites/deletes **exactly the row you target** via Edit/Delete command. Lines you didn't touch are preserved byte-for-byte, and every write re-reads the file first | Command definitions — plain ones, and slotted ones that double as templates |
+| `commands.json` | You, by hand only — the TUI shows its entries as read-only | The same definitions in JSON |
 | `commands.local.json` | baton (via **Edit project → Commands → Add → From template**) | Template-derived commands (identity only; values live in vars.tsv) |
 
 Both layers can coexist; names in `commands.local.json` take priority.
