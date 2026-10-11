@@ -110,7 +110,7 @@ answer for the user to confirm or change. Name slots with that in mind
 to another list for values that should be asked independently.
 
 Rows containing `{slot}` also serve as templates for the TUI's
-**Create command → From template**.
+**Edit project → Commands → Add → From template**.
 
 ## Reserved path inputs
 

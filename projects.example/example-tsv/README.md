@@ -4,12 +4,16 @@ Minimal project layout using hand-written TSV.
 
 ```
 example-tsv/
-├── commands.tsv         <- command definitions (hand-written; baton never modifies it)
+├── commands.tsv         <- command definitions (edit freely; the TUI changes only the rows you target)
 ├── lists/               <- selection lists for placeholders (value \t label)
 ├── vars.tsv             <- variable table: {$name} globals + saved commands' fixed values
-├── workflows.json       <- workflows (managed by the TUI; hand-editable)
-└── commands.local.json  <- commands created via Manage commands (generated)
+├── workflows.json       <- workflows (written by the TUI; do not edit)
+└── commands.local.json  <- commands saved from a template (written by the TUI; do not edit)
 ```
+
+workflows.json and commands.local.json appear once you save a workflow or
+a command from a template; [AGENTS.md](../../AGENTS.md) lists every file
+and who may write it.
 
 ## commands.tsv columns
 
@@ -24,7 +28,7 @@ example-tsv/
 
 - Being a template is a per-row property, not a file: rows containing
   `{slot}` placeholders become sources for
-  **Create command → From template**
+  **Edit project → Commands → Add → From template**
 - Rows without slots (`hello`, `where`) run as-is
 - Excel-style quoting is supported: cells like
   `"message=messages,env=environments"` are unquoted on load
