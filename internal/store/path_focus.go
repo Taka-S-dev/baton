@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 )
 
-// Path focus is a UI preference, separate from command execution history.
+// pathFocusFile is where a file picker's remembered cursor is kept. Path
+// focus is a UI preference, separate from command execution history.
 func pathFocusFile(projectsDir, base, project, command, slot string) string {
 	return filepath.Join(projectsDir, ".baton-recent", "path-focus", recentHash(recentPathKey(base)+"\x00"+recentPathKey(project)+"\x00"+command+"\x00"+slot)+".json")
 }

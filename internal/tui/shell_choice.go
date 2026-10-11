@@ -31,7 +31,9 @@ func (m *Model) acceptShellChoice() {
 	m.cf.fieldErr = ""
 }
 
-// Text entry is disabled for this enum; Tab remains form navigation.
+// updateShellChoice handles keys on the shell field and reports whether it
+// used them. Text entry is disabled for this enum; Tab remains form
+// navigation.
 func (m *Model) updateShellChoice(msg tea.KeyMsg) (bool, tea.Cmd) {
 	cf := m.cf
 	switch msg.String() {

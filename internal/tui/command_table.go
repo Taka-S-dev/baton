@@ -19,8 +19,9 @@ func commandKind(c mdl.Command) string {
 	return "Direct"
 }
 
-// Use the same column widths for headers and rows. Narrow panes prioritize
-// identity and type; group and command remain available in the detail pane.
+// commandTableLine renders a command row in the same column widths as the
+// header. Narrow panes prioritize identity and type; group and command
+// remain available in the detail pane.
 func commandTableLine(it wsItem, w int) string {
 	available := max(1, w-3)
 	kindW := min(20, max(8, available/2))
@@ -79,7 +80,8 @@ func (m Model) writeCommandIdentity(b *strings.Builder, c mdl.Command, w int) {
 	}
 }
 
-// Candidate rows use explicit labels, leaving execution order to the queue.
+// selectCommandColumns renders a candidate row with explicit labels,
+// leaving execution order to the queue.
 func selectCommandColumns(name, group, kind string, w int) string {
 	groupW := 0
 	if w >= 48 {

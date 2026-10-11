@@ -198,7 +198,8 @@ func (m Model) runHomeLayout(w int) (string, []runHomeAction) {
 	return text, actions
 }
 
-// Match the editor's navigation vocabulary; compact screens keep the list first.
+// runHomeKeys is the key hint line of the Run workspace, in the editor's
+// navigation vocabulary; compact screens keep the list first.
 func (m Model) runHomeKeys() string {
 	if m.runHome.searching {
 		selectKey := ""

@@ -6,6 +6,7 @@ import (
 	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
+// pathInputReady reports whether a path input holds an accepted value.
 // Completion highlights are suggestions, not accepted input.
 func (m Model) pathInputReady() bool {
 	s := m.sp

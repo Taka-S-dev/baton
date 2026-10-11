@@ -6,7 +6,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Layout uses the unmodified form's frame for both rendering and hit testing.
+// leavePopup lays out the leave prompt over the unmodified form's frame,
+// for both rendering and hit testing.
 func (m Model) leavePopup(w int) actionPopupLayout {
 	bg := m
 	bg.leaveAsk = leaveNone

@@ -2,7 +2,8 @@ package tui
 
 import "strings"
 
-// Compare digit runs by magnitude without integer overflow.
+// naturalPathLess orders paths with digit runs compared by magnitude,
+// without integer overflow.
 func naturalPathLess(a, b string) bool {
 	originalA, originalB := a, b
 	a, b = strings.ToLower(a), strings.ToLower(b)

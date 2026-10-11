@@ -13,7 +13,8 @@ type actionPopupLayout struct {
 	footer                  bool
 }
 
-// One geometry definition drives painting and mouse hit testing.
+// actionPopup lays out the action menu; one geometry definition drives
+// painting and mouse hit testing.
 func (m Model) actionPopup(w int, count int) actionPopupLayout {
 	l := m.exploreLayout(w)
 	p := actionPopupLayout{w: min(44, w), h: min(count+4, max(3, l.bodyH))}

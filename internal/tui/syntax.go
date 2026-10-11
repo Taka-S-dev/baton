@@ -46,8 +46,9 @@ func (m Model) previewVars(text string) string {
 	return b.String()
 }
 
-// Highlight by placeholder origin, never by matching the selected value's text.
-// A literal "prod" beside {env} must not light up when env resolves to prod.
+// templateSyntax highlights by placeholder origin, never by matching the
+// selected value's text. A literal "prod" beside {env} must not light up
+// when env resolves to prod.
 func (m Model) templateSyntax(text string, values map[string]string, active string) string {
 	var b strings.Builder
 	end := 0
@@ -83,8 +84,8 @@ func (m Model) writeSyntaxWarnings(b *strings.Builder, text string) {
 	}
 }
 
-// Render every span with the selected background; nested ANSI resets must
-// not erase it between highlighted tokens.
+// selectedSyntaxRow renders every span with the selected background;
+// nested ANSI resets must not erase it between highlighted tokens.
 func (m Model) selectedSyntaxRow(text string, width int) string {
 	text = ansi.Truncate(ansi.Strip(text), max(1, width), "…")
 	text += strings.Repeat(" ", max(0, width-lipgloss.Width(text)))

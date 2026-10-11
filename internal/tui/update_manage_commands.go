@@ -478,7 +478,6 @@ func (m *Model) editRefCommand(ref editRef) *mdl.Command {
 	return &m.config.Commands[ref.idx]
 }
 
-// gotoEditCommandPick opens the edit picker with the cursor on ref.
 // commandPickTexts builds the search haystacks for a set of editRefs,
 // matching the same fields as the Run commands search.
 func (m *Model) commandPickTexts(refs []editRef) []string {
@@ -489,6 +488,7 @@ func (m *Model) commandPickTexts(refs []editRef) []string {
 	return texts
 }
 
+// gotoEditCommandPick opens the edit picker with the cursor on at.
 func (m *Model) gotoEditCommandPick(at editRef) {
 	names, refs := m.editableCommands()
 	m.screen = ScreenEditCommandPick

@@ -7,7 +7,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Draw and hit-test from the same labels, spacing and cell widths.
+// tabPresentation returns the tab labels and the gap between them, so
+// drawing and hit-testing use the same labels, spacing and cell widths.
 func (m Model) tabPresentation(w int) ([]string, string) {
 	labels := make([]string, tabCount)
 	for i, name := range tabNames {

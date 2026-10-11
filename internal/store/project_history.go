@@ -7,8 +7,9 @@ import (
 	"sort"
 )
 
-// Project open order is a UI preference kept with the other app-managed
-// recency data, so the projects directory gains no file of its own.
+// projectHistoryFile is where the project open order is kept: with the
+// other app-managed recency data, so the projects directory gains no file
+// of its own.
 func projectHistoryFile(projectsDir string) string {
 	return filepath.Join(projectsDir, ".baton-recent", "projects.json")
 }

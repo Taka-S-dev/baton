@@ -146,8 +146,8 @@ func (m *Model) switchTab(tab int) {
 
 // openExploreCommandForm starts a command edit. On a terminal with room
 // for the right side the form takes the editor box and the list stays;
-// on one without, the form has the screen to itself, which is what the
-// manage menu always gave it, and comes back here when it closes.
+// on one without, the form has the screen to itself and comes back here
+// when it closes.
 func (m *Model) openExploreCommandForm(name string) tea.Cmd {
 	cf := &commandFormState{mode: 0, editIdx: -1, returnTo: ScreenExplore}
 	if name == "" {

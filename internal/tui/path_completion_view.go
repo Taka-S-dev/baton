@@ -8,7 +8,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// The picker owns its filter; the background only supplies command context.
+// pathCompletionBackground draws the command context behind the file
+// picker; the picker owns its filter.
 func (m Model) pathCompletionBackground(w int) string {
 	_, _, bg := m.pickerFrame(w)
 	return bg

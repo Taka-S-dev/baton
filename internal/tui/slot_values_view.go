@@ -250,7 +250,9 @@ func (m Model) updateSlotValuesMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// Empty custom input is not a selectable row in a list picker.
+// valueSkipRow is the row index of the Skip choice, after the values and
+// the typed-value row. Empty custom input is not a selectable row in a list
+// picker, so that row only counts once something is typed.
 func (sp *slotPickState) valueSkipRow() int {
 	n := len(sp.filtered)
 	if sp.search != "" || sp.pathDef.PathKind != "" {

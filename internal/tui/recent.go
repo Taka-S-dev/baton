@@ -61,7 +61,8 @@ func (m *Model) gotoRecent() {
 	m.focusRecentCommand()
 }
 
-// Prefer the newest available reference; otherwise focus Browse projects.
+// focusRecentCommand puts the cursor on the newest available reference,
+// or on Browse projects when there is none.
 func (m *Model) focusRecentCommand() {
 	filtered := m.recentFiltered()
 	m.recentCursor = len(filtered)

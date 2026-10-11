@@ -44,8 +44,9 @@ type pathCompletionResult struct {
 	err     error
 }
 
-// Resolve the actual execution directory, without changing the process cwd.
-// A slot that chooses workdir itself is completed from the launch directory.
+// completionBase resolves the actual execution directory, without
+// changing the process cwd. A slot that chooses workdir itself is completed
+// from the launch directory.
 func (m Model) completionBase() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -323,8 +324,9 @@ func completePathsFor(base, query, kind string, extensions []string) ([]pathCand
 	return out, nil
 }
 
-// Prefix matches come first, then contiguous matches, then a rune-safe
-// subsequence match. No shell or external fuzzy-finder process is invoked.
+// pathMatchScore ranks name against query: prefix matches come first,
+// then contiguous matches, then a rune-safe subsequence match. No shell or
+// external fuzzy-finder process is invoked.
 func pathMatchScore(name, query string) (int, bool) {
 	if runtime.GOOS == "windows" {
 		name = strings.ToLower(name)
@@ -381,7 +383,8 @@ func (m Model) pathCandidateSelectable(c pathCandidate) bool {
 	return !c.parent && (m.sp.pathDef.PathKind != "file" || !c.directory)
 }
 
-// Closing suggestions keeps explicit selections without choosing the highlighted row.
+// closePathCompletion closes the suggestions, keeping explicit selections
+// without choosing the highlighted row.
 func (m Model) closePathCompletion() {
 	if m.sp.variadic {
 		m.sp.picked = append([]string(nil), m.sp.completion.draft...)
@@ -392,7 +395,8 @@ func (m Model) closePathCompletion() {
 	m.sp.completion = nil
 }
 
-// Return a normalized parent query while preserving the user's slash style.
+// completionParent returns a normalized parent query while preserving the
+// user's slash style.
 func completionParent(base, query string) (string, string, bool) {
 	prefix, _ := filepath.Split(query)
 	if prefix == "" {

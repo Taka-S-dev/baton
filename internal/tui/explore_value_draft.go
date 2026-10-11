@@ -2,7 +2,9 @@ package tui
 
 import "strings"
 
-// Drafts exist only in the view: saved data and the previous cursor stay intact.
+// newValueDraft is the list row standing in for a value being added.
+// Drafts exist only in the view: saved data and the previous cursor stay
+// intact.
 func (m Model) newValueDraft() (wsItem, bool) {
 	if !m.exploreLaunched {
 		return wsItem{}, false

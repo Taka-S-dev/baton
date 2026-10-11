@@ -7,7 +7,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Short terminals devote space to search and candidates; F1 exposes help.
+// viewRecentCompact draws the recent launcher on a short terminal, giving
+// the space to search and candidates; F1 exposes help.
 func (m Model) viewRecentCompact(w int) string {
 	p := m.recentGeometry(w)
 	filtered := m.recentFiltered()

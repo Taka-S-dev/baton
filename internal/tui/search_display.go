@@ -112,7 +112,8 @@ func (m Model) commandSearchLine(w, matches int) string {
 	return search + strings.Repeat(" ", max(2, w-ansi.StringWidth(search)-ansi.StringWidth(meta))) + gray(meta)
 }
 
-// Use the same renderers for search placement and pointer targeting.
+// runSearchHit reports whether x, y lands on the Run search line, using the
+// same renderers for search placement and pointer targeting.
 func (m Model) runSearchHit(x, y int) bool {
 	w := m.viewWidth()
 	leftW := w

@@ -163,7 +163,8 @@ func (m Model) overlayHelp(bg string, w int) string {
 	return overlayBox(bg, box("Help", body, p.w, p.h, true), p.x, p.y, w)
 }
 
-// Keep connectors intact on narrow terminals by switching to a compact map.
+// conceptDiagram draws the help screen's concept map, switching to a
+// compact map on narrow terminals so the connectors stay intact.
 func conceptDiagram(width int) []string {
 	if width < 48 {
 		return []string{

@@ -7,7 +7,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Match rune ranges, preserving the original spelling and display width.
+// searchMatchMask marks the runes of text that terms match, preserving the
+// original spelling and display width.
 func searchMatchMask(text string, terms []string) []bool {
 	runes := []rune(text)
 	mask := make([]bool, len(runes))

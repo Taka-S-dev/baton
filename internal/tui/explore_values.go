@@ -6,7 +6,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Keep existing form state and persistence; only its presentation changes.
+// exploreValueFlow reports whether a list or variable editor opened from
+// the overview is showing. It keeps its form state and persistence; only
+// its presentation changes.
 func (m Model) exploreValueFlow() bool {
 	if !m.exploreLaunched {
 		return false

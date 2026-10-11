@@ -34,8 +34,9 @@ func recentDirectory(projectsDir, cwd string) string {
 	return filepath.Join(projectsDir, ".baton-recent", recentHash(recentPathKey(cwd)))
 }
 
-// Independent references have separate atomic files to avoid lost updates
-// when multiple baton processes run different commands concurrently.
+// RecordRecent stores a reference to a command run from cwd. Independent
+// references have separate atomic files to avoid lost updates when
+// multiple baton processes run different commands concurrently.
 func RecordRecent(projectsDir, cwd, project, command string, now time.Time) error {
 	if projectsDir == "" || cwd == "" || project == "" || command == "" {
 		return fmt.Errorf("incomplete recent command reference")

@@ -8,7 +8,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Follow the working copy, including the highlighted candidate, without saving.
+// workflowDetailBox draws the details of the step or add candidate under
+// the cursor, following the working copy without saving.
 func (m Model) workflowDetailBox(l exploreLayout) string {
 	title := "Step details"
 	var b strings.Builder

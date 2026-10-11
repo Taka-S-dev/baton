@@ -6,8 +6,10 @@ import (
 	"strings"
 )
 
-// The UI owns this per-project preference. Empty content means Default;
-// absence or unrecognized content means no previous selection is available.
+// applyShellPreference preselects the shell picked for the previous
+// command. The UI owns this per-project preference. Empty content means
+// Default; absence or unrecognized content means no previous selection is
+// available.
 func (m Model) applyShellPreference(cf *commandFormState) {
 	if m.projectDir == "" {
 		return

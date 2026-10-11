@@ -7,7 +7,8 @@ import (
 	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
-// Match saved answers against the template's slot-to-list mapping.
+// listValueRefs lists the saved commands whose fixed answers use value
+// from listName, matched through each template's slot-to-list mapping.
 // Equal text in an unrelated command or list is not a reference.
 func (m Model) listValueRefs(listName, value string) []string {
 	if value == "" {

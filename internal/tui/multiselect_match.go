@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Only explain matches absent from the visible label. Keep the explanation
+// commandMatchReason explains only matches absent from the visible label,
 // on the same row so filtering never changes checkbox or cursor geometry.
 func commandMatchReason(c *mdl.Command, label string, terms []string, budget int) string {
 	visible := strings.ToLower(ansi.Strip(label))
