@@ -95,6 +95,14 @@ the list — nothing to edit by hand unless you prefer to.
 
 ![Write a command with a placeholder, take the suggested name, save](docs/demo-add.gif)
 
+## Runbooks on a server
+
+Put `commands.tsv` next to the steps a machine needs and run
+`ssh host -t baton` instead of reading them off a wiki: the environment
+is a `{env}` pick, the order is a workflow, and a failed step offers a
+retry from where it stopped. Nothing is sent anywhere — the commands
+run on that machine, in that terminal.
+
 ## Keys
 
 A key keeps its meaning on every screen it appears on.
