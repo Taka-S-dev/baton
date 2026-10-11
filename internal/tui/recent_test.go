@@ -164,6 +164,7 @@ func TestRecentLayoutAndFilter(t *testing.T) {
 			t.Fatal("recent view exceeds viewport")
 		}
 	}
+	m.recentSearching = true
 	nm, _ := m.updateRecent(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("no match")})
 	m = nm.(Model)
 	if len(m.recentFiltered()) != 0 || !strings.Contains(m.View(), "Browse projects") {
@@ -190,6 +191,7 @@ func TestRecentFocusSkipsUnavailableAndRefreshes(t *testing.T) {
 	if m.recentCursor != 1 || m.recentRows[m.recentCursor].ref.Command != "choose" {
 		t.Fatal("did not focus newest available command")
 	}
+	m.recentSearching = true
 	nm, _ := m.updateRecent(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("removed")})
 	m = nm.(Model)
 	if m.recentCursor != 1 {
@@ -203,6 +205,8 @@ func TestRecentFocusSkipsUnavailableAndRefreshes(t *testing.T) {
 	if err := store.RecordRecent(root, cwd, project, "choose", now.Add(3*time.Second)); err != nil {
 		t.Fatal(err)
 	}
+	nm, _ = m.updateRecent(tea.KeyMsg{Type: tea.KeyEsc})
+	m = nm.(Model)
 	nm, _ = m.updateRecent(tea.KeyMsg{Type: tea.KeyCtrlR})
 	m = nm.(Model)
 	if m.recentCursor != 0 || m.recentRows[0].ref.Command != "choose" {
@@ -224,7 +228,7 @@ func TestRecentCompactLayoutAndMouse(t *testing.T) {
 	if !strings.Contains(lines[p.browseY], "Browse projects") || !strings.Contains(lines[p.browseY-1], "─") {
 		t.Fatal("browse not separated")
 	}
-	if !strings.Contains(view, "Search recent commands") || !strings.Contains(view, "Selected command") || !strings.Contains(view, "Enter Select") {
+	if !strings.Contains(view, "/ Search…") || !strings.Contains(view, "Selected command") || !strings.Contains(view, "Enter Select") {
 		t.Fatal("missing visual hierarchy")
 	}
 	nm, cmd := m.updateRecentMouse(tea.MouseMsg{X: p.x + 1, Y: p.browseY - 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})

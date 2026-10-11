@@ -65,7 +65,7 @@ func TestDropdownMultiEscapeKeepsSelections(t *testing.T) {
 	if m.sp.completion == nil || m.sp.search != "" || !reflect.DeepEqual(m.sp.completion.draft, []string{"test.go"}) {
 		t.Fatal("clear lost selection or closed popup")
 	}
-	if !strings.Contains(stripStyle(m.View()), "Esc Close") {
+	if !strings.Contains(stripStyle(m.View()), "Esc Back") {
 		t.Fatal("missing close hint")
 	}
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEsc})

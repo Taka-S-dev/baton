@@ -196,12 +196,10 @@ func TestRunHomeSearchDoesNotRunOrLoseSelection(t *testing.T) {
 	}
 	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("build")})
 	m = homeKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.screen != ScreenRunCommands || m.runHome.searching || m.msSearchTI.Focused() || m.msSearchTI.Value() != "build" {
-		t.Fatal("Enter must only finish search")
+	if m.screen != ScreenSlotPick && m.screen != ScreenConfirmRun {
+		t.Fatal("Enter must review the selected commands")
 	}
-	m = homeKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
-	m = homeKey(m, tea.KeyMsg{Type: tea.KeyEsc})
-	if m.msSearchTI.Value() != "" || len(m.msSelected) != 2 || m.msEscArmed {
-		t.Fatal("search cancellation changed execution selection")
+	if len(m.msSelected) != 2 {
+		t.Fatal("execution selection lost")
 	}
 }

@@ -397,13 +397,17 @@ func shellFormLabel() string {
 
 // Model is the main bubbletea model.
 type Model struct {
-	runHome runHomeState
+	projectSearchTI textinput.Model
+	recentSearchTI  textinput.Model
+	exploreSearchTI textinput.Model
+	runHome         runHomeState
 
 	launchDir        string
 	recentActive     bool
 	exitAfterRun     bool
 	recentRows       []recentRow
 	recentSearch     string
+	recentSearching  bool
 	recentCursor     int
 	recentUndo       *recentRow
 	recentNotice     string

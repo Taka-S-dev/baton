@@ -89,7 +89,7 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.msSearchTI.SetValue("")
 		msg = tea.KeyMsg{Type: tea.KeyEsc}
 	}
-	if msg.String() == "f3" {
+	if msg.String() == "f3" && !m.runHomeVisible() {
 		m.cycleCommandSort()
 		return m, nil
 	}

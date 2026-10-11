@@ -201,7 +201,14 @@ func (m Model) runHomeLayout(w int) (string, []runHomeAction) {
 // Match the editor's navigation vocabulary; compact screens keep the list first.
 func (m Model) runHomeKeys() string {
 	if m.runHome.searching {
-		return "Search: ↑↓ Move · Enter Done · Esc Clear · F1 Help"
+		selectKey := ""
+		if m.screen == ScreenRunCommands {
+			selectKey = " · Tab Select"
+		}
+		if m.runSearchInput().Value() == "" {
+			return "Search: ↓ Results · Enter Review" + selectKey + " · Esc Done · F1 Help"
+		}
+		return "Search: ↓ Results · Enter Review" + selectKey + " · Esc Clear · F1 Help"
 	}
 	if m.runQueueFocused && m.screen == ScreenRunCommands {
 		return "J/K Reorder · Del Remove · F2 List · / Search · e Edit · p Projects · q Quit · F1 Help"
@@ -231,6 +238,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.switchRunTab("workflows")
 			case "2":
 				return m.switchRunTab("commands")
+			case "s":
+				if m.screen == ScreenRunCommands && !m.runQueueFocused {
+					m.cycleCommandSort()
+				}
+				return m, nil
 			case "e":
 				return m.editFromRunHome()
 			case "p":
@@ -264,6 +276,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			mouse.Y--
+			if mouse.Button == tea.MouseButtonRight && m.screen == ScreenRunCommands {
+				return m.updateRunSelectMouse(mouse)
+			}
 			msg = mouse
 		}
 	}
@@ -286,7 +301,8 @@ func (m Model) viewRunHome(body string, w int) string {
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], w, "…")
 	}
-	return m.runHomeHeader(w) + "\n" + strings.Join(lines, "\n")
+	content := m.runHomeHeader(w) + "\n" + strings.Join(lines, "\n")
+	return content
 }
 
 func (m *Model) runSearchInput() *textinput.Model {
@@ -300,37 +316,26 @@ func (m *Model) syncRunSearch() tea.Cmd {
 	input := m.runSearchInput()
 	if m.runHome.searching {
 		input.Prompt = "Search / "
-		input.Placeholder = "type to filter · Enter done · Esc clear"
+		input.Placeholder = ""
 		return input.Focus()
 	}
 	input.Prompt = "/ "
-	input.Placeholder = "Press / to search"
+	input.Placeholder = "Search…"
 	input.Blur()
 	return nil
 }
 
 func (m Model) updateRunSearch(key tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch key.String() {
-	case "enter", "esc":
-		if key.String() == "esc" {
-			m.runSearchInput().SetValue("")
-			m.msCursor, m.listCursor = 0, 0
-			m.updateStepsViewport()
-		}
-		m.runHome.searching = false
-		m.syncRunSearch()
+	if key.String() == "down" && ((m.screen == ScreenRunCommands && len(m.msFiltered()) == 0) || (m.screen == ScreenRunWorkflow && len(m.wfFiltered()) == 0)) {
 		return m, nil
-	case "up", "down":
-		if m.screen == ScreenRunWorkflow {
-			return m.updateRunWorkflow(key)
-		}
+	}
+	if key.String() == "tab" && m.screen == ScreenRunCommands {
 		return m.updateMultiSelect(key)
 	}
 	input := m.runSearchInput()
-	before := input.Value()
-	updated, cmd := input.Update(key)
-	*input = updated
-	if input.Value() != before {
+	query := input.Value()
+	handled, changed, closed, cmd := updateSearchInput(input, &query, key, m.runSearchCanAccept())
+	if changed {
 		if m.screen == ScreenRunWorkflow {
 			m.listCursor = 0
 			m.updateStepsViewport()
@@ -338,5 +343,22 @@ func (m Model) updateRunSearch(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.msCursor = 0
 		}
 	}
-	return m, cmd
+	if closed {
+		m.runHome.searching = false
+		m.syncRunSearch()
+	}
+	if handled {
+		return m, cmd
+	}
+	if m.screen == ScreenRunWorkflow {
+		return m.updateRunWorkflow(key)
+	}
+	return m.updateMultiSelect(key)
+}
+
+func (m Model) runSearchCanAccept() bool {
+	if m.screen == ScreenRunWorkflow {
+		return len(m.wfFiltered()) > 0
+	}
+	return len(m.msFiltered()) > 0 || len(m.msSelected) > 0
 }

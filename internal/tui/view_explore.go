@@ -92,7 +92,10 @@ func (m Model) exploreKeys() string {
 		return "↑↓ Step  J/K Move  a Add  x Remove  Enter Open command  Ctrl+S Save  Esc Back"
 	}
 	if m.exploreSearching {
-		return "Type to search  ↑↓ Select  Enter Done  Esc Clear"
+		if m.exploreSearch == "" {
+			return "Type to search  ↓ Results  Enter Open  Esc Done"
+		}
+		return "Type to search  ↓ Results  Enter Open  Esc Clear"
 	}
 	if m.exploreMenu {
 		return "↑↓ Choose  Enter Do it  Esc Close"
@@ -163,13 +166,7 @@ func (m Model) exploreListPane(l exploreLayout) string {
 
 // exploreSearchLine is the first line inside the list box.
 func (m Model) exploreSearchLine() string {
-	switch {
-	case m.exploreSearching:
-		return " " + accent("/") + " " + white(m.exploreSearch) + dim("_")
-	case m.exploreSearch != "":
-		return " " + accent("/") + " " + white(m.exploreSearch) + "  " + dim("Esc clears")
-	}
-	return " " + dim("/ search")
+	return " " + searchInputView(m.exploreSearchTI, m.exploreSearch, m.exploreSearching)
 }
 
 // exploreRow renders one list row. The selected one is a bar across the

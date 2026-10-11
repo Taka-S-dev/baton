@@ -128,7 +128,7 @@ any-folder/                  (Windows, or portable install)
         └── commands.tsv
 ```
 
-If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `1` / `2` (or click a tab) to switch, `e` to open the selected item in the project editor, and `p` to open the project picker (`Esc` also goes back). Press `/` to start searching. While searching, letters and digits are text; `Enter` finishes search without running a command, and `Esc` clears it.
+If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `1` / `2` (or click a tab) to switch, `e` to open the selected item in the project editor, and `p` to open the project picker (`Esc` also goes back).
 
 The last Run tab is remembered per project in the app-managed `.last_run_tab`. On first use, projects with workflows open Workflows; otherwise they open Commands. An empty project offers `e` to add its first command. Switching Run tabs and returning from the editor preserve searches, cursors, and command execution order; deleted commands are removed from that selection. `baton r` remains the separate directory-scoped recent-command launcher.
 
@@ -408,9 +408,17 @@ lives in [AGENTS.md](AGENTS.md).
 
 The Run workspace has **Workflows** (`1`) and **Commands** (`2`) tabs. `e` opens **Edit project** at the current tab and item; `Esc` goes back to the project picker; clear search and confirm discarding selections first if needed. `p` opens the project picker directly. `F1` shows the available keys; `q` quits outside search; `Ctrl+C` also quits.
 
+### Searching
+
+- Projects, Recent, the editor and Run lists: `/` starts or resumes search.
+- `↓` focuses the current result without clearing the query; list actions such as `e` then work.
+- `Enter` opens the result or proceeds to input/review; with no result or queued command, search stays active.
+- In search, `Esc` clears text first, then exits when empty; in a result list it clears a retained filter before going back.
+- File/folder pickers accept text immediately; `↑↓` selects candidates and `Tab` checks multiple values.
+
 ### Projects
 
-The project picker searches inline with `/`, highlighting matches without covering the results. `Enter` opens a project, `a` adds one, and `r` refreshes. `Space` or right-click opens actions; `o` opens the settings folder and `c` copies its path.
+`Enter` opens a project, `a` adds one, and `r` refreshes. `Space` or right-click opens actions; `o` opens the settings folder and `c` copies its path.
 
 `Del` / `x` asks to delete a project. This moves its baton settings into `.baton-trash` under the projects directory; command working directories are untouched. Restore an archived project by moving its folder back into the projects directory.
 
@@ -459,7 +467,7 @@ The queue shows order, name and command text, with long rows abbreviated and pla
 
 | Key | Action |
 |---|---|
-| Type | Filter by name, group, command body or values; terms are ANDed |
+| `s` in candidates | Cycle sort order |
 | `↑↓` | Move within the focused list |
 | `Tab` in candidates | Select / deselect |
 | `F2` | Switch candidates / queue (`Ctrl+Q` also works) |
@@ -501,11 +509,11 @@ baton recent --dry-run
 ```
 
 Open the current launch directory's recent commands directly, newest first.
-Type to filter by command or project; Enter reloads the current definition,
+Enter reloads the current definition,
 prompts for interactive inputs (including file completion), then shows execution
 review. On success, recent mode returns directly to the shell after one
 completion summary; failures retain the retry choices. Explicit workdir settings still apply; an empty workdir uses the launch
-directory. Esc clears the filter, then exits. Ctrl+R refreshes the list.
+directory. `p` opens projects, `q` quits, and `Ctrl+R` refreshes the list.
 Search matches are highlighted in candidates and the command preview; each row
 shows its last execution time. Delete removes only the selected reference from
 this directory’s history, leaving the command definition intact. Ctrl+Z restores

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Taka-S-dev/baton/internal/config"
 	"github.com/atotto/clipboard"
@@ -63,30 +64,23 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	key := msg.String()
 	if m.projectMode == "search" {
-		switch key {
-		case "up":
-			m.listCursor = max(0, m.listCursor-1)
-			return m, nil
-		case "down":
-			m.listCursor = min(max(0, len(names)-1), m.listCursor+1)
-			return m, nil
-		case "esc":
-			m.projectMode = ""
-			m.projectFilter = ""
+		handled, changed, closed, cmd := updateSearchInput(&m.projectSearchTI, &m.projectFilter, msg, len(names) > 0)
+		if changed {
 			m.listCursor = 0
-			return m, nil
+		}
+		if closed {
+			m.projectMode = ""
+		}
+		if handled {
+			return m, cmd
 		}
 	}
-	if m.projectMode == "new" || m.projectMode == "search" {
+	if m.projectMode == "new" {
 		if key == "esc" {
 			m.projectMode = ""
 			return m, nil
 		}
 		if key == "enter" {
-			if m.projectMode == "search" {
-				m.projectMode = ""
-				return m, nil
-			}
 			path, err := projectPath(m.projectsDir, m.projectInput)
 			if err == nil {
 				err = os.Mkdir(path, 0755)
@@ -110,9 +104,6 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		target := &m.projectInput
-		if m.projectMode == "search" {
-			target = &m.projectFilter
-		}
 		if key == "backspace" {
 			r := []rune(*target)
 			if len(r) > 0 {
@@ -122,9 +113,6 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			*target += " "
 		} else if msg.Type == tea.KeyRunes {
 			*target += string(msg.Runes)
-		}
-		if m.projectMode == "search" {
-			m.listCursor = 0
 		}
 		return m, nil
 	}
@@ -187,6 +175,7 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.projectInput = ""
 	case "/":
 		m.projectMode = "search"
+		return m, startSearchInput(&m.projectSearchTI, m.projectFilter)
 	case "r":
 		m.refreshProjects()
 	case " ":
@@ -287,15 +276,7 @@ func (m Model) viewProjects(w int) string {
 	if m.termHeight() >= 18 {
 		b.WriteString(" " + gray(truncate("Choose a project to run commands or edit settings.", max(1, w-1))) + "\n")
 	}
-	search := "/ " + m.projectFilter
-	if m.projectFilter == "" && m.projectMode != "search" {
-		search = "/ Search…"
-	}
-	if m.projectMode == "search" {
-		b.WriteString(" " + accent(truncate(search+"_", max(1, w-1))) + "\n")
-	} else {
-		b.WriteString(" " + gray(truncate(search, max(1, w-1))) + "\n")
-	}
+	b.WriteString(" " + ansi.Truncate(searchInputView(m.projectSearchTI, m.projectFilter, m.projectMode == "search"), max(1, w-1), "…") + "\n")
 
 	empty := "No projects · a creates one"
 	if m.projectFilter != "" {
@@ -334,7 +315,7 @@ func (m Model) viewProjects(w int) string {
 		}
 		keys := "↑↓ Select  Enter Open  / Search  Space Actions  a Add  r Refresh  Del Delete  q Quit  F1 Help"
 		if m.projectMode == "search" {
-			keys = "↑↓ Select  Enter Done  Esc Clear  F1 Help"
+			keys = "↓ Results  Enter Open  Esc Clear / Back  F1 Help"
 		}
 		b.WriteString(gray(truncate(keys, w)))
 	} else {
@@ -357,9 +338,6 @@ func (m Model) viewProjects(w int) string {
 		case "new":
 			title = "New project"
 			body = "Name > " + m.projectInput + "_\nEnter Create  Esc Cancel"
-		case "search":
-			title = "Search projects"
-			body = "/ " + m.projectFilter + "_\nEnter Done  Esc Close"
 		case "delete":
 			title = "Delete project?"
 			body = filepath.Join(m.projectsDir, m.projectInput) + "\nMoves Baton settings to .baton-trash.\nCommand working directories are untouched.\ny Confirm  Esc Cancel"

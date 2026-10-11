@@ -8,8 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Keep the original input and command context in place. The completion list
-// is anchored to that input, not a second screen with its own search field.
+// The picker owns its filter; the background only supplies command context.
 func (m Model) pathCompletionBackground(w int) string {
 	bg := m
 	sp := *m.sp
@@ -17,69 +16,72 @@ func (m Model) pathCompletionBackground(w int) string {
 	sp.previewOnly = true
 	sp.picked = append([]string(nil), m.sp.completion.draft...)
 	bg.sp = &sp
-	background := bg.renderScreen(w)
-	if frameRows(background) > m.termHeight() {
-		input := "/ " + sp.search + "_"
-		if sp.search == "" {
-			input = "/ type to filter…"
-		}
-		background = accentBold("  "+sp.placeholder()) + "\n  " + input
-	}
-	lines := strings.Split(strings.TrimRight(background, "\n"), "\n")
+	lines := strings.Split(bg.renderScreen(w), "\n")
+	end := len(lines)
 	for i, line := range lines {
 		plain := ansi.Strip(line)
-		if strings.Contains(plain, "Tab: open choices") || strings.Contains(plain, "Tab: choices  Enter:") {
-			if strings.Contains(plain, "Tab: choices  Enter: confirm") && i > 0 {
-				lines[i-1] = ""
-			}
-			line = ""
+		if strings.Contains(plain, "Select value") && !strings.Contains(plain, "[") || strings.HasPrefix(strings.TrimSpace(plain), "/ ") {
+			end = i
+			break
 		}
-		if sp.search == "" {
-			line = strings.ReplaceAll(line, sp.inputHint(), "/ type to filter…")
-		}
-		lines[i] = ansi.Truncate(line, max(1, w), "…")
 	}
-	for len(lines) < m.termHeight() {
-		lines = append(lines, "")
+	lines = lines[:end]
+	for len(lines) > 0 && strings.TrimSpace(ansi.Strip(lines[len(lines)-1])) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	maxContext := max(0, m.termHeight()-6)
+	if len(lines) > maxContext {
+		compact := []string{accentBold("  " + sp.placeholder())}
+		for _, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(ansi.Strip(line)), "$ ") {
+				compact = append(compact, line)
+				break
+			}
+		}
+		lines = compact[:min(len(compact), maxContext)]
+	}
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], max(1, w), "…")
 	}
 	return strings.Join(lines, "\n")
 }
 
 func (m Model) pathCompletionAnchor(w int) (int, int) {
-	for y, line := range strings.Split(m.pathCompletionBackground(w), "\n") {
-		plain := ansi.Strip(line)
-		if i := strings.Index(plain, "/ "); i >= 0 && (strings.Contains(plain, "/ type to filter") || strings.Contains(plain, "/ "+m.sp.search+"_")) {
-			return ansi.StringWidth(plain[:i]), y + 1
-		}
+	bg := m.pathCompletionBackground(w)
+	if bg == "" {
+		return 0, 0
 	}
-	return 2, max(1, m.termHeight()/2)
+	return 0, strings.Count(bg, "\n") + 1
 }
 
 func (m Model) pathCompletionLayout(w int) actionPopupLayout {
 	x, anchor := m.pathCompletionAnchor(w)
 	height := max(1, m.termHeight())
-	width := min(64, max(3, w-x-2))
-	desired := min(10, max(4, len(m.sp.completion.entries)+3))
-	y, h := anchor, min(desired, height-anchor)
-	if h < 4 && anchor > height-anchor {
-		h = min(desired, anchor-1)
-		y = anchor - 1 - h
+	h := max(1, height-anchor)
+	reserved := 4
+	if m.termHeight() >= 18 {
+		reserved++
 	}
-	h = max(1, min(h, height))
-	p := actionPopupLayout{x: min(x, max(0, w-width)), y: max(0, min(y, height-h)), w: min(width, w), h: h, rows: max(1, h-3)}
-	if m.termHeight() < 18 {
-		p.rows = max(1, p.h-2)
-	}
+	p := actionPopupLayout{x: x, y: anchor, w: max(1, w), h: h, rows: max(1, h-reserved)}
 	p.start = windowStart(p.rows, len(m.sp.completion.entries), m.sp.completion.cursor)
 	return p
 }
 
-const pathCandidateRowOffset = 1 // only the border precedes the candidates
+const pathCandidateRowOffset = 3 // border, filter, separator
 
 func (m Model) overlayPathCompletion(w int) string {
 	p := m.pathCompletionLayout(w)
 	c := m.sp.completion
 	var b strings.Builder
+	input := c.input
+	input.Prompt = "Search / "
+	input.Placeholder = "Filter files…"
+	if m.sp.pathDef.PathKind == "dir" {
+		input.Placeholder = "Filter folders…"
+	}
+	input.Width = max(1, p.w-5-ansi.StringWidth(input.Prompt))
+	b.WriteString(" " + ansi.Truncate(input.View(), max(1, p.w-4), "…") + "\n")
+	b.WriteString(" " + hline(max(1, p.w-4)) + "\n")
 	for row := 0; row < p.rows; row++ {
 		line := ""
 		i := p.start + row
@@ -124,27 +126,27 @@ func (m Model) overlayPathCompletion(w int) string {
 		}
 		b.WriteString(line + "\n")
 	}
-	footer := "↑↓ Move  Enter Confirm  Esc Close"
+	footer := "↑↓ Move  Enter Select  Esc Back"
 	if m.sp.pathDef.PathKind == "dir" {
-		footer = "↑↓ Move  → Open  Enter Confirm  Esc Close"
+		footer = "↑↓ Move  → Open  Enter Select  Esc Back"
 	}
 	if m.sp.variadic {
-		footer = "Tab Check  Enter Confirm  Esc Close"
+		footer = "Tab Check  Enter Select  Esc Back"
 		if p.w >= 60 {
-			footer = "↑↓ Move  Tab Check  Enter Confirm  Esc Close"
+			footer = "↑↓ Move  Tab Check  Enter Select  Esc Back"
 			if m.sp.pathDef.PathKind == "dir" {
-				footer = "↑↓ Move  Tab Check  → Open  Enter Confirm  Esc Close"
+				footer = "↑↓ Move  Tab Check  → Open  Enter Select  Esc Back"
 			}
 		}
 	}
 	if !c.loading && c.err == nil && len(c.entries) > 0 && !m.pathCandidateSelectable(c.entries[c.cursor]) {
-		footer = "↑↓ Move  Enter/→ Open folder  Esc Close"
+		footer = "↑↓ Move  Enter/→ Open folder  Esc Back"
 	}
 	if len(c.entries) > 0 && c.entries[c.cursor].parent {
-		footer = "Enter/← Parent folder  Esc Close"
+		footer = "Enter/← Parent folder  Esc Back"
 	}
 	if m.sp.search != "" {
-		footer = strings.ReplaceAll(footer, "Esc Close", "Esc Clear filter")
+		footer = strings.ReplaceAll(footer, "Esc Back", "Esc Clear filter")
 	}
 	if len([]rune(footer)) > p.w-4 {
 		footer = strings.TrimPrefix(footer, "↑↓ Move  ")
@@ -160,7 +162,9 @@ func (m Model) overlayPathCompletion(w int) string {
 	if m.sp.variadic {
 		title = fmt.Sprintf("%s · %d selected · %d candidates", kind, len(c.draft), len(c.entries))
 	}
-	return overlayBox(m.pathCompletionBackground(w), box(title, b.String(), p.w, p.h, true), p.x, p.y, w)
+	background := m.pathCompletionBackground(w)
+	background += strings.Repeat("\n", max(0, m.termHeight()-strings.Count(background, "\n")-1))
+	return overlayBox(background, box(title, b.String(), p.w, p.h, true), p.x, p.y, w)
 }
 
 func (m Model) updatePathCompletionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -174,8 +178,7 @@ func (m Model) updatePathCompletionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) 
 		if msg.Action != tea.MouseActionPress {
 			return m, nil
 		}
-		_, anchor := m.pathCompletionAnchor(m.viewWidth())
-		if msg.Y == anchor-1 {
+		if msg.Y == p.y+1 && msg.X >= p.x && msg.X < p.x+p.w {
 			return m, nil
 		}
 		if msg.X < p.x || msg.X >= p.x+p.w || msg.Y < p.y || msg.Y >= p.y+p.h {

@@ -28,33 +28,18 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		*cur = max(0, len(items)-1)
 	}
 
-	// The search takes the letters while it is open. The arrows still
-	// move the cursor through what matches, so narrowing the list and
-	// picking from it is one motion.
+	// Search owns text input; Down transfers focus to the current result.
 	if m.exploreSearching {
-		switch msg.String() {
-		case "esc":
-			m.exploreSearch, m.exploreSearching = "", false
-		case "enter":
-			m.exploreSearching = false
-		case "backspace":
-			if r := []rune(m.exploreSearch); len(r) > 0 {
-				m.exploreSearch = string(r[:len(r)-1])
-			}
-		case "up":
-			*cur = max(0, *cur-1)
-		case "down":
-			*cur = min(max(0, len(m.exploreVisible())-1), *cur+1)
-		default:
-			if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
-				m.exploreSearch += string(msg.Runes)
-				if msg.Type == tea.KeySpace {
-					m.exploreSearch += " "
-				}
-				*cur = 0
-			}
+		handled, changed, closed, cmd := updateSearchInput(&m.exploreSearchTI, &m.exploreSearch, msg, len(items) > 0)
+		if changed {
+			*cur = 0
 		}
-		return m, nil
+		if closed {
+			m.exploreSearching = false
+		}
+		if handled {
+			return m, cmd
+		}
 	}
 
 	// The action menu takes the keys while it is open: the arrows and
@@ -114,6 +99,8 @@ func (m Model) updateExplore(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.switchTab((m.exploreTab + 1) % tabCount)
 	case "/":
 		m.exploreSearching = true
+		cmd := startSearchInput(&m.exploreSearchTI, m.exploreSearch)
+		return m, cmd
 	case "enter", "e":
 		// Enter is "open" on every kind, and e the same key by name:
 		// a command edits in the box, the rest go to their editors.

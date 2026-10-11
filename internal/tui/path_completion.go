@@ -11,6 +11,7 @@ import (
 
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/Taka-S-dev/baton/internal/store"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -22,6 +23,7 @@ type pathCandidate struct {
 }
 
 type pathCompletion struct {
+	input                             textinput.Model
 	base, query                       string
 	focusValue                        string
 	entries                           []pathCandidate
@@ -92,8 +94,10 @@ func (m Model) startPathCompletion() tea.Cmd {
 		}
 	}
 	m.sp.completion = p
+	focus := startSearchInput(&p.input, m.sp.search)
+	p.input.CharLimit = 0
 	if err != nil {
-		return nil
+		return focus
 	}
 	return m.requestPathCompletion(p)
 }
@@ -131,7 +135,7 @@ func (m Model) receivePathCompletion(msg pathCompletionResult) (tea.Model, tea.C
 	if p.autoInsert && p.err == nil && len(p.entries) == 1 {
 		m.insertPathCandidate(p.entries[0].value)
 	}
-	return m, nil
+	return m, p.input.Focus()
 }
 
 func (m Model) insertPathCandidate(value string) {
@@ -178,8 +182,17 @@ func (m Model) updatePathCompletion(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			p.cursor = (p.cursor + 1) % len(p.entries)
 		}
 	case "left":
+		if len(p.entries) > 0 && p.entries[p.cursor].parent {
+			return m, m.parentPathCompletion()
+		}
+		if p.input.Position() > 0 {
+			return m.editPathSearch(msg)
+		}
 		return m, m.parentPathCompletion()
 	case "right":
+		if p.input.Position() < len([]rune(p.input.Value())) {
+			return m.editPathSearch(msg)
+		}
 		if len(p.entries) > 0 && p.entries[p.cursor].parent {
 			return m, m.parentPathCompletion()
 		}
@@ -220,22 +233,8 @@ func (m Model) updatePathCompletion(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.insertPathCandidate(p.entries[p.cursor].value)
 			return m.confirmCompletedPath()
 		}
-	case "backspace", "ctrl+u":
-		if msg.String() == "ctrl+u" {
-			m.sp.search = ""
-		} else if r := []rune(m.sp.search); len(r) > 0 {
-			m.sp.search = string(r[:len(r)-1])
-		}
-		return m, m.refilterPathCompletion()
 	default:
-		if msg.Type == tea.KeyRunes {
-			for _, r := range msg.Runes {
-				if !unicode.IsControl(r) {
-					m.sp.search += string(r)
-				}
-			}
-			return m, m.refilterPathCompletion()
-		}
+		return m.editPathSearch(msg)
 	}
 	return m, nil
 }
@@ -248,6 +247,10 @@ func (m Model) refilterPathCompletion() tea.Cmd {
 	// to the same query. Background reads never mutate UI state.
 	next := *old
 	next.query = m.sp.search
+	if next.input.Value() != m.sp.search {
+		next.input.SetValue(m.sp.search)
+		next.input.CursorEnd()
+	}
 	next.entries = nil
 	next.cursor = 0
 	next.err = nil
@@ -436,4 +439,15 @@ func (m Model) confirmCompletedPath() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m.updateSlotPick(tea.KeyMsg{Type: tea.KeyEnter})
+}
+
+func (m Model) editPathSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	p := m.sp.completion
+	var cmd tea.Cmd
+	p.input, cmd = p.input.Update(msg)
+	if p.input.Value() != m.sp.search {
+		m.sp.search = p.input.Value()
+		return m, m.refilterPathCompletion()
+	}
+	return m, cmd
 }

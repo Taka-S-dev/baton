@@ -16,7 +16,7 @@ func (m Model) viewRunWorkflow(w int) string {
 	}
 	leftW := w / 3
 	var b strings.Builder
-	b.WriteString(m.wfSearchTI.View() + "\n")
+	b.WriteString(m.runSearchView(m.wfSearchTI) + "\n")
 	filtered := m.wfFiltered()
 	writeWindowedList(&b, max(1, m.termHeight()-5), len(filtered), m.listCursor, "No workflows.", func(i int) string {
 		wf := m.workflows[filtered[i]]

@@ -12,10 +12,7 @@ func (m Model) viewRecentCompact(w int) string {
 	p := m.recentGeometry(w)
 	filtered := m.recentFiltered()
 	h := m.termHeight()
-	search := "/ " + m.recentSearch + "_"
-	if m.recentSearch == "" {
-		search = gray("/ Search recent commands…")
-	}
+	search := m.recentSearchLine()
 	title := fmt.Sprintf("Recent · %d/%d", len(filtered), len(m.recentRows))
 	if len(filtered) > p.rows {
 		title += fmt.Sprintf(" · %d–%d", p.start+1, min(p.start+p.rows, len(filtered)))

@@ -296,7 +296,7 @@ func (m Model) viewRunWorkflowList(w int) string {
 	if m.compact() {
 		gap, below = "", 4
 	}
-	b.WriteString("  " + m.wfSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n" + gap)
+	b.WriteString("  " + m.runSearchView(m.wfSearchTI) + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n" + gap)
 	cur := m.listCursor
 	if cur >= n {
 		cur = max(0, n-1)
@@ -412,7 +412,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 	if m.compact() {
 		gap, below = "", 4
 	}
-	b.WriteString("  " + m.msSearchTI.View() + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.msItems))+"  Sort: "+m.commandSortLabel()+" · F3") + "\n" + gap)
+	b.WriteString("  " + m.commandSearchLine(max(0, w-2), n) + "\n" + gap)
 
 	if !showPreview {
 		previewH = 0

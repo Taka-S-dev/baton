@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/Taka-S-dev/baton/internal/config"
 	mdl "github.com/Taka-S-dev/baton/internal/model"
@@ -29,6 +28,7 @@ func (m *Model) gotoRecent() {
 	m.recentRows = nil
 	m.recentCursor = 0
 	m.recentSearch = ""
+	m.recentSearching = false
 	m.loadWarnings = nil
 	refs, err := store.LoadRecent(m.projectsDir, m.launchDir)
 	if err != nil {
@@ -85,12 +85,24 @@ func (m Model) recentFiltered() []int {
 }
 
 func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.recentSearching {
+		return m.updateRecentSearch(msg)
+	}
 	if msg.String() != "delete" && msg.String() != "ctrl+z" {
 		m.recentNotice = ""
 	}
 	filtered := m.recentFiltered()
 	n := len(filtered) + 1 // browse is always available, including an empty history
 	switch msg.String() {
+	case "/":
+		m.recentSearching = true
+		cmd := startSearchInput(&m.recentSearchTI, m.recentSearch)
+		return m, cmd
+	case "p":
+		m.browseRecentProjects()
+		return m, nil
+	case "q":
+		return m, tea.Quit
 	case "up":
 		m.recentCursor = (m.recentCursor + n - 1) % n
 	case "down":
@@ -108,20 +120,9 @@ func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			return m, tea.Quit
 		}
-	case "backspace":
-		r := []rune(m.recentSearch)
-		if len(r) > 0 {
-			m.recentSearch = string(r[:len(r)-1])
-			m.focusRecentCommand()
-		}
 	case "enter":
 		if m.recentCursor >= len(filtered) {
-			m.recentActive = false
-			m.screen = ScreenProjectSelect
-			m.projectFilter = ""
-			m.projectMode = ""
-			m.refreshProjects()
-			m.listCursor = 0
+			m.browseRecentProjects()
 			return m, nil
 		}
 		row := m.recentRows[filtered[m.recentCursor]]
@@ -136,19 +137,7 @@ func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.recentActive = true
 		return m.startResolveFlow([]msItem{{cmd: &cmd}})
-	default:
-		if msg.Type == tea.KeySpace {
-			m.recentSearch += " "
-			m.focusRecentCommand()
-		}
-		if msg.Type == tea.KeyRunes {
-			for _, r := range msg.Runes {
-				if !unicode.IsControl(r) {
-					m.recentSearch += string(r)
-				}
-			}
-			m.focusRecentCommand()
-		}
+
 	}
 	return m, nil
 }
@@ -183,10 +172,7 @@ func (m Model) viewRecent(w int) string {
 	p := m.recentGeometry(w)
 	filtered := m.recentFiltered()
 	rule := gray(strings.Repeat("─", p.width))
-	search := gray("/ Search recent commands…")
-	if m.recentSearch != "" {
-		search = "/ " + m.recentSearch + "_"
-	}
+	search := m.recentSearchLine()
 	lines := []string{accentBold("[ Recent commands ]"), gray("In: " + m.launchDir), gray(fmt.Sprintf("%d matches / %d recent", len(filtered), len(m.recentRows))), search, rule}
 	rowLine := func(label string, selected bool) string {
 		if selected {
@@ -245,16 +231,13 @@ func (m Model) viewRecent(w int) string {
 		}
 	}
 	lines = append(lines, gray("  │ ")+cmdLine, gray("  │ ")+dirLine, rule, recentBrowseRow(p.width, m.recentCursor == len(filtered)))
-	footer := "↑↓ Move  Enter Select  Esc Quit"
-	if m.recentSearch != "" {
-		footer = "↑↓ Move  Enter Select  Esc Clear"
-	}
-	if p.width >= 58 {
-		footer += "  Ctrl+R Refresh"
-	}
+	footer := m.recentKeys()
 	lines = append(lines, gray(footer))
 	actions := "Delete: Remove from history"
-	if m.recentUndo != nil {
+	if m.recentSearching {
+		actions = "Enter keeps filter · Esc clears text, then exits search"
+	}
+	if m.recentUndo != nil && !m.recentSearching {
 		actions += "  Ctrl+Z: Undo"
 	}
 	lines = append(lines, gray(actions))
@@ -284,16 +267,73 @@ func (m Model) updateRecentMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if msg.X < p.x || msg.X >= p.x+p.width {
 			return m, nil
 		}
+		searchY := p.listY - 2
+		if m.shortPanels() {
+			searchY = 1
+		}
+		if msg.Y == searchY {
+			m.recentSearching = true
+			cmd := startSearchInput(&m.recentSearchTI, m.recentSearch)
+			return m, cmd
+		}
 		n := len(m.recentFiltered())
 		if msg.Y == p.browseY {
+			m.recentSearching = false
 			m.recentCursor = n
 			return m.updateRecent(tea.KeyMsg{Type: tea.KeyEnter})
 		}
 		row := msg.Y - p.listY
 		if row >= 0 && row < p.rows && p.start+row < n {
 			m.recentCursor = p.start + row
+			m.recentSearching = false
 			return m.updateRecent(tea.KeyMsg{Type: tea.KeyEnter})
 		}
 	}
 	return m, nil
+}
+
+func (m *Model) browseRecentProjects() {
+	m.recentActive = false
+	m.recentSearching = false
+	m.screen = ScreenProjectSelect
+	m.projectFilter, m.projectMode = "", ""
+	m.refreshProjects()
+	m.listCursor = 0
+}
+
+func (m Model) recentSearchLine() string {
+	return searchInputView(m.recentSearchTI, m.recentSearch, m.recentSearching)
+}
+
+func (m Model) recentKeys() string {
+	if m.recentSearching {
+		if m.recentSearch == "" {
+			return "↓ Results  Enter Open  Esc Done  F1 Help"
+		}
+		return "↓ Results  Enter Open  Esc Clear  F1 Help"
+	}
+	return "↑↓ Move  Enter Select  / Search  p Projects  q Quit  F1 Help"
+}
+
+func (m Model) updateRecentSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	handled, changed, closed, cmd := updateSearchInput(&m.recentSearchTI, &m.recentSearch, msg, len(m.recentFiltered()) > 0)
+	if changed {
+		m.focusRecentCommand()
+	}
+	if closed {
+		m.recentSearching = false
+	}
+	if handled {
+		return m, cmd
+	}
+	if closed {
+		return m.updateRecent(msg)
+	}
+	n := len(m.recentFiltered()) + 1
+	if msg.String() == "up" {
+		m.recentCursor = (m.recentCursor + n - 1) % n
+	} else {
+		m.recentCursor = (m.recentCursor + 1) % n
+	}
+	return m, cmd
 }

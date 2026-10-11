@@ -176,6 +176,10 @@ func TestExploreSearchNarrowsTheList(t *testing.T) {
 		t.Errorf("the box title does not say how many of how many matched\n%s", m.View())
 	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.exploreSearching || m.exploreCursor[tabCommands] != 0 {
+		t.Fatal("Down must focus current result")
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyDown})
 	if m.exploreCursor[tabCommands] != 1 {
 		t.Error("the arrows do not move through the matches while searching")
 	}

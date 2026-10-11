@@ -3,6 +3,8 @@ package tui
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/cursor"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Taka-S-dev/baton/internal/runner"
@@ -201,7 +203,7 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && mouse.Y == func() int { y, _ := m.projectRows(m.viewWidth()); return y - 1 }() {
 			m.projectMode = "search"
-			return m, nil
+			return m, startSearchInput(&m.projectSearchTI, m.projectFilter)
 		}
 		names := m.visibleProjects()
 		y, rows := m.projectRows(m.viewWidth())
@@ -249,6 +251,27 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	// Forward non-key messages to textinput (handles internal blink tick).
 	if _, ok := msg.(tea.KeyMsg); !ok {
+		_, searchBlink := msg.(cursor.BlinkMsg)
+		if searchBlink && m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion != nil {
+			var cmd tea.Cmd
+			m.sp.completion.input, cmd = m.sp.completion.input.Update(msg)
+			return m, cmd
+		}
+		if searchBlink && m.screen == ScreenProjectSelect && m.projectMode == "search" {
+			var cmd tea.Cmd
+			m.projectSearchTI, cmd = m.projectSearchTI.Update(msg)
+			return m, cmd
+		}
+		if searchBlink && m.screen == ScreenRecent && m.recentSearching {
+			var cmd tea.Cmd
+			m.recentSearchTI, cmd = m.recentSearchTI.Update(msg)
+			return m, cmd
+		}
+		if searchBlink && m.screen == ScreenExplore && m.exploreSearching && m.exploreListFocused() {
+			var cmd tea.Cmd
+			m.exploreSearchTI, cmd = m.exploreSearchTI.Update(msg)
+			return m, cmd
+		}
 		if m.screen == ScreenNameInput || m.screen == ScreenCreateCommandName || m.screen == ScreenEditCommandName || m.screen == ScreenCommandForm || m.screen == ScreenVarForm {
 			ti, c := m.nameInput.Update(msg)
 			m.nameInput = ti
