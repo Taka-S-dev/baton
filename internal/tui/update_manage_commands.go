@@ -1119,7 +1119,7 @@ func (m *Model) openSlotPickForCommandEdit(cmd *mdl.Command) (tea.Model, tea.Cmd
 	if s.PathKind != "" {
 		return *m, m.startPathCompletion()
 	}
-	return *m, nil
+	return *m, startSearchInput(&sp.input, sp.search)
 }
 
 func (m *Model) finishCommandSlotResolution() (tea.Model, tea.Cmd) {

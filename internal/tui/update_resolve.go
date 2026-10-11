@@ -363,7 +363,7 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 	if s.PathKind != "" {
 		return m, m.startPathCompletion()
 	}
-	return m, nil
+	return m, startSearchInput(&sp.input, sp.search)
 }
 
 // indexOfEntry returns the position of value in entries, or -1.

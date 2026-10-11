@@ -107,6 +107,9 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion == nil && m.sp.pathDef.PathKind == "" && m.sce == nil {
+		return m.updateSlotValuesMouse(mouse)
+	}
 	if m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion != nil {
 		switch input := msg.(type) {
 		case tea.MouseMsg:
@@ -255,6 +258,11 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if searchBlink && m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion != nil {
 			var cmd tea.Cmd
 			m.sp.completion.input, cmd = m.sp.completion.input.Update(msg)
+			return m, cmd
+		}
+		if searchBlink && m.screen == ScreenSlotPick && m.sp != nil && m.sp.completion == nil && m.sp.pathDef.PathKind == "" {
+			var cmd tea.Cmd
+			m.sp.input, cmd = m.sp.input.Update(msg)
 			return m, cmd
 		}
 		if searchBlink && m.screen == ScreenProjectSelect && m.projectMode == "search" {

@@ -546,17 +546,24 @@ func (m Model) viewDiscardWindow(w int, selNames []string) string {
 // panel grows with the steps still to resolve — so no fixed height can
 // say when it has to give its spacing up. It asks the frame instead.
 func (m Model) viewSlotPick(w int) string {
+	view, _ := m.slotPickRender(w)
+	return view
+}
+
+// slotPickRender is viewSlotPick with the layout of the values box, for
+// the pointer; the layout is nil when the box was not drawn.
+func (m Model) slotPickRender(w int) (string, *actionPopupLayout) {
 	if !m.compact() {
-		if view := m.slotPickFrame(w, false, 3); frameRows(view) <= m.termHeight() {
-			return view
+		if view, p := m.slotPickFrame(w, false, 3); frameRows(view) <= m.termHeight() {
+			return view, p
 		}
 	}
 	// Spacing goes first, then the context panel narrows a step at a
 	// time, down to the step being resolved on its own with the counts
 	// either side of it.
 	for around := 3; around > 0; around-- {
-		if view := m.slotPickFrame(w, true, around); frameRows(view) <= m.termHeight() {
-			return view
+		if view, p := m.slotPickFrame(w, true, around); frameRows(view) <= m.termHeight() {
+			return view, p
 		}
 	}
 	return m.slotPickFrame(w, true, 0)
@@ -568,7 +575,7 @@ func frameRows(s string) int {
 	return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1
 }
 
-func (m Model) slotPickFrame(w int, tight bool, around int) string {
+func (m Model) slotPickFrame(w int, tight bool, around int) (string, *actionPopupLayout) {
 	sp := m.sp
 	var b strings.Builder
 	title := "  [ Select value for " + sp.placeholder() + " ]"
@@ -670,6 +677,19 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 				b.WriteString("    " + gray("workdir:") + " " + preview(dir) + "\n")
 			}
 		}
+	}
+
+	// A list slot gets the same box as a path slot, under the context
+	// and the preview, whenever the terminal has room for it.
+	if sp.pathDef.PathKind == "" {
+		background := b.String()
+		anchor := strings.Count(background, "\n")
+		if m.termHeight()-anchor >= 6 {
+			p := m.slotValuesLayout(w, anchor)
+			return m.overlaySlotValues(w, background, anchor), &p
+		}
+	}
+	if sp.contextNames != nil {
 		// The reuse hint rides on the divider rather than taking its own
 		// line: this screen is height-critical, and the value itself is
 		// already visible on the cursor row and in the preview above.
@@ -706,7 +726,7 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 		}
 		keys := m.pathInputKeys()
 		b.WriteString(hline(w) + "\n  " + gray(keys) + "\n")
-		return b.String()
+		return b.String(), nil
 	}
 	// List
 	skipRow := len(sp.filtered) + 1
@@ -729,7 +749,7 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 		isSkip := sp.canSkip && i == skipRow
 
 		if i == sp.cursor {
-			// Render raw text inside sCursor to avoid ANSI width miscalculation
+			// Plain text under the row style, so the width is the text width
 			var rawLine string
 			if isSkip {
 				rawLine = "[ → skip — resolve at run time ]"
@@ -751,7 +771,7 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 					}
 				}
 			}
-			return sCursor.Width(w - 2).Render("    " + rawLine)
+			return sRowActive.Width(w - 2).Render("    " + rawLine)
 		}
 		var line string
 		if isSkip {
@@ -789,7 +809,7 @@ func (m Model) slotPickFrame(w int, tight bool, around int) string {
 	} else {
 		b.WriteString("  " + gray("↑↓ Enter") + "  " + gray("Esc: ") + dim("clear filter / back") + "\n")
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 // writePickFilter renders the type-to-filter line for the management

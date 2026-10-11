@@ -18,7 +18,6 @@ var (
 	sError     = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	sBold      = lipgloss.NewStyle().Bold(true)
 	sDim       = lipgloss.NewStyle().Faint(true)
-	sCursor    = lipgloss.NewStyle().Background(lipgloss.Color("238")).Foreground(lipgloss.Color("97"))
 	// The overview's selected row, drawn as a bar across the pane. It
 	// dims when the pane beside it has the keys, so which half is being
 	// driven is readable without a frame around either.

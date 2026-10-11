@@ -119,7 +119,8 @@ type slotPickState struct {
 	filtered      []mdl.ListEntry
 	cursor        int
 	search        string
-	canSkip       bool // true when creating a template-derived command
+	input         textinput.Model // the search line of the values box; search stays the value
+	canSkip       bool            // true when creating a template-derived command
 
 	// {name...} slots: Tab toggles values into picked (in toggle order)
 	// and Enter joins them with spaces. With nothing picked, Enter falls
