@@ -39,7 +39,7 @@ func renamedProject(t *testing.T) string {
 
 // TestRenameRepair_ApplyUpdatesReferences checks the whole hand-edit
 // flow: loading detects the rename, the repair screen opens before the
-// main menu, and confirming rewrites workflows.json and refreshes the
+// Run home, and confirming rewrites workflows.json and refreshes the
 // snapshot under the new name.
 func TestRenameRepair_ApplyUpdatesReferences(t *testing.T) {
 	dir := renamedProject(t)
@@ -60,8 +60,8 @@ func TestRenameRepair_ApplyUpdatesReferences(t *testing.T) {
 	}
 
 	m.updateRenameRepair(tea.KeyMsg{Type: tea.KeyEnter}) // Yes is preselected
-	if m.screen != ScreenMainMenu {
-		t.Fatalf("confirming must land on the main menu, screen=%v", m.screen)
+	if m.screen != ScreenRunWorkflow {
+		t.Fatalf("confirming must land on the Run home, screen=%v", m.screen)
 	}
 	if steps := m.workflows[0].Commands; steps[0] != "api-start" || steps[1] != "keep" {
 		t.Fatalf("workflow steps = %v, want only the renamed step updated", steps)
@@ -95,8 +95,8 @@ func TestRenameRepair_DeclineKeepsFilesQuietly(t *testing.T) {
 	}
 	m.gotoPostLoad()
 	m.updateRenameRepair(tea.KeyMsg{Type: tea.KeyEscape})
-	if m.screen != ScreenMainMenu {
-		t.Fatalf("declining must land on the main menu, screen=%v", m.screen)
+	if m.screen != ScreenRunWorkflow {
+		t.Fatalf("declining must land on the Run home, screen=%v", m.screen)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, "workflows.json"))
 	if err != nil {

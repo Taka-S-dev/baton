@@ -41,8 +41,8 @@ func TestRenameWorkflow_LastWorkflowFollows(t *testing.T) {
 
 // TestWorkflowMgmt_Navigation checks the Manage workflows submenu mirrors
 // the Manage aliases pattern: Enter opens the chosen action, Esc returns
-// to the main menu, and finished/canceled sub-screens come back to the
-// submenu rather than the main menu.
+// to the Run home, and finished/canceled sub-screens come back to the
+// submenu rather than the Run home.
 func TestWorkflowMgmt_Navigation(t *testing.T) {
 	enter := tea.KeyMsg{Type: tea.KeyEnter}
 	esc := tea.KeyMsg{Type: tea.KeyEscape}
@@ -60,10 +60,10 @@ func TestWorkflowMgmt_Navigation(t *testing.T) {
 		t.Fatalf("Create workflow: screen=%v", got.screen)
 	}
 
-	// Esc from the submenu returns to the main menu.
+	// Esc from the submenu returns to the Run home.
 	nm, _ = m.updateWorkflowMgmt(esc)
-	if got := nm.(Model); got.screen != ScreenMainMenu {
-		t.Fatalf("Esc: screen=%v, want main menu", got.screen)
+	if got := nm.(Model); got.screen != ScreenRunWorkflow {
+		t.Fatalf("Esc: screen=%v, want Run home", got.screen)
 	}
 
 	// Esc from the Edit workflow picker returns to the submenu.

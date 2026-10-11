@@ -1,35 +1,28 @@
 package tui
 
 import (
-	"testing"
-
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"testing"
 )
 
-func TestMainMenuRunFirstAndContentDefault(t *testing.T) {
-	items := mainMenuItems()
-	want := []string{"Run workflow", "Run commands", "Edit project", "Switch project", "Exit"}
-	for i, name := range want {
-		if items[i] != name {
-			t.Fatalf("menu %v", items)
+func TestProjectOpensRunHomeByContent(t *testing.T) {
+	for _, tc := range []struct {
+		workflows, commands bool
+		want                Screen
+	}{
+		{true, true, ScreenRunWorkflow}, {false, true, ScreenRunCommands}, {false, false, ScreenRunCommands},
+	} {
+		m := exploreProject()
+		m.projectDir = t.TempDir()
+		if !tc.workflows {
+			m.workflows = nil
 		}
-	}
-	m := exploreProject()
-	if items[m.defaultMainMenuCursor()] != "Run workflow" {
-		t.Fatal("workflow default")
-	}
-	m.workflows = nil
-	if items[m.defaultMainMenuCursor()] != "Run commands" {
-		t.Fatal("command default")
-	}
-	m.config = mdl.Config{}
-	if items[m.defaultMainMenuCursor()] != "Edit project" {
-		t.Fatal("empty project default")
-	}
-	m.projectDir = ""
-	m.mainMenuCursor = 3
-	m.gotoMainMenu()
-	if m.listCursor != 3 {
-		t.Fatal("return lost selection")
+		if !tc.commands {
+			m.config = mdl.Config{}
+		}
+		m.gotoPostLoad()
+		if m.screen != tc.want {
+			t.Fatalf("got %v want %v", m.screen, tc.want)
+		}
 	}
 }

@@ -12,7 +12,7 @@ them. Everything needed to produce a valid project is on this page, and
 | `commands.tsv` | yes — command definitions (the baton TUI also appends, edits, or deletes individual rows on user request; untargeted lines are never touched) |
 | `lists/<name>.tsv` | yes — selection lists for `{slot}` placeholders |
 | `vars.tsv` | `*` rows: freely. Command-scoped rows: edit the **value** column only — baton creates the rows, and the first two columns are addresses (see vars.tsv below) |
-| `commands.local.json`, `workflows.json`, `.last_workflow`, `.command_names`, `.last_shell`, `.command_sort` | **never** — owned and written by the baton TUI (the last two remember UI choices: the shell picked for the previous command, and the sort order of the Run commands list) |
+| `commands.local.json`, `workflows.json`, `.last_workflow`, `.command_names`, `.last_shell`, `.command_sort`, `.last_run_tab` | **never** — owned and written by the baton TUI (the last three remember UI choices: the shell picked for the previous command, the sort order of the Run commands list, and the last Run workspace tab) |
 | `<projects-dir>/.baton-recent/` | **never** — app-managed recent command references and file-picker cursor preferences |
 
 ## Directory layout

@@ -44,7 +44,7 @@ func (m Model) shortRunQueue(w int) string {
 		lines = append(lines, line)
 	}
 	if n == 0 {
-		lines = append(lines, gray("No commands selected · Tab to add"))
+		lines = append(lines, gray("Tab: add commands in execution order"))
 	}
 	return strings.Join(lines, "\n")
 }

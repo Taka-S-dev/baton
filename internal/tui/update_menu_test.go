@@ -39,7 +39,8 @@ func TestMainMenu_EveryItemResponds(t *testing.T) {
 		}
 
 		m := &Model{}
-		m.gotoMainMenu()
+		m.screen = ScreenMainMenu
+		m.listItems = mainMenuItems()
 		m.listCursor = i
 		nm, cmd := m.updateMainMenu(tea.KeyMsg{Type: tea.KeyEnter})
 		got := nm.(Model)

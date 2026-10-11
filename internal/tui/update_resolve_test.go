@@ -284,16 +284,16 @@ func TestUpdateMultiSelect_EscDiscardGuard(t *testing.T) {
 	m = nm.(Model)
 	nm, _ = m.updateMultiSelect(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m = nm.(Model)
-	if m.screen != ScreenMainMenu {
-		t.Fatalf("second Esc: screen=%v, want main menu", m.screen)
+	if m.screen != ScreenProjectSelect {
+		t.Fatalf("second Esc: screen=%v, want projects", m.screen)
 	}
 
 	m2 := msModel([]msItem{{cmd: &a}})
 	m2.screen = ScreenRunCommands
 	nm, _ = m2.updateMultiSelect(tea.KeyMsg{Type: tea.KeyEscape})
 	m2 = nm.(Model)
-	if m2.screen != ScreenMainMenu {
-		t.Fatalf("no selection: screen=%v, want main menu after one Esc", m2.screen)
+	if m2.screen != ScreenProjectSelect {
+		t.Fatalf("no selection: screen=%v, want projects after one Esc", m2.screen)
 	}
 }
 

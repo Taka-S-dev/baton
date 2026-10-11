@@ -110,8 +110,8 @@ func TestUpdateRunWorkflow_SearchKeys(t *testing.T) {
 	}
 	nm, _ = m.updateRunWorkflow(tea.KeyMsg{Type: tea.KeyEscape})
 	m = nm.(Model)
-	if m.screen != ScreenMainMenu {
-		t.Fatalf("second Esc: screen=%v, want main menu", m.screen)
+	if m.screen != ScreenProjectSelect {
+		t.Fatalf("second Esc: screen=%v, want projects", m.screen)
 	}
 }
 
@@ -355,7 +355,7 @@ func TestRunCompletion_IgnoresTheKeyBurst(t *testing.T) {
 	// Once it has settled, a real keypress returns to the menu.
 	m = newDone(settleAfterRun + 10*time.Millisecond)
 	nm, _ := m.Update(enter)
-	if got := nm.(Model); got.screen != ScreenMainMenu || got.running != nil {
+	if got := nm.(Model); got.screen != ScreenRunCommands || got.running != nil {
 		t.Fatalf("after settling a key must return to the menu, screen=%v running=%v", got.screen, got.running)
 	}
 }

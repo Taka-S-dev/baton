@@ -56,7 +56,7 @@ baton/
 │       ├── update_*.go                             # Menu, run, slot resolution, command/variable/list editing, rename repair
 │       ├── explore_*.go, view_explore.go           # Edit project: tabs, in-place editors, action popup, leave prompt
 │       ├── run_*.go                                # Run commands / Run workflow: queue, step review, mouse
-│       ├── projects.go, main_menu_*.go             # Project picker and main menu
+│       ├── projects.go, run_home.go                # Project picker and Run tabs
 │       └── help.go, syntax.go, search_highlight.go # Help overlay, placeholder colouring, match highlighting
 └── projects.example/         # Sample projects (JSON and TSV) to copy as a starting point
 ```
@@ -128,7 +128,9 @@ any-folder/                  (Windows, or portable install)
         └── commands.tsv
 ```
 
-If multiple projects exist, baton shows a selection screen on startup. Use **Switch project** from the main menu to switch projects at any time.
+If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `F7` / `F8` (or click a tab) to switch, `F4` to open the selected item in the project editor, and `Esc` to go back to the project picker (or click **Projects**). Ordinary typing always searches.
+
+The last Run tab is remembered per project in the app-managed `.last_run_tab`. On first use, projects with workflows open Workflows; otherwise they open Commands. An empty project offers `F4` to add its first command. Switching Run tabs and returning from the editor preserve searches, cursors, and command execution order; deleted commands are removed from that selection. `baton r` remains the separate directory-scoped recent-command launcher.
 
 ## Configuration
 
@@ -231,7 +233,7 @@ The actual command line is recomputed from `template` + `vars.tsv` on every load
 Command names are the reference key everywhere — workflow steps, the `template` field of derived commands, and per-command `vars.tsv` rows all point at them. Renames keep those references intact from either direction:
 
 - **In the TUI** (Edit command), every reference is rewritten in the same save.
-- **By hand in `commands.tsv` / `commands.json`** — just change the name. baton records each command's name and content fingerprint in `.command_names` (app-managed, like `.last_workflow`), so the next start recognizes "a referenced name vanished, the same content reappeared under a new one" as a rename and offers a one-key repair before the main menu:
+- **By hand in `commands.tsv` / `commands.json`** — just change the name. baton records each command's name and content fingerprint in `.command_names` (app-managed, like `.last_workflow`), so the next start recognizes "a referenced name vanished, the same content reappeared under a new one" as a rename and offers a one-key repair before the Run workspace:
 
 ```
   Rename detected
@@ -253,7 +255,7 @@ Use `{name}` placeholders in `cmd` or `workdir` to prompt for a value at runtime
 
 ### Selection lists
 
-Create lists via **Edit project → Lists** from the main menu. Each list is stored as a `.tsv` file in `projects/<name>/lists/`:
+Create lists via **F4 → Lists** from the Run workspace. Each list is stored as a `.tsv` file in `projects/<name>/lists/`:
 
 ```
 /home/user/api    api
@@ -404,7 +406,7 @@ in CI, or as the verification loop when generating project files with an
 AI agent — the complete file spec, shared by hand-editors and agents,
 lives in [AGENTS.md](AGENTS.md).
 
-The main menu puts **Run workflow** and **Run commands** first. Use **Edit project** for definitions and **Switch project** to choose another project.
+The Run workspace has **Workflows** (`F7`) and **Commands** (`F8`) tabs. `F4` opens **Edit project** at the current tab and item; `Esc` goes back to the project picker; clear search and confirm discarding selections first if needed. You can also click **Projects**. `F1` shows the available keys; `Ctrl+C` quits.
 
 ### Projects
 

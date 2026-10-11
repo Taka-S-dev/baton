@@ -168,6 +168,9 @@ func (m Model) renderScreen(w int) string {
 			view = m.viewExplore(w)
 		}
 	}
+	if m.runHomeVisible() {
+		view = m.viewRunHome(view, w)
+	}
 	return view
 }
 
@@ -1077,7 +1080,11 @@ func (m Model) rows() int {
 // termHeight is what the frame may occupy: the terminal less the rows
 // the banner takes under it.
 func (m Model) termHeight() int {
-	return max(1, m.rows()-m.bannerRows)
+	reserved := 0
+	if m.runHomeVisible() {
+		reserved = 1
+	}
+	return max(1, m.rows()-m.bannerRows-reserved)
 }
 
 // bannerLines renders what goes under the frame: an error, a success
@@ -1092,7 +1099,7 @@ func (m Model) bannerLines() []string {
 	if m.successMsg != "" {
 		out = append(out, success("  ✓ "+m.successMsg))
 	}
-	if len(m.loadWarnings) > 0 && m.screen == ScreenMainMenu {
+	if len(m.loadWarnings) > 0 && (m.screen == ScreenMainMenu || m.runHomeVisible()) {
 		// The warnings are a pointer to `baton check`, not the report
 		// itself, so they never take more of the terminal than the menu
 		// they are pointing away from.

@@ -269,7 +269,7 @@ func (m Model) updateRunWorkflow(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateStepsViewport()
 			return m, nil
 		}
-		m.gotoMainMenu()
+		m.openRunProjects()
 	default:
 		prev := m.wfSearchTI.Value()
 		var cmd tea.Cmd

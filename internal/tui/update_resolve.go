@@ -215,7 +215,7 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.gotoWorkflowMgmt()
 			return m, nil
 		}
-		m.gotoMainMenu()
+		m.openRunProjects()
 	default:
 		prevSearch := m.msSearchTI.Value()
 		var cmd tea.Cmd

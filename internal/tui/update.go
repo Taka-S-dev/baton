@@ -17,7 +17,7 @@ type runSummaryPrintedMsg struct{}
 // someone reading the screen.
 const settleAfterRun = 500 * time.Millisecond
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if result, ok := msg.(pathCompletionResult); ok {
 		return m.receivePathCompletion(result)
 	}

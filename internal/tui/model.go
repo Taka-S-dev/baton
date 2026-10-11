@@ -398,6 +398,8 @@ func shellFormLabel() string {
 
 // Model is the main bubbletea model.
 type Model struct {
+	runHome runHomeState
+
 	launchDir        string
 	recentActive     bool
 	exitAfterRun     bool
@@ -638,6 +640,7 @@ func (m *Model) loadProject(projectDir string) error {
 	if err != nil {
 		return err
 	}
+	m.runHome = runHomeState{}
 	m.projectDir = projectDir
 	m.configFile = p.Files
 	m.config = p.Config
@@ -736,15 +739,13 @@ func (m *Model) gotoMainMenu() {
 		return
 	}
 	m.exploreLaunched = false
-	m.screen = ScreenMainMenu
-	m.listItems = mainMenuItems()
+	m.openRunHome()
 	// Re-diagnose so the warnings describe the current state — TUI
 	// edits since load (deleted commands, workflows, …) are reflected.
 	if m.projectDir != "" {
 		m.loadWarnings = config.Diagnose(m.config, m.workflows, m.lists, m.vars)
 		m.writeSnapshot()
 	}
-	m.listCursor = m.mainMenuCursor
 }
 
 // Init implements tea.Model.

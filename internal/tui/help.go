@@ -16,6 +16,9 @@ func (m Model) helpGeometry(w int) actionPopupLayout {
 
 func (m Model) helpLines(w int) []string {
 	lines := []string{"Current screen"}
+	if m.runHomeVisible() {
+		lines = append(lines, "F7 Workflows · F8 Commands · click a tab to switch", "F4 Edit selected item · Esc Back to projects · Ctrl+C Quit", "Esc first clears search or leaves queue focus; selected commands require discard confirmation. Click Projects to open the project picker directly.", "Tab changes preserve search, cursor and command execution order.")
+	}
 	if m.screen == ScreenRecent {
 		lines = append(lines, "Type to filter · ↑↓ Move · Enter Select", "Esc Clear search / Quit · Ctrl+R Refresh", "Delete Remove from this directory’s history", "Ctrl+Z Undo the last removal", "Command definitions are never deleted.", "F1 / Esc Close help")
 	} else if m.screen == ScreenProjectSelect {
