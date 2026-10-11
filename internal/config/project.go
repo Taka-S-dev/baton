@@ -79,7 +79,7 @@ func LoadProject(projectDir string) (Project, error) {
 }
 
 // Diagnose runs the consistency checks over an in-memory project state.
-// It is re-run whenever the TUI returns to the main menu, so warnings
+// It is re-run whenever the TUI returns to the Run workspace, so warnings
 // always describe the current state rather than the state at load time.
 func Diagnose(cfg model.Config, workflows []model.Workflow, lists map[string][]model.ListEntry, vars map[string]string) []string {
 	var warnings []string

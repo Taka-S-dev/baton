@@ -12,8 +12,8 @@ import (
 // ── Rename repair ─────────────────────────────────────────────────────────────
 //
 // Commands renamed by hand in commands.tsv / commands.json are detected
-// at load (see config.DetectRenames) and offered here, before the main
-// menu: one Enter rewrites every reference to the new names, Esc keeps
+// at load (see config.DetectRenames) and offered here, before the Run
+// workspace: one Enter rewrites every reference to the new names, Esc keeps
 // the files as they are and leaves the usual warnings.
 
 func (m *Model) gotoRenameRepair() {

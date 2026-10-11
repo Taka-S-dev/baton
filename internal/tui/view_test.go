@@ -82,8 +82,7 @@ func TestViewMultiSelect_FixedHeight(t *testing.T) {
 
 // TestTruncate checks the shared shortener every view uses: text that
 // fits is untouched, longer text is cut to the limit including the
-// ellipsis, and multi-byte text is cut on rune boundaries — the reason
-// this replaced the byte slicing each view used to do.
+// ellipsis, and multi-byte text is cut on rune boundaries.
 func TestTruncate(t *testing.T) {
 	cases := []struct {
 		in     string
@@ -627,10 +626,6 @@ func TestSubmenusShowEveryChoice(t *testing.T) {
 		}
 	}
 }
-
-// too short for eight entries used to render all of them and let the
-// terminal scroll the top ones away — including, at four lines, every
-// entry above the cursor.
 
 // frameLines is how many terminal lines a view occupies. View trims the
 // frame's trailing newline — it would carry the cursor onto a further
