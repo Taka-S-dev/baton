@@ -598,6 +598,7 @@ func newModel(dryRun, recent bool) (Model, error) {
 		return Model{}, err
 	}
 	projects := config.ListProjects(projectsDir)
+	store.SortProjectsByRecent(projectsDir, projects)
 
 	cmdCounts := make(map[string]int, len(projects))
 	for _, p := range projects {
@@ -664,7 +665,26 @@ func (m *Model) loadProject(projectDir string) error {
 	m.snapOld = config.LoadSnapshot(projectDir)
 	m.renames = config.DetectRenames(p.Config, p.Workflows, p.Vars, m.snapOld)
 	m.renameBtn = 1
+	m.rememberProject()
 	return nil
+}
+
+// rememberProject moves a project inside the projects directory to the
+// top of the picker. Best-effort, like SaveLastWorkflow: a read-only
+// projects directory only costs the ordering.
+func (m *Model) rememberProject() {
+	if m.projectsDir == "" {
+		return
+	}
+	base, err := filepath.Abs(m.projectsDir)
+	if err != nil {
+		return
+	}
+	project, err := filepath.Abs(m.projectDir)
+	if err != nil || filepath.Dir(project) != base {
+		return
+	}
+	_ = store.RecordProjectOpen(base, filepath.Base(project))
 }
 
 // gotoPostLoad enters the rename-repair offer when loading detected

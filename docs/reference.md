@@ -102,7 +102,7 @@ any-folder/                  (Windows, or portable install)
         └── commands.tsv
 ```
 
-If multiple projects exist, baton shows a project picker on startup. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `1` / `2` (or click a tab) to switch, `e` to open the selected item in the project editor, and `p` to open the project picker (`Esc` also goes back).
+If multiple projects exist, baton shows a project picker on startup, most recently opened first; projects never opened follow in name order. Opening a project goes directly to the Run workspace: **Workflows** and **Commands** tabs. Use `1` / `2` (or click a tab) to switch, `e` to open the selected item in the project editor, and `p` to open the project picker (`Esc` also goes back).
 
 The last Run tab is remembered per project in the app-managed `.last_run_tab`. On first use, projects with workflows open Workflows; otherwise they open Commands. An empty project offers `e` to add its first command. Switching Run tabs and returning from the editor preserve searches, cursors, and command execution order; deleted commands are removed from that selection. `baton r` remains the separate directory-scoped recent-command launcher.
 

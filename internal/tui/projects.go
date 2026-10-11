@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Taka-S-dev/baton/internal/config"
+	"github.com/Taka-S-dev/baton/internal/store"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -29,6 +30,7 @@ func (m Model) visibleProjects() []string {
 
 func (m *Model) refreshProjects() {
 	m.projects = config.ListProjects(m.projectsDir)
+	store.SortProjectsByRecent(m.projectsDir, m.projects)
 	m.projectCmdCounts = map[string]int{}
 	for _, name := range m.projects {
 		if name == ".baton-trash" {
