@@ -8,7 +8,10 @@ import (
 )
 
 func (m Model) viewRunWorkflow(w int) string {
-	if w < 100 || m.termHeight() < 20 {
+	if splitPanels(w) && m.shortPanels() {
+		return m.viewShortWorkflowSplit(w)
+	}
+	if !splitPanels(w) {
 		return m.viewRunWorkflowList(w)
 	}
 	leftW := w / 3
@@ -42,17 +45,26 @@ func (m Model) viewRunWorkflow(w int) string {
 		})
 	}
 	right := box(truncate(title, rightW-4), detail.String(), rightW, m.termHeight()-1, false)
-	footer := "↑↓ Select · Tab/→ Steps · F2 Details · Enter Review · Esc Back · F1 Help"
+	footer := "↑↓ Move · Enter Continue · Tab/→ Steps · F2 Details · Esc Back · F1 Help"
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right) + "\n" + gray(truncate(footer, w)) + "\n"
 }
 
-func (m Model) workflowDetailsInline() bool { return m.viewWidth() >= 100 && m.termHeight() >= 20 }
+func (m Model) workflowDetailsInline() bool { return splitPanels(m.viewWidth()) }
 
 func (m Model) viewRunWorkflowSteps(w int) string {
 	if m.wfp == nil {
 		return ""
 	}
-	if w < 100 || m.termHeight() < 20 {
+	if m.shortPanels() {
+		if splitPanels(w) {
+			return joinPanels(m.shortWorkflowSteps(w/2), m.shortWorkflowDetail(w-w/2-3), w, w/2, m.termHeight())
+		}
+		if m.runWorkflowDetail {
+			return m.shortWorkflowDetail(w)
+		}
+		return m.shortWorkflowSteps(w)
+	}
+	if !splitPanels(w) {
 		if m.runWorkflowDetail {
 			return m.workflowRunDetail(w)
 		}

@@ -47,7 +47,6 @@ func TestReservedExtensionsAndFolderSelection(t *testing.T) {
 	}
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyTab})
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.screen != ScreenConfirmRun || !strings.Contains(m.confirmRunItems[0].Cmd.Cmd, "child.go") {
 		t.Fatal("reserved token did not resolve")
 	}
@@ -87,7 +86,7 @@ func TestFolderNavigationKeepsCheckedFiles(t *testing.T) {
 	}
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyTab})
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if len(m.sp.picked) != 2 {
+	if m.screen != ScreenConfirmRun || !strings.Contains(m.confirmRunItems[0].Cmd.Cmd, "test.go") || !strings.Contains(m.confirmRunItems[0].Cmd.Cmd, "child.go") {
 		t.Fatal("cross-directory selections lost")
 	}
 }

@@ -20,7 +20,6 @@ func TestPathFocusRestoredWithoutSelecting(t *testing.T) {
 	m := start("build", base)
 	m = queryCompletion(m, "日本語")
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.screen != ScreenConfirmRun {
 		t.Fatal("selection did not reach review")
 	}

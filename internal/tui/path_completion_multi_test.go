@@ -44,10 +44,6 @@ func TestDropdownMultiSelectionAcrossFilters(t *testing.T) {
 	}
 	m = queryCompletion(m, "no-such-file")
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.sp.completion != nil || m.screen != ScreenSlotPick || !reflect.DeepEqual(m.sp.picked, []string{"test.go", "templates.txt"}) {
-		t.Fatal("Enter did not apply hidden selections in selection order")
-	}
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.screen != ScreenConfirmRun || m.confirmRunItems[0].Cmd.Cmd != "echo test.go templates.txt" {
 		t.Fatal("selected values did not reach execution review")
 	}

@@ -16,17 +16,23 @@ func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.X < 0 || msg.X >= w || msg.Y < 0 {
 		return m, nil
 	}
-	split := w >= 100 && m.termHeight() >= 20
+	split := splitPanels(w)
 	leftW := w
 	if split {
 		leftW = w / 2
 	}
 	if (split && msg.X > leftW) || (!split && m.runQueueFocused) {
 		queueH := max(5, m.termHeight()/2)
+		if m.shortPanels() {
+			queueH = m.termHeight() + 1
+		}
 		if msg.Y < 1 || msg.Y >= queueH-1 {
 			return m, nil
 		}
 		rows := max(1, queueH-3)
+		if m.shortPanels() {
+			rows = max(1, m.termHeight()-1)
+		}
 		start := windowStart(rows, len(m.msSelected), min(m.runQueueCursor, max(0, len(m.msSelected)-1)))
 		row := msg.Y - 1
 		index := start + row

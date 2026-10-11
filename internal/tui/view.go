@@ -532,8 +532,10 @@ func (m Model) viewRunWorkflowList(w int) string {
 
 	if len(m.workflows) == 0 {
 		b.WriteString("  " + gray("(no workflows saved)") + "\n")
-		b.WriteString("\n" + hline(w) + "\n")
-		b.WriteString("  " + gray("Esc: back") + "\n")
+		if m.termHeight() >= 18 {
+			b.WriteString("\n" + hline(w) + "\n")
+			b.WriteString("  " + gray("Esc Back · F1 Help") + "\n")
+		}
 		return b.String()
 	}
 
@@ -559,6 +561,9 @@ func (m Model) viewRunWorkflowList(w int) string {
 		// opens with; without the preview the list gets both rows.
 		below -= 2
 	}
+	if m.termHeight() < 18 {
+		stepsH, below = 0, 0
+	}
 	viewH := m.listBudget(&b, stepsH+below)
 	writeWindowedList(&b, viewH, n, cur, "No results.", func(i int) string {
 		wf := m.workflows[filtered[i]]
@@ -583,8 +588,17 @@ func (m Model) viewRunWorkflowList(w int) string {
 		b.WriteString(m.stepsVP.View() + "\n")
 	}
 
-	b.WriteString(gap + hline(w) + "\n")
-	b.WriteString("  " + gray("Type to search  ↑↓ Enter Esc  Tab/→: pick steps  F2: details") + "\n")
+	if m.termHeight() >= 18 {
+		b.WriteString(gap + hline(w) + "\n")
+		b.WriteString("  " + gray("↑↓ Move  Enter Continue  Tab/→ Steps  F2 Details  Esc Back  F1 Help") + "\n")
+	}
+	if m.termHeight() < 18 {
+		lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+		for len(lines) < m.termHeight() {
+			lines = append(lines, " ")
+		}
+		return strings.Join(lines, "\n")
+	}
 	return b.String()
 }
 
@@ -595,6 +609,9 @@ func (m Model) viewMultiSelectList(w int) string {
 }
 
 func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func(int, int)) string {
+	if m.shortPanels() {
+		return m.viewCompactCandidates(w, hitRow...)
+	}
 	title := "Select commands"
 	if m.screen == ScreenEditWorkflowCommands {
 		title = "Edit commands"
@@ -603,7 +620,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 	n := len(filtered)
 
 	terms := strings.Fields(m.msSearchTI.Value())
-	orderW := max(3, len(fmt.Sprint(len(m.msSelected))))
+	orderW := max(3, len(fmt.Sprint(len(m.msSelected)))+2)
 	columnW, matchW := max(1, w-3-orderW), 0
 	if len(terms) > 0 && columnW >= 48 {
 		matchW = min(32, columnW/3)
@@ -666,10 +683,10 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 		origIdx := filtered[i]
 		item := m.msItems[origIdx]
 
-		check := fmt.Sprintf("%-*s", orderW, "—")
+		check := gray(fmt.Sprintf("%-*s", orderW, "[ ]"))
 		for order, selected := range m.msSelected {
 			if selected == origIdx {
-				check = sSelNum.Render(fmt.Sprintf("%-*d", orderW, order+1))
+				check = sSelNum.Render(fmt.Sprintf("%-*s", orderW, fmt.Sprintf("[%d]", order+1)))
 				break
 			}
 		}
@@ -1337,6 +1354,13 @@ func (m Model) viewEditCommandPick(w int) string {
 // screen. The view and the ↑↓ handler share it so scrolling stops exactly
 // at the last page.
 func (m Model) confirmRunPerPage() int {
+	if m.termHeight() < 18 {
+		_, same := m.confirmCommonDirectory()
+		if same {
+			return max(1, m.termHeight()-5)
+		}
+		return max(1, (m.termHeight()-5)/2)
+	}
 	var b strings.Builder
 	m.writeHeadingUnder(&b, "Confirm", m.width, 20)
 	// Below the items: the "n more" line, a blank, the rule, a blank, the
@@ -1367,6 +1391,9 @@ func confirmGap(m Model) string {
 }
 
 func (m Model) viewConfirmRun(w int) string {
+	if m.termHeight() < 18 {
+		return m.viewCompactConfirm(w)
+	}
 	var b strings.Builder
 	m.writeHeadingUnder(&b, "Review & run", w, 20)
 
@@ -1868,6 +1895,9 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 // ── Run workflow: per-run step selection ──────────────────────────────────────
 
 func (m Model) viewRunWorkflowStepsList(w int, hitRow ...func(int, int)) string {
+	if m.shortPanels() {
+		return m.shortWorkflowSteps(w, hitRow...)
+	}
 	var b strings.Builder
 	p := m.wfp
 	if p == nil || p.wfIdx >= len(m.workflows) {

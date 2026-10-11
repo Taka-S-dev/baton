@@ -101,7 +101,7 @@ func TestPathCompletionRankingAndNestedPaths(t *testing.T) {
 	}
 }
 
-func TestPathCompletionInsertDoesNotConfirmOrRun(t *testing.T) {
+func TestPathCompletionTabInsertsBeforeConfirm(t *testing.T) {
 	d := completionFixture(t)
 	m := completionModel(t, d)
 	m.sp.search = "te"
@@ -115,13 +115,13 @@ func TestPathCompletionInsertDoesNotConfirmOrRun(t *testing.T) {
 	if m.sp.completion == nil || m.sp.search != "test.go" {
 		t.Fatal("typing closed dropdown")
 	}
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyTab})
 	if m.screen != ScreenSlotPick || m.sp.completion != nil || m.sp.search != "test.go" || m.sp.cursor != len(m.sp.filtered) {
-		t.Fatal("Enter should only insert")
+		t.Fatal("Tab should only insert")
 	}
 	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.screen != ScreenConfirmRun || m.confirmRunItems[0].Cmd.Cmd != "echo test.go" {
-		t.Fatal("second Enter should reach execution review")
+		t.Fatal("Enter should reach execution review")
 	}
 }
 
@@ -135,7 +135,7 @@ func TestPathCompletionUniqueFolderAndStaleReads(t *testing.T) {
 		t.Fatal("reserved picker must stay open")
 	}
 	m = queryCompletion(m, "testdir/")
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyTab})
 	if m.sp.search != "testdir/child.go" {
 		t.Fatalf("child not completed: %q", m.sp.search)
 	}

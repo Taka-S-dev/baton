@@ -404,6 +404,8 @@ type Model struct {
 	recentRows       []recentRow
 	recentSearch     string
 	recentCursor     int
+	recentUndo       *recentRow
+	recentNotice     string
 	dryRun           bool
 	projectMode      string
 	projectInput     string

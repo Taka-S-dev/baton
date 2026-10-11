@@ -117,3 +117,32 @@ func LoadRecent(projectsDir, cwd string) ([]RecentEntry, error) {
 	}
 	return entries, firstErr
 }
+
+func RemoveRecent(projectsDir string, entry RecentEntry) error {
+	cwd, err := filepath.Abs(entry.Directory)
+	if err != nil {
+		return err
+	}
+	project, err := filepath.Abs(entry.Project)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(recentDirectory(projectsDir, cwd), recentHash(recentPathKey(project)+"\x00"+entry.Command)+".json")
+	err = os.Remove(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+func RestoreRecent(projectsDir string, entry RecentEntry) error {
+	entries, err := LoadRecent(projectsDir, entry.Directory)
+	if err != nil {
+		return err
+	}
+	for _, current := range entries {
+		if recentPathKey(current.Project) == recentPathKey(entry.Project) && current.Command == entry.Command && !current.UsedAt.Before(entry.UsedAt) {
+			return nil
+		}
+	}
+	return RecordRecent(projectsDir, entry.Directory, entry.Project, entry.Command, entry.UsedAt)
+}

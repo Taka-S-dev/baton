@@ -220,7 +220,7 @@ func TestRecentCompactLayoutAndMouse(t *testing.T) {
 	if !strings.Contains(lines[p.browseY], "Browse projects") || !strings.Contains(lines[p.browseY-1], "─") {
 		t.Fatal("browse not separated")
 	}
-	if !strings.Contains(view, "Search recent commands") || !strings.Contains(view, "Preview") || !strings.Contains(view, "Enter Select") {
+	if !strings.Contains(view, "Search recent commands") || !strings.Contains(view, "Selected command") || !strings.Contains(view, "Enter Select") {
 		t.Fatal("missing visual hierarchy")
 	}
 	nm, cmd := m.updateRecentMouse(tea.MouseMsg{X: p.x + 1, Y: p.browseY - 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})

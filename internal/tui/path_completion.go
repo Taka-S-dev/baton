@@ -163,7 +163,14 @@ func (m Model) updatePathCompletion(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		fallthrough
+		if !p.loading && p.err == nil && len(p.entries) > 0 {
+			if m.pathCandidateSelectable(p.entries[p.cursor]) {
+				m.insertPathCandidate(p.entries[p.cursor].value)
+			} else {
+				return m.updatePathCompletion(tea.KeyMsg{Type: tea.KeyEnter})
+			}
+		}
+		return m, nil
 	case "down":
 		if len(p.entries) > 0 {
 			p.cursor = (p.cursor + 1) % len(p.entries)
@@ -196,15 +203,20 @@ func (m Model) updatePathCompletion(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				p.toggle(p.entries[p.cursor].value)
 			}
+			if len(p.draft) == 0 {
+				m.sp.picked = nil
+				return m, nil
+			}
 			m.sp.picked = append([]string(nil), p.draft...)
 			m.sp.search = ""
 			m.sp.applyFilter()
 			m.sp.cursor = len(m.sp.filtered)
 			m.sp.completion = nil
-			return m, nil
+			return m.confirmCompletedPath()
 		}
 		if !p.loading && p.err == nil && len(p.entries) > 0 && m.pathCandidateSelectable(p.entries[p.cursor]) {
 			m.insertPathCandidate(p.entries[p.cursor].value)
+			return m.confirmCompletedPath()
 		}
 	case "backspace", "ctrl+u":
 		if msg.String() == "ctrl+u" {
@@ -301,7 +313,7 @@ func completePathsFor(base, query, kind string, extensions []string) ([]pathCand
 		if out[i].score != out[j].score {
 			return out[i].score < out[j].score
 		}
-		return out[i].value < out[j].value
+		return naturalPathLess(out[i].value, out[j].value)
 	})
 	return out, nil
 }
@@ -412,4 +424,11 @@ func (m Model) parentPathCompletion() tea.Cmd {
 	cmd := m.refilterPathCompletion()
 	m.sp.completion.focusValue = focus
 	return cmd
+}
+
+func (m Model) confirmCompletedPath() (tea.Model, tea.Cmd) {
+	if m.resolve == nil && m.sce == nil {
+		return m, nil
+	}
+	return m.updateSlotPick(tea.KeyMsg{Type: tea.KeyEnter})
 }

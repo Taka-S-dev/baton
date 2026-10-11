@@ -16,7 +16,7 @@ func TestPathReadinessOnlyAfterSelection(t *testing.T) {
 		t.Fatal("hover treated as completed")
 	}
 	m = queryCompletion(m, "test.go")
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyTab})
 	view := stripStyle(m.View())
 	for _, want := range []string{"✓ Inputs complete", "✓ File selected: test.go", "Enter: review run"} {
 		if !strings.Contains(view, want) {
@@ -33,7 +33,7 @@ func TestPathReadinessCountsLaterInputs(t *testing.T) {
 	nm, read := (Model{width: 120, height: 40}).startResolveFlow([]msItem{{cmd: &cmd}})
 	m := completionResult(nm.(Model), read)
 	m = queryCompletion(m, "test.go")
-	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = completionKey(m, tea.KeyMsg{Type: tea.KeyTab})
 	if m.inputProgressLabel() != "Inputs 1/2 complete" || !strings.Contains(m.pathInputKeys(), "next input") {
 		t.Fatal("later input ignored")
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/Taka-S-dev/baton/internal/config"
@@ -82,6 +83,9 @@ func (m Model) recentFiltered() []int {
 	return result
 }
 func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() != "delete" && msg.String() != "ctrl+z" {
+		m.recentNotice = ""
+	}
 	filtered := m.recentFiltered()
 	n := len(filtered) + 1 // browse is always available, including an empty history
 	switch msg.String() {
@@ -89,6 +93,10 @@ func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.recentCursor = (m.recentCursor + n - 1) % n
 	case "down":
 		m.recentCursor = (m.recentCursor + 1) % n
+	case "delete":
+		return m.removeRecentSelection()
+	case "ctrl+z":
+		return m.undoRecentRemoval()
 	case "ctrl+r":
 		m.gotoRecent()
 	case "esc":
@@ -147,15 +155,28 @@ func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 type recentLayout struct{ x, width, rows, start, listY, browseY int }
 
 func (m Model) recentGeometry(w int) recentLayout {
+	if splitPanels(w) && m.shortPanels() {
+		w = w / 2
+	}
 	x := 2
 	if w < 20 {
 		x = 0
 	}
 	n := len(m.recentFiltered())
-	rows := min(max(1, n), min(8, max(1, m.termHeight()-11)))
-	return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: windowStart(rows, n, min(m.recentCursor, max(0, n-1))), listY: 5, browseY: 9 + rows}
+	if m.shortPanels() {
+		rows := min(max(1, n), max(1, m.termHeight()-3))
+		return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: windowStart(rows, n, min(m.recentCursor, max(0, n-1))), listY: 2, browseY: 2 + rows}
+	}
+	rows := min(max(1, n), min(8, max(1, m.termHeight()-14)))
+	return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: windowStart(rows, n, min(m.recentCursor, max(0, n-1))), listY: 5, browseY: 10 + rows}
 }
 func (m Model) viewRecent(w int) string {
+	if splitPanels(w) && m.shortPanels() {
+		return joinPanels(m.viewRecentCompact(w), m.recentSidePreview(w-w/2-3), w, w/2, m.termHeight())
+	}
+	if m.shortPanels() {
+		return m.viewRecentCompact(w)
+	}
 	p := m.recentGeometry(w)
 	filtered := m.recentFiltered()
 	rule := gray(strings.Repeat("─", p.width))
@@ -163,10 +184,10 @@ func (m Model) viewRecent(w int) string {
 	if m.recentSearch != "" {
 		search = "/ " + m.recentSearch + "_"
 	}
-	lines := []string{accentBold("[ Recent commands ]"), gray("In: " + m.launchDir), "", search, rule}
+	lines := []string{accentBold("[ Recent commands ]"), gray("In: " + m.launchDir), gray(fmt.Sprintf("%d matches / %d recent", len(filtered), len(m.recentRows))), search, rule}
 	rowLine := func(label string, selected bool) string {
 		if selected {
-			return sRowActive.Width(p.width).Render(ansi.Truncate("▶ "+ansi.Strip(label), p.width, "…"))
+			return sRowActive.Width(p.width).Render(ansi.Truncate("▶ "+label, p.width, "…"))
 		}
 		return "  " + label
 	}
@@ -181,24 +202,38 @@ func (m Model) viewRecent(w int) string {
 			continue
 		}
 		entry := m.recentRows[filtered[i]]
-		label := entry.ref.Command + gray("  · "+filepath.Base(entry.ref.Project))
-		if entry.problem != "" {
-			label += gray("  [unavailable]")
+		nameWidth := 0
+		for _, index := range filtered {
+			nameWidth = max(nameWidth, ansi.StringWidth(m.recentRows[index].ref.Command))
 		}
-		lines = append(lines, rowLine(label, i == m.recentCursor))
+		nameWidth = min(nameWidth, max(8, p.width/2))
+		name := ansi.Truncate(entry.ref.Command, nameWidth, "…")
+		label := name + strings.Repeat(" ", max(0, nameWidth-ansi.StringWidth(name))) + "  · " + filepath.Base(entry.ref.Project)
+		if entry.problem != "" {
+			label += "  [unavailable]"
+		}
+		age := recentAge(entry.ref.UsedAt, time.Now())
+		if p.width >= 48 && age != "" {
+			label = ansi.Truncate(label, p.width-ansi.StringWidth(age)-4, "…")
+			label += strings.Repeat(" ", max(2, p.width-2-ansi.StringWidth(label)-ansi.StringWidth(age))) + age
+		}
+		lines = append(lines, rowLine(recentHighlight(label, m.recentSearch, i == m.recentCursor), i == m.recentCursor))
 	}
-	preview := "Preview"
+	preview := "Selected command"
+	if m.recentCursor >= len(filtered) {
+		preview = "Browse projects"
+	}
 	if len(filtered) > p.rows {
-		preview += fmt.Sprintf("  · %d–%d / %d", p.start+1, min(p.start+p.rows, len(filtered)), len(filtered))
+		lines[2] += gray(fmt.Sprintf(" · showing %d–%d", p.start+1, min(p.start+p.rows, len(filtered))))
 	}
-	lines = append(lines, gray("── "+preview+" "+strings.Repeat("─", max(0, p.width-ansi.StringWidth(preview)-4))))
+	lines = append(lines, "", gray("  "+preview))
 	cmdLine, dirLine := gray("Choose a project to find more commands."), ""
 	if m.recentCursor < len(filtered) {
 		entry := m.recentRows[filtered[m.recentCursor]]
 		if entry.problem != "" {
 			cmdLine = warn(entry.problem)
 		} else {
-			cmdLine = "$ " + entry.command.Cmd
+			cmdLine = "$ " + recentHighlight(entry.command.Cmd, m.recentSearch, false)
 			dir := entry.command.Dir
 			if dir == "" {
 				dir = m.launchDir
@@ -206,7 +241,7 @@ func (m Model) viewRecent(w int) string {
 			dirLine = gray("workdir: " + dir)
 		}
 	}
-	lines = append(lines, cmdLine, dirLine, rule, rowLine("Browse projects…", m.recentCursor == len(filtered)))
+	lines = append(lines, gray("  │ ")+cmdLine, gray("  │ ")+dirLine, rule, recentBrowseRow(p.width, m.recentCursor == len(filtered)))
 	footer := "↑↓ Move  Enter Select  Esc Quit"
 	if m.recentSearch != "" {
 		footer = "↑↓ Move  Enter Select  Esc Clear"
@@ -215,6 +250,14 @@ func (m Model) viewRecent(w int) string {
 		footer += "  Ctrl+R Refresh"
 	}
 	lines = append(lines, gray(footer))
+	actions := "Delete: Remove from history"
+	if m.recentUndo != nil {
+		actions += "  Ctrl+Z: Undo"
+	}
+	lines = append(lines, gray(actions))
+	if m.recentNotice != "" {
+		lines = append(lines, gray(m.recentNotice))
+	}
 	for i := range lines {
 		lines[i] = strings.Repeat(" ", p.x) + ansi.Truncate(lines[i], p.width, "…")
 	}

@@ -248,10 +248,34 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 type projectFolderMsg struct{ err error }
 
 func (m Model) projectRows(w int) (int, int) {
+	if m.termHeight() < 18 {
+		reserved := 3
+		if m.showProjectAdd() {
+			reserved++
+		}
+		return 2, min(max(1, len(m.visibleProjects())), max(1, m.termHeight()-reserved))
+	}
 	return 3, min(max(1, len(m.visibleProjects())), max(1, m.termHeight()-8))
 }
 
-func (m Model) projectAddY(w int) int { y, rows := m.projectRows(w); return y + rows + 1 }
+func (m Model) showProjectAdd() bool {
+	if m.termHeight() >= 18 {
+		return true
+	}
+	for _, name := range m.projects {
+		if name != ".baton-trash" && name != ".baton-recent" {
+			return false
+		}
+	}
+	return true
+}
+func (m Model) projectAddY(w int) int {
+	if !m.showProjectAdd() {
+		return -1
+	}
+	y, rows := m.projectRows(w)
+	return y + rows + 1
+}
 
 func (m Model) viewProjects(w int) string {
 	names := m.visibleProjects()
@@ -259,7 +283,9 @@ func (m Model) viewProjects(w int) string {
 	_ = y
 	var b strings.Builder
 	b.WriteString(" " + accent(truncate("BATON · Projects", max(1, w-1))) + "\n")
-	b.WriteString(" " + gray(truncate("Choose a project to run commands or edit settings.", max(1, w-1))) + "\n")
+	if m.termHeight() >= 18 {
+		b.WriteString(" " + gray(truncate("Choose a project to run commands or edit settings.", max(1, w-1))) + "\n")
+	}
 	search := "/ " + m.projectFilter
 	if m.projectFilter == "" && m.projectMode != "search" {
 		search = "/ Search…"
@@ -295,18 +321,35 @@ func (m Model) viewProjects(w int) string {
 	for strings.Count(b.String(), "\n") < m.projectAddY(w) {
 		b.WriteString("\n")
 	}
-	b.WriteString(accent("+ Add project  a") + "\n")
-	for strings.Count(b.String(), "\n") < m.termHeight()-2 {
-		b.WriteString("\n")
+	if m.showProjectAdd() {
+		b.WriteString(accent("+ Add project  a") + "\n")
 	}
-	if m.termHeight() >= 8 {
-		b.WriteString(hline(w) + "\n")
+	if m.termHeight() >= 18 {
+		for strings.Count(b.String(), "\n") < m.termHeight()-2 {
+			b.WriteString("\n")
+		}
+		if m.termHeight() >= 8 {
+			b.WriteString(hline(w) + "\n")
+		}
+		keys := "↑↓ Select  Enter Open  / Search  Space Actions  a Add  r Refresh  Del Delete  q Quit  F1 Help"
+		if m.projectMode == "search" {
+			keys = "↑↓ Select  Enter Done  Esc Clear  F1 Help"
+		}
+		b.WriteString(gray(truncate(keys, w)))
+	} else {
+		if strings.Count(b.String(), "\n") == m.termHeight() && !m.showProjectAdd() {
+			content := strings.TrimSuffix(b.String(), "\n")
+			b.Reset()
+			b.WriteString(content)
+			b.WriteString(" ")
+		}
+		if strings.Count(b.String(), "\n") <= m.termHeight()-1 {
+			for strings.Count(b.String(), "\n") < m.termHeight()-1 {
+				b.WriteString("\n")
+			}
+			b.WriteString(" ")
+		}
 	}
-	keys := "↑↓ Select  Enter Open  / Search  Space Actions  a Add  r Refresh  Del Delete  q Quit  F1 Help"
-	if m.projectMode == "search" {
-		keys = "↑↓ Select  Enter Done  Esc Clear  F1 Help"
-	}
-	b.WriteString(gray(truncate(keys, w)))
 	if m.projectMode != "" && m.projectMode != "search" {
 		title, body := "Project actions", "o  Open project folder\nc  Copy path\nx  Delete project\nEsc Close"
 		switch m.projectMode {

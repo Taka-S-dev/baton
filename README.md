@@ -504,6 +504,10 @@ prompts for interactive inputs (including file completion), then shows execution
 review. On success, recent mode returns directly to the shell after one
 completion summary; failures retain the retry choices. Explicit workdir settings still apply; an empty workdir uses the launch
 directory. Esc clears the filter, then exits. Ctrl+R refreshes the list.
+Search matches are highlighted in candidates and the command preview; each row
+shows its last execution time. Delete removes only the selected reference from
+this directory’s history, leaving the command definition intact. Ctrl+Z restores
+the last removed reference with its original timestamp during this session.
 
 Normal runs and workflow steps also record history when a step is started.
 Dry runs, canceled selections, and steps never reached are not recorded.
@@ -553,10 +557,11 @@ to the folder just left. The parent row is never selectable as a value. Only one
 directory is listed at a time; there is no recursive search. Typing a directory
 prefix such as `src/` also works. Directory pickers support Right to browse.
 No registered list is mixed in.
-For multiple values, Tab or a click toggles checkboxes, Enter applies the
+For multiple values, Tab or a click toggles checkboxes, Enter confirms the
 selection in selection order, and Esc clears a nonempty filter first.
 With an empty filter, Esc closes suggestions and keeps checked values. Selections survive
-filtering and navigation. A separate Enter continues to execution review.
+filtering and navigation. Enter confirms the input and continues to the next input or execution review.
+For a single value, Tab or a click inserts it for further editing.
 Tab or Ctrl+Space reopens the dropdown. During template creation, Ctrl+K keeps
 the input interactive instead of saving an answer.
 

@@ -1,11 +1,9 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 func (m Model) discardOptions() string {
@@ -23,7 +21,16 @@ func (m Model) viewMultiSelect(w int) string {
 		}
 		return m.viewDiscardWindow(w, names)
 	}
-	if w < 100 || m.termHeight() < 20 {
+	if m.shortPanels() {
+		if splitPanels(w) {
+			return joinPanels(m.viewCompactCandidates(w/2), m.shortRunQueue(w-w/2-3), w, w/2, m.termHeight())
+		}
+		if m.runQueueFocused {
+			return m.shortRunQueue(w)
+		}
+		return m.viewCompactCandidates(w)
+	}
+	if !splitPanels(w) {
 		if m.runQueueFocused {
 			return m.viewRunQueue(w)
 		}
@@ -52,17 +59,8 @@ func (m Model) viewRunQueue(w int) string {
 	queueH := max(5, h/2)
 	var b strings.Builder
 	cursor := min(m.runQueueCursor, max(0, len(m.msSelected)-1))
-	nameWidth := 0
-	for _, idx := range m.msSelected {
-		nameWidth = max(nameWidth, lipgloss.Width(m.msItems[idx].name()))
-	}
-	nameWidth = min(nameWidth, max(4, (w-10)/3))
 	writeWindowedList(&b, max(1, queueH-3), len(m.msSelected), cursor, "Tab adds from the list; Enter there reviews one command.", func(i int) string {
-		item := m.msItems[m.msSelected[i]]
-		name := truncate(item.name(), nameWidth)
-		name += strings.Repeat(" ", max(0, nameWidth-lipgloss.Width(name)))
-		command := strings.Join(strings.Fields(item.cmd.Cmd), " ")
-		label := ansi.Truncate(fmt.Sprintf(" %d  %s  $ ", i+1, name)+m.previewVars(command), max(1, w-2), "…")
+		label := " " + m.queueCommandLabel(i, max(1, w-3))
 		if i == cursor && m.runQueueFocused {
 			return m.selectedSyntaxRow(label, max(1, w-2))
 		}

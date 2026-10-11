@@ -17,7 +17,15 @@ func (m Model) pathCompletionBackground(w int) string {
 	sp.previewOnly = true
 	sp.picked = append([]string(nil), m.sp.completion.draft...)
 	bg.sp = &sp
-	lines := strings.Split(strings.TrimRight(bg.renderScreen(w), "\n"), "\n")
+	background := bg.renderScreen(w)
+	if frameRows(background) > m.termHeight() {
+		input := "/ " + sp.search + "_"
+		if sp.search == "" {
+			input = "/ type to filter…"
+		}
+		background = accentBold("  "+sp.placeholder()) + "\n  " + input
+	}
+	lines := strings.Split(strings.TrimRight(background, "\n"), "\n")
 	for i, line := range lines {
 		plain := ansi.Strip(line)
 		if strings.Contains(plain, "Tab: open choices") || strings.Contains(plain, "Tab: choices  Enter:") {
@@ -57,8 +65,11 @@ func (m Model) pathCompletionLayout(w int) actionPopupLayout {
 		h = min(desired, anchor-1)
 		y = anchor - 1 - h
 	}
-	h = max(3, min(h, height))
+	h = max(1, min(h, height))
 	p := actionPopupLayout{x: min(x, max(0, w-width)), y: max(0, min(y, height-h)), w: min(width, w), h: h, rows: max(1, h-3)}
+	if m.termHeight() < 18 {
+		p.rows = max(1, p.h-2)
+	}
 	p.start = windowStart(p.rows, len(m.sp.completion.entries), m.sp.completion.cursor)
 	return p
 }
@@ -113,16 +124,16 @@ func (m Model) overlayPathCompletion(w int) string {
 		}
 		b.WriteString(line + "\n")
 	}
-	footer := "↑↓ Move  Enter Insert  Esc Close"
+	footer := "↑↓ Move  Enter Confirm  Esc Close"
 	if m.sp.pathDef.PathKind == "dir" {
-		footer = "↑↓ Move  → Open  Enter Insert  Esc Close"
+		footer = "↑↓ Move  → Open  Enter Confirm  Esc Close"
 	}
 	if m.sp.variadic {
-		footer = "Tab Check  Enter Apply  Esc Close"
+		footer = "Tab Check  Enter Confirm  Esc Close"
 		if p.w >= 60 {
-			footer = "↑↓ Move  Tab Check  Enter Apply  Esc Close"
+			footer = "↑↓ Move  Tab Check  Enter Confirm  Esc Close"
 			if m.sp.pathDef.PathKind == "dir" {
-				footer = "↑↓ Move  Tab Check  → Open  Enter Apply  Esc Close"
+				footer = "↑↓ Move  Tab Check  → Open  Enter Confirm  Esc Close"
 			}
 		}
 	}
@@ -138,7 +149,9 @@ func (m Model) overlayPathCompletion(w int) string {
 	if len([]rune(footer)) > p.w-4 {
 		footer = strings.TrimPrefix(footer, "↑↓ Move  ")
 	}
-	b.WriteString(" " + truncate(footer, max(1, p.w-4)))
+	if m.termHeight() >= 18 {
+		b.WriteString(" " + truncate(footer, max(1, p.w-4)))
+	}
 	kind := "Files"
 	if m.sp.pathDef.PathKind == "dir" {
 		kind = "Folders"
@@ -174,6 +187,9 @@ func (m Model) updatePathCompletionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) 
 		if !c.loading && c.err == nil && msg.X > p.x && msg.X < p.x+p.w-1 && row >= 0 && row < p.rows && p.start+row < len(c.entries) {
 			c.cursor = p.start + row
 			if m.sp.variadic && m.pathCandidateSelectable(c.entries[c.cursor]) {
+				return m.updatePathCompletion(tea.KeyMsg{Type: tea.KeyTab})
+			}
+			if !m.sp.variadic && m.pathCandidateSelectable(c.entries[c.cursor]) {
 				return m.updatePathCompletion(tea.KeyMsg{Type: tea.KeyTab})
 			}
 			return m.updatePathCompletion(tea.KeyMsg{Type: tea.KeyEnter})

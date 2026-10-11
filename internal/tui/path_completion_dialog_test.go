@@ -16,7 +16,7 @@ func TestPathCompletionAnchorsToOriginalInput(t *testing.T) {
 	m, read = completionKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("te")})
 	m = completionResult(m, read)
 	view := stripStyle(m.View())
-	for _, want := range []string{"/ te_", "command preview", "workdir:", "0 selected", "Tab Check", "Enter Apply"} {
+	for _, want := range []string{"/ te_", "command preview", "workdir:", "0 selected", "Tab Check", "Enter Confirm"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("missing %q: %s", want, view)
 		}
