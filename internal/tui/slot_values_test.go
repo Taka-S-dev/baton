@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -90,17 +91,66 @@ func TestSlotValuesClickSelects(t *testing.T) {
 	}
 }
 
-// TestSlotValuesFitAShortTerminal: with no room for the box the picker
-// falls back to the inline list, and never runs past the last row.
+// TestSlotValuesFitAShortTerminal: the box is kept on a short terminal
+// — the context above it gives way first — and the frame never runs
+// past the last row.
 func TestSlotValuesFitAShortTerminal(t *testing.T) {
-	for _, h := range []int{13, 15, 17} {
+	for _, h := range []int{6, 8, 13, 17} {
 		m := slotValuesFixture(t)
 		m.height = h
+		view := stripStyle(m.View())
 		if rows := frameRows(m.View()); rows > h {
 			t.Errorf("height %d: picker draws %d rows", h, rows)
 		}
-		if !strings.Contains(stripStyle(m.View()), "dev") {
-			t.Errorf("height %d: the values are not shown", h)
+		if !strings.Contains(view, "Search / ") || !strings.Contains(view, "▶ dev") {
+			t.Errorf("height %d: the box is not drawn:\n%s", h, view)
+		}
+	}
+}
+
+// TestSlotValuesShowMoreCandidates: the rows above the box are the step
+// and the preview only, so a 24-row terminal lists at least 15 values.
+func TestSlotValuesShowMoreCandidates(t *testing.T) {
+	cmd := mdl.Command{Name: "deploy", Cmd: "deploy --env {env}"}
+	m := Model{width: 100, height: 24}
+	var entries []mdl.ListEntry
+	for i := 0; i < 30; i++ {
+		entries = append(entries, mdl.ListEntry{Value: fmt.Sprintf("env-%02d", i)})
+	}
+	m.lists = map[string][]mdl.ListEntry{"env": entries}
+	next, _ := m.startResolveFlow([]msItem{{cmd: &cmd}})
+	m = next.(Model)
+	view := stripStyle(m.View())
+	if strings.Count(view, "env-") < 16 { // 15 rows plus the preview line
+		t.Errorf("too few values in view:\n%s", view)
+	}
+	for _, gone := range []string{"[ Select value for", "command preview", "─ Select value ─"} {
+		if strings.Contains(view, gone) {
+			t.Errorf("%q still takes a row:\n%s", gone, view)
+		}
+	}
+}
+
+
+
+func TestPickerLayoutsMatch(t *testing.T) {
+	for _, size := range [][2]int{{140, 10}, {100, 24}, {70, 10}, {60, 24}} {
+		values := slotValuesFixture(t)
+		values.width, values.height = size[0], size[1]
+		files := multiCompletion(t)
+		files.width, files.height = size[0], size[1]
+		files, cmd := completionKey(files, tea.KeyMsg{Type: tea.KeyTab})
+		files = completionResult(files, cmd)
+		_, vp := values.slotValuesScreen(size[0])
+		fp := files.pathCompletionLayout(size[0])
+		if vp.w != fp.w || (size[0] >= 100 && (vp.y != 0 || fp.y != 0 || vp.h != fp.h)) {
+			t.Fatalf("layout mismatch %v: %+v %+v", size, vp, fp)
+		}
+		if frameRows(files.View()) > size[1] {
+			t.Fatal("file picker overflows")
+		}
+		if size[0] >= 100 && !strings.Contains(stripStyle(files.View()), "Command preview") {
+			t.Fatal("shared preview missing")
 		}
 	}
 }

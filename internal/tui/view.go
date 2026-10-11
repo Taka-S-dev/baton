@@ -577,6 +577,9 @@ func frameRows(s string) int {
 
 func (m Model) slotPickFrame(w int, tight bool, around int) (string, *actionPopupLayout) {
 	sp := m.sp
+	if sp.pathDef.PathKind == "" {
+		return m.slotValuesScreen(w)
+	}
 	var b strings.Builder
 	title := "  [ Select value for " + sp.placeholder() + " ]"
 	if sp.variadic {
@@ -679,27 +682,6 @@ func (m Model) slotPickFrame(w int, tight bool, around int) (string, *actionPopu
 		}
 	}
 
-	// A list slot gets the same box as a path slot, under the context
-	// and the preview, whenever the terminal has room for it.
-	if sp.pathDef.PathKind == "" {
-		background := b.String()
-		anchor := strings.Count(background, "\n")
-		if m.termHeight()-anchor >= 6 {
-			p := m.slotValuesLayout(w, anchor)
-			return m.overlaySlotValues(w, background, anchor), &p
-		}
-	}
-	if sp.contextNames != nil {
-		// The reuse hint rides on the divider rather than taking its own
-		// line: this screen is height-critical, and the value itself is
-		// already visible on the cursor row and in the preview above.
-		selectLabel := "Select value"
-		if sp.reuseFrom != "" {
-			selectLabel += "  ·  same as " + sp.reuseFrom + " — Enter keeps it"
-		}
-		b.WriteString(gap + gap + hlineLabelBright(w, selectLabel) + "\n" + gap)
-	}
-
 	// Search field
 	if sp.search == "" {
 		b.WriteString("  " + dim(sp.inputHint()) + "\n" + gap)
@@ -726,88 +708,6 @@ func (m Model) slotPickFrame(w int, tight bool, around int) (string, *actionPopu
 		}
 		keys := m.pathInputKeys()
 		b.WriteString(hline(w) + "\n  " + gray(keys) + "\n")
-		return b.String(), nil
-	}
-	// List
-	skipRow := len(sp.filtered) + 1
-	total := skipRow
-	if sp.canSkip {
-		total++
-	}
-
-	// Compute label column alignment
-	labelCol := 0
-	for _, e := range sp.filtered {
-		if e.Label != "" && len(e.Value)+2 > labelCol {
-			labelCol = len(e.Value) + 2
-		}
-	}
-
-	viewH := m.listBudget(&b, 3)
-	writeWindowedList(&b, viewH, total, sp.cursor, "", func(i int) string {
-		isCustom := i == len(sp.filtered)
-		isSkip := sp.canSkip && i == skipRow
-
-		if i == sp.cursor {
-			// Plain text under the row style, so the width is the text width
-			var rawLine string
-			if isSkip {
-				rawLine = "[ → skip — resolve at run time ]"
-			} else if isCustom {
-				rawLine = sp.typedValueLabel()
-			} else {
-				e := sp.filtered[i]
-				if e.Label != "" {
-					pad := strings.Repeat(" ", max(1, labelCol-len(e.Value)))
-					rawLine = e.Value + pad + "·  " + e.Label
-				} else {
-					rawLine = e.Value
-				}
-				if sp.variadic {
-					if sp.isPicked(e.Value) {
-						rawLine = "[x] " + rawLine
-					} else {
-						rawLine = "[ ] " + rawLine
-					}
-				}
-			}
-			return sRowActive.Width(w - 2).Render("    " + rawLine)
-		}
-		var line string
-		if isSkip {
-			line = dim("[ → skip — resolve at run time ]")
-		} else if isCustom {
-			line = dim(sp.typedValueLabel())
-		} else {
-			e := sp.filtered[i]
-			if e.Label != "" {
-				pad := strings.Repeat(" ", max(1, labelCol-len(e.Value)))
-				line = white(e.Value) + dim(pad+"·  "+e.Label)
-			} else {
-				line = white(e.Value)
-			}
-			if sp.variadic {
-				if sp.isPicked(e.Value) {
-					line = success("[x] ") + line
-				} else {
-					line = dim("[ ] ") + line
-				}
-			}
-		}
-		return "    " + line
-	})
-
-	b.WriteString("\n" + hline(w) + "\n")
-	if sp.variadic {
-		picked := ""
-		if len(sp.picked) > 0 {
-			picked = "  " + dim(fmt.Sprintf("%d picked", len(sp.picked)))
-		}
-		b.WriteString("  " + gray("↑↓") + "  " + gray("Tab: ") + dim("toggle") +
-			"  " + gray("Enter: ") + dim("confirm") +
-			"  " + gray("Esc: ") + dim("clear filter / back") + picked + "\n")
-	} else {
-		b.WriteString("  " + gray("↑↓ Enter") + "  " + gray("Esc: ") + dim("clear filter / back") + "\n")
 	}
 	return b.String(), nil
 }

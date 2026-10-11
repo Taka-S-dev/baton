@@ -10,59 +10,25 @@ import (
 
 // The picker owns its filter; the background only supplies command context.
 func (m Model) pathCompletionBackground(w int) string {
-	bg := m
-	sp := *m.sp
-	sp.completion = nil
-	sp.previewOnly = true
-	sp.picked = append([]string(nil), m.sp.completion.draft...)
-	bg.sp = &sp
-	lines := strings.Split(bg.renderScreen(w), "\n")
-	end := len(lines)
-	for i, line := range lines {
-		plain := ansi.Strip(line)
-		if strings.Contains(plain, "Select value") && !strings.Contains(plain, "[") || strings.HasPrefix(strings.TrimSpace(plain), "/ ") {
-			end = i
-			break
-		}
-	}
-	lines = lines[:end]
-	for len(lines) > 0 && strings.TrimSpace(ansi.Strip(lines[len(lines)-1])) == "" {
-		lines = lines[:len(lines)-1]
-	}
-	maxContext := max(0, m.termHeight()-6)
-	if len(lines) > maxContext {
-		compact := []string{accentBold("  " + sp.placeholder())}
-		for _, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(ansi.Strip(line)), "$ ") {
-				compact = append(compact, line)
-				break
-			}
-		}
-		lines = compact[:min(len(compact), maxContext)]
-	}
-	for i := range lines {
-		lines[i] = ansi.Truncate(lines[i], max(1, w), "…")
-	}
-	return strings.Join(lines, "\n")
+	_, _, bg := m.pickerFrame(w)
+	return bg
 }
 
 func (m Model) pathCompletionAnchor(w int) (int, int) {
-	bg := m.pathCompletionBackground(w)
-	if bg == "" {
-		return 0, 0
-	}
-	return 0, strings.Count(bg, "\n") + 1
+	_, anchor, _ := m.pickerFrame(w)
+	return 0, anchor
 }
 
 func (m Model) pathCompletionLayout(w int) actionPopupLayout {
-	x, anchor := m.pathCompletionAnchor(w)
+	leftW, anchor, _ := m.pickerFrame(w)
+	x := 0
 	height := max(1, m.termHeight())
 	h := max(1, height-anchor)
 	reserved := 4
 	if m.termHeight() >= 18 {
 		reserved++
 	}
-	p := actionPopupLayout{x: x, y: anchor, w: max(1, w), h: h, rows: max(1, h-reserved)}
+	p := actionPopupLayout{x: x, y: anchor, w: max(1, leftW), h: h, rows: max(1, h-reserved)}
 	p.start = windowStart(p.rows, len(m.sp.completion.entries), m.sp.completion.cursor)
 	return p
 }
@@ -164,7 +130,8 @@ func (m Model) overlayPathCompletion(w int) string {
 	}
 	background := m.pathCompletionBackground(w)
 	background += strings.Repeat("\n", max(0, m.termHeight()-strings.Count(background, "\n")-1))
-	return overlayBox(background, box(title, b.String(), p.w, p.h, true), p.x, p.y, w)
+	left := overlayBox(background, box(title, b.String(), p.w, p.h, true), p.x, p.y, p.w)
+	return m.finishPickerFrame(w, p.w, left)
 }
 
 func (m Model) updatePathCompletionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {

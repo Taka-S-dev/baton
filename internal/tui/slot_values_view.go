@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Taka-S-dev/baton/internal/slot"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -134,6 +136,92 @@ func (m Model) overlaySlotValues(w int, background string, anchor int) string {
 	return overlayBox(background, box(title, b.String(), p.w, p.h, true), p.x, p.y, w)
 }
 
+// pickerContextLines is what a choice depends on: the step being
+// answered, and the command as it would run with the hovered value.
+// It is all that accompanies either picker, beside the box on a wide
+// terminal and above it on a narrow one, so the values get the rows.
+func (m Model) pickerContextLines(w int) []string {
+	sp := m.sp
+	lines := []string{}
+	if sp.contextNames != nil {
+		step := fmt.Sprintf("▶ %d. %s", sp.contextIdx+1, sp.contextNames[sp.contextIdx])
+		if n := len(sp.contextNames); n > 1 {
+			step += "   " + fmt.Sprintf("%d of %d", sp.contextIdx+1, n)
+		}
+		lines = append(lines, " "+accentBold(truncate(step, max(1, w-2))))
+	}
+	if sp.currentCmd != nil {
+		hovered := ""
+		if sp.cursor >= 0 && sp.cursor < len(sp.filtered) {
+			hovered = sp.filtered[sp.cursor].Value
+		} else if sp.cursor == len(sp.filtered) && sp.search != "" {
+			hovered = sp.search
+		}
+		if c := sp.completion; c != nil {
+			hovered = ""
+			if !c.loading && c.err == nil && c.cursor >= 0 && c.cursor < len(c.entries) && m.pathCandidateSelectable(c.entries[c.cursor]) {
+				hovered = c.entries[c.cursor].value
+			}
+		}
+		picked := sp.picked
+		if sp.completion != nil {
+			picked = sp.completion.draft
+		}
+		preview := func(text string) string {
+			for k, v := range sp.resolvedSoFar {
+				text = slot.Replace(text, k, v)
+			}
+			switch {
+			case sp.variadic && len(picked) > 0:
+				text = slot.Replace(text, sp.slotName, highlight(strings.Join(picked, " ")))
+			case hovered != "":
+				text = slot.Replace(text, sp.slotName, highlight(hovered))
+			default:
+				text = slot.Replace(text, sp.slotName, slotVar(sp.placeholder()))
+			}
+			return slot.ApplyVars(text, m.vars)
+		}
+		lines = append(lines, " "+gray("$")+" "+preview(sp.currentCmd.Cmd))
+		if sp.currentCmd.Dir != "" {
+			lines = append(lines, " "+gray("workdir:")+" "+preview(sp.currentCmd.Dir))
+		}
+	}
+	return lines
+}
+
+func (m Model) pickerFrame(w int) (int, int, string) {
+	if splitPanels(w) && m.termHeight() >= 6 {
+		return w / 2, 0, ""
+	}
+	lines := m.pickerContextLines(w)
+	for len(lines) > 0 && m.termHeight()-len(lines) < 7 {
+		lines = lines[:len(lines)-1]
+	}
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], max(1, w), "…")
+	}
+	return w, len(lines), strings.Join(lines, "\n")
+}
+
+func (m Model) finishPickerFrame(w, leftW int, left string) string {
+	if leftW == w {
+		return left
+	}
+	rightW := w - leftW - 1
+	lines := m.pickerContextLines(rightW)
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], max(1, rightW-4), "…")
+	}
+	right := box("Command preview", strings.Join(lines, "\n"), rightW, m.termHeight(), false)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
+}
+
+func (m Model) slotValuesScreen(w int) (string, *actionPopupLayout) {
+	leftW, anchor, bg := m.pickerFrame(w)
+	p := m.slotValuesLayout(leftW, anchor)
+	return m.finishPickerFrame(w, leftW, m.overlaySlotValues(leftW, bg, anchor)), &p
+}
+
 // updateSlotValuesMouse selects the clicked row, and chooses it on a
 // second click; a click elsewhere in the box does nothing.
 func (m Model) updateSlotValuesMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -158,3 +246,4 @@ func (m Model) updateSlotValuesMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	m.sp.cursor = p.start + row
 	return m, nil
 }
+

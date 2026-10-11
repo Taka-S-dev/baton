@@ -16,7 +16,7 @@ func TestPathCompletionOwnsFilterAndKeepsPreview(t *testing.T) {
 	m, read = completionKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("te")})
 	m = completionResult(m, read)
 	view := stripStyle(m.View())
-	for _, want := range []string{"Search / te", "command preview", "workdir:", "0 selected", "Tab Check", "Enter Select"} {
+	for _, want := range []string{"Search / te", "Command preview", "workdir:", "0 selected", "Tab Check", "Enter Select"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("missing %q: %s", want, view)
 		}
