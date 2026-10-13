@@ -145,6 +145,13 @@ func (m Model) editFromRunHome() (tea.Model, tea.Cmd) {
 	m.captureRunHome()
 	m.exploreTab = tabCommands
 	name := m.runHome.commandName
+	if m.screen == ScreenRunCommands {
+		if c := m.runDetailCommand(); c != nil {
+			name = c.Name
+		}
+	}
+	m.runDetailOpen = false
+	m.runScrollDrag = 0
 	if m.runHome.tab == "workflows" {
 		m.exploreTab = tabWorkflows
 		name = m.runHome.workflowName
@@ -212,9 +219,13 @@ func (m Model) runHomeKeys() string {
 		return "Search: ↓ Results · Enter Review" + selectKey + " · Esc Clear · F1 Help"
 	}
 	if m.runQueueFocused && m.screen == ScreenRunCommands {
-		return "J/K Reorder · Del Remove · F2 List · / Search · e Edit · p Projects · q Quit · F1 Help"
+		return "J/K Reorder · Del Remove · d Details · PgUp/PgDn Scroll · F2 List · / Search · e Edit · p Projects · q Quit · F1 Help"
 	}
-	return "↑↓ Move · Enter Review · / Search · e Edit · p Projects · q Quit · F1 Help"
+	detail := ""
+	if m.screen == ScreenRunCommands {
+		detail = " · d Details"
+	}
+	return "↑↓ Move · Enter Review · / Search" + detail + " · e Edit · p Projects · q Quit · F1 Help"
 }
 
 func (m Model) runHomeHeader(w int) string {
@@ -224,7 +235,69 @@ func (m Model) runHomeHeader(w int) string {
 
 // Update owns the run-home frame; screen handlers keep their local coordinates.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.runHomeVisible() && !m.helpOpen && !m.msEscArmed && !m.pasteMenu && m.leaveAsk == leaveNone {
+		if mouse, ok := msg.(tea.MouseMsg); ok {
+			mouse.Y--
+			if m.handleRunDivider(mouse) {
+				return m, nil
+			}
+		}
+	}
+
 	m.captureRunHome()
+	if m.screen == ScreenExplore && !m.helpOpen && !m.exploreMenu && m.leaveAsk == leaveNone && !m.pasteMenu {
+		if mouse, ok := msg.(tea.MouseMsg); ok && !m.exploreDragging && m.handleRunScrollMouse(mouse) {
+			return m, nil
+		}
+		if _, ok := msg.(tea.KeyMsg); ok && m.exploreListFocused() {
+			m.exploreScrollManual[m.exploreTab] = false
+		}
+	}
+	switch msg.(type) {
+	case tea.WindowSizeMsg, tea.KeyMsg:
+		m.msScrollManual = false
+		m.wfScrollManual = false
+		m.runScrollDrag = 0
+	}
+	if m.runDetailOpen && !m.helpOpen {
+		if key, ok := msg.(tea.KeyMsg); ok {
+			switch key.String() {
+			case "e":
+				if m.runHomeVisible() {
+					return m.editFromRunHome()
+				}
+			case "f1":
+				m.helpOpen = true
+			case "esc", "d":
+				m.runDetailOpen = false
+			case "up":
+				m.scrollRunDetail(-1)
+			case "pgup":
+				m.scrollRunDetail(-5)
+			case "down":
+				m.scrollRunDetail(1)
+			case "pgdown":
+				m.scrollRunDetail(5)
+			case "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+
+		if mouse, ok := msg.(tea.MouseMsg); ok {
+			if m.runHomeVisible() {
+				mouse.Y--
+			}
+			p := m.runDetailPopup()
+			if m.runScrollDrag == 0 && mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && (mouse.X < p.x || mouse.X >= p.x+p.w || mouse.Y < p.y || mouse.Y >= p.y+p.h) {
+				m.runDetailOpen = false
+				return m, nil
+			}
+			m.handleRunScrollMouse(mouse)
+			return m, nil
+		}
+
+	}
 	if m.runHomeVisible() && !m.helpOpen && !m.msEscArmed && !m.pasteMenu && m.leaveAsk == leaveNone {
 		if key, ok := msg.(tea.KeyMsg); ok {
 			if m.runHome.searching && key.String() != "f1" && key.String() != "ctrl+c" {
@@ -244,6 +317,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cycleCommandSort()
 				}
 				return m, nil
+			case "d":
+				if m.screen == ScreenRunCommands {
+					m.runDetailOpen = true
+					m.scrollRunDetail(0)
+					return m, nil
+				}
+			case "pgup", "pgdown":
+				if m.screen != ScreenRunCommands {
+					break
+				}
+				delta := 5
+				if key.String() == "pgup" {
+					delta = -5
+				}
+				m.scrollRunDetail(delta)
+				return m, nil
 			case "e":
 				return m.editFromRunHome()
 			case "p":
@@ -259,6 +348,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if mouse, ok := msg.(tea.MouseMsg); ok {
+			if m.runScrollDrag != 0 {
+				mouse.Y--
+				m.handleRunScrollMouse(mouse)
+				return m, nil
+			}
 			if mouse.Y == 0 {
 				if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
 					_, actions := m.runHomeLayout(m.viewWidth())
@@ -291,6 +385,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	next, cmd := m.updateScreen(msg)
 	if result, ok := next.(Model); ok {
+		_, key := result.runDetailLines(1)
+		if key != result.runDetailKey {
+			result.runDetailOffset = 0
+			result.runDetailKey = key
+		}
 		result.captureRunHome()
 		return result, cmd
 	}

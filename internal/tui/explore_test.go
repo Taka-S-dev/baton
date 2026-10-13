@@ -367,7 +367,7 @@ func TestExploreWheelAndDrag(t *testing.T) {
 	m := exploreProject()
 	m.exploreCursor[tabCommands] = 4
 	up := mouseAt(m, 0, 0, tea.MouseActionPress, tea.MouseButtonWheelUp)
-	if up.exploreCursor[tabCommands] != 4-wheelRows {
+	if up.exploreCursor[tabCommands] != 4 {
 		t.Errorf("wheel up moved the cursor to %d", up.exploreCursor[tabCommands])
 	}
 	editing := press(m, tea.KeyMsg{Type: tea.KeyEnter})
@@ -931,7 +931,7 @@ func TestWorkflowStepsAreClickable(t *testing.T) {
 	// The editor state is shared by pointer between copies of the model,
 	// so each gesture starts from a fresh editor.
 	m = openReleaseEditor(t)
-	if got := mouseAt(m, l.rightX+4, y, tea.MouseActionPress, tea.MouseButtonWheelDown); got.wfe.cursor != 1 {
+	if got := mouseAt(m, l.rightX+4, y, tea.MouseActionPress, tea.MouseButtonWheelDown); got.wfe.cursor != 0 {
 		t.Errorf("the wheel moved the step cursor to %d", got.wfe.cursor)
 	}
 	m = openReleaseEditor(t)

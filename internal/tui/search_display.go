@@ -120,7 +120,7 @@ func (m Model) runSearchHit(x, y int) bool {
 	row := -1
 	if m.screen == ScreenRunCommands {
 		if splitPanels(w) {
-			leftW = w / 2
+			leftW = m.runLeftWidth(w)
 		} else if m.runQueueFocused {
 			return false
 		}
@@ -131,7 +131,7 @@ func (m Model) runSearchHit(x, y int) bool {
 		})
 	} else {
 		if splitPanels(w) {
-			leftW = w / 3
+			leftW = m.runLeftWidth(w)
 		}
 		m.viewRunWorkflow(w, func(y int) { row = y })
 	}

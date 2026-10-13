@@ -14,6 +14,9 @@ func (m Model) discardOptions() string {
 }
 
 func (m Model) viewMultiSelect(w int) string {
+	if m.runDetailOpen {
+		return m.viewRunDetailPopup(w)
+	}
 	if m.msEscArmed && len(m.msSelected) > 0 {
 		names := []string{}
 		for _, i := range m.msSelected {
@@ -23,7 +26,7 @@ func (m Model) viewMultiSelect(w int) string {
 	}
 	if m.shortPanels() {
 		if splitPanels(w) {
-			return joinPanels(m.viewCompactCandidates(w/2), m.shortRunQueue(w-w/2-3), w, w/2, m.termHeight())
+			return lipgloss.JoinHorizontal(lipgloss.Top, m.viewCompactCandidates(m.runLeftWidth(w)), m.runDivider(m.termHeight()), m.shortRunQueue(w-m.runLeftWidth(w)-1))
 		}
 		if m.runQueueFocused {
 			return m.shortRunQueue(w)
@@ -36,7 +39,7 @@ func (m Model) viewMultiSelect(w int) string {
 		}
 		return m.viewMultiSelectList(w)
 	}
-	leftW := w / 2
+	leftW := m.runLeftWidth(w)
 	left := strings.TrimRight(m.viewMultiSelectCandidates(leftW, false), "\n")
 	right := m.viewRunQueue(w - leftW - 1)
 	leftLines := strings.Split(left, "\n")
@@ -50,37 +53,29 @@ func (m Model) viewMultiSelect(w int) string {
 	for len(rightLines) < rows {
 		rightLines = append(rightLines, "")
 	}
-	body := lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(leftLines[:rows], "\n"), " ", strings.Join(rightLines[:rows], "\n"))
+	body := lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(leftLines[:rows], "\n"), m.runDivider(rows), strings.Join(rightLines[:rows], "\n"))
 	return body + "\n" + hline(w) + "\n" + gray(truncate(m.runSelectKeys(), w))
 }
 
 func (m Model) viewRunQueue(w int) string {
 	h := m.termHeight()
 	queueH := max(5, h/2)
-	var b strings.Builder
 	cursor := min(m.runQueueCursor, max(0, len(m.msSelected)-1))
-	writeWindowedList(&b, max(1, queueH-3), len(m.msSelected), cursor, "Tab adds from the list; Enter there reviews one command.", func(i int) string {
-		label := " " + m.queueCommandLabel(i, max(1, w-3))
+	rows := max(1, queueH-3)
+	start := windowStart(rows, len(m.msSelected), cursor)
+	var queue []string
+	for i := range m.msSelected {
+		label := " " + m.queueCommandLabel(i, max(1, w-4))
 		if i == cursor && m.runQueueFocused {
-			return m.selectedSyntaxRow(label, max(1, w-2))
+			label = m.selectedSyntaxRow(label, max(1, w-3))
 		}
-		return label
-	})
-	top := box("Run queue · execution order", b.String(), w, queueH, m.runQueueFocused)
-	var detail strings.Builder
-	index := -1
-	if m.runQueueFocused && len(m.msSelected) > 0 {
-		index = m.msSelected[cursor]
-	} else {
-		filtered := m.msFiltered()
-		if m.msCursor >= 0 && m.msCursor < len(filtered) {
-			index = filtered[m.msCursor]
-		}
+		queue = append(queue, label)
 	}
-	if index >= 0 {
-		m.writeCommandHover(&detail, m.msItems[index].cmd, w-2)
+	if len(queue) == 0 {
+		queue = []string{"Tab adds from the list."}
 	}
-	bottom := box("Command details", detail.String(), w, max(3, h-queueH-2), false)
+	top := box("Run queue · execution order", scrollRows(queue, start, rows, w-2), w, queueH, m.runQueueFocused)
+	bottom := m.runDetailBox(w, max(3, h-queueH-2))
 	footer := m.runSelectKeys()
 	lines := strings.Split(top+"\n"+bottom, "\n")
 	return strings.Join(lines[:min(max(0, h-1), len(lines))], "\n") + "\n" + gray(truncate(footer, w))
@@ -91,7 +86,7 @@ func (m Model) runSelectKeys() string {
 		return m.runHomeKeys()
 	}
 	if m.runQueueFocused {
-		return "↑↓ Select  J/K Reorder  Del Remove  Enter Review  F2 List  Esc List  F1 Help"
+		return "↑↓ Select  J/K Reorder  Del Remove  d Details · PgUp/PgDn Scroll  Enter Review  F2 List  Esc List  F1 Help"
 	}
-	return "↑↓ Select  Tab Toggle  Enter Review  F2 Queue  s Sort  / Search  Esc Back  F1 Help"
+	return "↑↓ Select  Tab Toggle  Enter Review  F2 Queue  d Details  s Sort  / Search  Esc Back  F1 Help"
 }

@@ -14,7 +14,7 @@ func TestShortCommandSplitAndQueueMouse(t *testing.T) {
 		c := mdl.Command{Name: "build", Cmd: "echo ok"}
 		m := Model{width: 120, height: h, msItems: []msItem{{cmd: &c}}, msSelected: []int{0}}
 		got := stripStyle(m.viewMultiSelect(120))
-		if !strings.Contains(got, "Run queue") || !strings.Contains(got, "1. $ echo ok") {
+		if !strings.Contains(got, "Run queue") || !strings.Contains(got, "1. build  $ echo ok") {
 			t.Fatal(got)
 		}
 		if len(strings.Split(got, "\n")) > h {

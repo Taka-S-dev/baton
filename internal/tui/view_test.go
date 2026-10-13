@@ -272,13 +272,13 @@ func TestViewMultiSelect_ScrollMarkersAndCounter(t *testing.T) {
 	if !strings.Contains(view, "30/30") {
 		t.Fatal("search row must show the filtered/total counter")
 	}
-	if !strings.Contains(view, "↓") || !strings.Contains(view, "more") {
-		t.Fatal("rows below the fold must be announced as \"↓ N more\"")
+	if !strings.Contains(view, "┃") || strings.Contains(view, "more") {
+		t.Fatal("overflow must show a scrollbar")
 	}
 
 	m.msCursor = len(items) - 1
 	view = m.viewMultiSelect(80)
-	if !strings.Contains(view, "↑") {
+	if !strings.Contains(view, "┃") {
 		t.Fatal("rows above the fold must be announced as \"↑ N more\"")
 	}
 

@@ -8,31 +8,24 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// Queue rows prioritize execution order and name; full commands and paths live in details.
 func (m Model) queueCommandLabel(order, w int) string {
 	item := m.msItems[m.msSelected[order]]
-	prefix := fmt.Sprintf("%d. $ ", order+1)
+	orderW := len(fmt.Sprint(len(m.msSelected)))
+	nameW := 0
+	for _, idx := range m.msSelected {
+		nameW = max(nameW, ansi.StringWidth(m.msItems[idx].name()))
+	}
+	// Reserve most of the row for the executable text; measure the entire queue
+	// so scrolling cannot move the command column.
+	nameW = min(nameW, max(1, (w-orderW-5)/3))
+	label := ansi.Truncate(item.name(), nameW, "…")
+	label += strings.Repeat(" ", max(0, nameW-ansi.StringWidth(label)))
+	name := fmt.Sprintf("%*d. %s", orderW, order+1, label)
 	if item.cmd == nil {
-		return ansi.Truncate(prefix+item.name(), w, "…")
+		return ansi.Truncate(name, w, "…")
 	}
 	cmd := slot.ApplyVarsToCommand(*item.cmd, m.vars)
-	// Preserve spacing inside shell arguments, including quoted values.
 	body := strings.ReplaceAll(strings.ReplaceAll(cmd.Cmd, "\r", ""), "\n", " ↵ ")
-	dir := m.confirmWorkdir(cmd.Dir)
-	differing := false
-	for _, idx := range m.msSelected {
-		other := m.msItems[idx].cmd
-		if other != nil && m.confirmWorkdir(slot.ApplyVarsToCommand(*other, m.vars).Dir) != dir {
-			differing = true
-			break
-		}
-	}
-	suffix := ""
-	if differing {
-		suffix = " · In: " + dir
-	}
-	if suffix != "" {
-		suffix = ansi.Truncate(suffix, max(1, w/2), "…")
-	}
-	bodyWidth := max(1, w-ansi.StringWidth(prefix)-ansi.StringWidth(suffix))
-	return ansi.Truncate(prefix+m.syntaxText(ansi.Truncate(body, bodyWidth, "…"))+gray(suffix), w, "…")
+	return ansi.Truncate(white(name)+"  "+gray("$ ")+m.syntaxText(body), w, "…")
 }

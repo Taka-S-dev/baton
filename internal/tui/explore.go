@@ -398,6 +398,10 @@ func (m Model) exploreLayout(w int) exploreLayout {
 			// as many of them as it can before the preview has its say.
 			l.editH = max(5, min(l.bodyH/2, len(m.wfe.steps)+5))
 		}
+		if m.cf == nil && m.wfe == nil && len(m.exploreVisible()) == 0 {
+			needed := strings.Count(categoryHelpContent(m.exploreTab, l.rightW-2), "\n") + 3
+			l.editH = min(l.bodyH, max(l.editH, needed))
+		}
 		l.prevH = l.bodyH - l.editH
 		if l.prevH < 3 {
 			l.editH, l.prevH = l.bodyH, 0
@@ -410,10 +414,10 @@ func (m Model) exploreLayout(w int) exploreLayout {
 	// carrying what is scrolled off. Too short for a box, it is rows.
 	if l.plain {
 		l.listY = l.bodyY
-		l.listH = max(1, l.bodyH-1)
+		l.listH = max(1, l.bodyH)
 	} else {
 		l.listY = l.bodyY + 2
-		l.listH = max(1, l.bodyH-4)
+		l.listH = max(1, l.bodyH-3)
 		if m.exploreTab == tabCommands && l.bodyH >= 6 {
 			l.listY++
 			l.listH--
@@ -433,6 +437,9 @@ func (m Model) exploreLayout(w int) exploreLayout {
 		}
 	}
 	l.start = windowStart(l.listH, len(l.items), l.cursor)
+	if m.exploreScrollManual[m.exploreTab] {
+		l.start = min(max(0, m.exploreScroll[m.exploreTab]), max(0, len(l.items)-l.listH))
+	}
 	return l
 }
 

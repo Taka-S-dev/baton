@@ -468,6 +468,15 @@ type Model struct {
 	msSearchTI      textinput.Model
 	runQueueFocused bool
 	runQueueCursor  int
+	msScrollOffset  int
+	msScrollManual  bool
+	runPaneWidths   [2]int
+	runPaneDragging bool
+	runScrollDrag   int
+	runScrollGrab   int
+	runDetailOffset int
+	runDetailKey    string
+	runDetailOpen   bool
 	discardCursor   int
 	msEscArmed      bool // first Esc with selections pressed; next Esc discards
 
@@ -505,6 +514,10 @@ type Model struct {
 	// Sub-models
 	spinner           spinner.Model
 	stepsVP           viewport.Model
+	wfScrollOffset    int
+	wfScrollManual    bool
+	wfDetailOffset    int
+	wfDetailKey       string
 	stepsFocused      bool
 	runWorkflowDetail bool
 	wfSearchTI        textinput.Model // Run workflow list search
@@ -530,14 +543,17 @@ type Model struct {
 	// Overview: which tab is open, where the cursor sits on each tab —
 	// kept per tab, so switching away and back lands where you were —
 	// and the search typed over the list.
-	narrowDetails    bool
-	helpOpen         bool
-	helpOffset       int
-	exploreHistory   []exploreLocation
-	exploreTab       int
-	exploreCursor    [tabCount]int
-	exploreSearch    string
-	exploreSearching bool
+	narrowDetails       bool
+	helpOpen            bool
+	helpOffset          int
+	exploreHistory      []exploreLocation
+	exploreTab          int
+	exploreScroll       [tabCount]int
+	exploreScrollManual [tabCount]bool
+	exploreCursor       [tabCount]int
+	explorePendingTab   int
+	exploreSearch       string
+	exploreSearching    bool
 
 	// The action menu Space opens over the row under the cursor, and
 	// the flag a flow launched from here carries so that, where it

@@ -200,6 +200,19 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.leaveAsk != leaveNone {
 		return m.updateLeaveMouse(msg)
 	}
+	divider := m.exploreLayout(m.viewWidth())
+	if !divider.single && msg.X == divider.leftW && msg.Y >= divider.bodyY && msg.Y < divider.bodyY+divider.bodyH && msg.Action == tea.MouseActionPress {
+		if msg.Button == tea.MouseButtonRight {
+			m.exploreSplit = 0
+			m.exploreDragging = false
+			return m, nil
+		}
+		if msg.Button == tea.MouseButtonLeft {
+			m.exploreDragging = true
+			m.exploreSplit = divider.leftW
+			return m, nil
+		}
+	}
 	if msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionPress && m.exploreListFocused() {
 		l := m.exploreLayout(m.viewWidth())
 		row := msg.Y - l.listY
@@ -224,7 +237,7 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// after it would move the divider instead of the cursor.
 	if m.exploreDragging {
 		if msg.Action == tea.MouseActionMotion && msg.Button == tea.MouseButtonLeft {
-			m.exploreSplit = msg.X
+			m.exploreSplit = min(max(msg.X, exploreMinList), m.viewWidth()-exploreMinRight-1)
 			return m, nil
 		}
 		m.exploreDragging = false
@@ -238,6 +251,11 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// it, leaving the way Esc does and selecting what was clicked.
 	if m.wfe != nil && !m.wfe.adding {
 		e := m.wfe
+		if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+			if len(e.steps) <= max(1, l.editH-4) || msg.X < l.rightX || msg.X >= l.rightX+l.rightW || msg.Y < l.fieldY || msg.Y >= l.editY+l.editH-1 {
+				return m, nil
+			}
+		}
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
 			e.cursor = max(0, e.cursor-1)
@@ -272,6 +290,11 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.cf == nil && m.wfe == nil {
+		if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+			if len(l.items) <= l.listH || msg.X < 0 || msg.X >= l.leftW || msg.Y < l.listY || msg.Y >= l.listY+l.listH {
+				return m, nil
+			}
+		}
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
 			*cur = max(0, l.cursor-wheelRows)
@@ -286,7 +309,7 @@ func (m Model) updateExploreMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// The column between the boxes is the handle for the split.
-	if !l.single && msg.X == l.leftW {
+	if !l.single && msg.X == l.leftW && msg.Y >= l.bodyY && msg.Y < l.bodyY+l.bodyH {
 		m.exploreDragging = true
 		m.exploreSplit = msg.X
 		return m, nil

@@ -448,10 +448,15 @@ The queue shows order, name and command text, with long rows abbreviated and pla
 | `F2` | Switch candidates / queue (`Ctrl+Q` also works) |
 | `J/K` or `Shift+↓/↑` in queue | Reorder |
 | `Del` / `x` in queue | Remove from this run, keeping the command definition |
+| `d`, or a click on the selected queue row | Open the details popup for the highlighted command; `Esc` or a click outside closes it |
+| `PgUp` / `PgDn`, mouse wheel | Scroll the details; the wheel scrolls the pane under the pointer |
+| Drag the divider, right-click it | Resize the two panes, reset the width |
 | `Enter` | Resolve inputs and proceed to execution review |
 | `Esc` in queue | Return to candidates |
 | `Esc` in candidates | Clear the filter first; otherwise leave, asking before discarding selections |
 | `F1` | Help |
+
+A queue row shows the position, the name and the start of the command; the details box below wraps the full command and working directory. Scrollbars appear only when a pane overflows — drag the thumb or click the track to page.
 
 With nothing selected, `Enter` in candidates uses the highlighted command. In an empty queue, `Enter` does nothing. The discard dialog defaults to **Keep selecting**. `Esc` cancels it and preserves the selection; choose **Discard and go back** and press `Enter` to leave. Execution starts only after the final run confirmation.
 

@@ -13,14 +13,18 @@ func (m Model) viewCompactCandidates(w int, hitRow ...func(int, int)) string {
 	if m.screen == ScreenEditWorkflowCommands {
 		title = "Edit commands"
 	}
-	title += fmt.Sprintf(" · %d selected", len(m.msSelected))
+
 	rows := max(1, m.termHeight()-2)
-	start := windowStart(rows, len(filtered), m.msCursor)
+	start := m.candidateStart(rows, len(filtered))
 	for _, hit := range hitRow {
 		hit(-2, 1)
 	}
 	search := m.commandSearchLine(w, len(filtered))
-	lines := []string{accentBold(ansi.Truncate(title, w, "…")), ansi.Truncate(search, w, "…")}
+	heading, buttonStart := m.candidateHeading(title, w)
+	if buttonStart < 0 {
+		heading = white(ansi.Truncate(title+fmt.Sprintf(" · %d selected", len(m.msSelected)), w, "…"))
+	}
+	lines := []string{heading, ansi.Truncate(search, w, "…")}
 	terms := strings.Fields(m.msSearchTI.Value())
 	for row := 0; row < rows; row++ {
 		i := start + row
@@ -73,7 +77,7 @@ func (m Model) viewCompactCandidates(w int, hitRow ...func(int, int)) string {
 		if selected {
 			label = searchHighlight(label, terms, true, true)
 		}
-		lines = append(lines, label)
+		lines = append(lines, candidateRow(label, w, len(filtered), rows, start, row))
 	}
 	return strings.Join(lines[:min(len(lines), m.termHeight())], "\n")
 }

@@ -62,6 +62,7 @@ func (m *Model) msFiltered() []int {
 }
 
 func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.msScrollManual = false
 	filtered := m.msFiltered()
 	n := len(filtered)
 
@@ -113,6 +114,20 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	if !escArmed && !m.msSearchTI.Focused() {
+		switch msg.String() {
+		case "d":
+			m.runDetailOpen = true
+			m.scrollRunDetail(0)
+			return m, nil
+		case "pgup":
+			m.scrollRunDetail(-5)
+			return m, nil
+		case "pgdown":
+			m.scrollRunDetail(5)
+			return m, nil
+		}
+	}
 	if msg.String() == "ctrl+q" || msg.String() == "f2" {
 		m.runQueueFocused = !m.runQueueFocused
 		return m, nil
@@ -122,7 +137,10 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.runQueueCursor = min(m.runQueueCursor, max(0, n-1))
 		i := m.runQueueCursor
 		switch msg.String() {
-		case "esc", "left":
+		case "left":
+			m.runQueueFocused = false
+			return m, nil
+		case "esc":
 			m.runQueueFocused = false
 			return m, nil
 		case "up":

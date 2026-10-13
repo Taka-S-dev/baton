@@ -33,11 +33,11 @@ func (m Model) shortRunQueue(w int) string {
 	if n > rows {
 		title += fmt.Sprintf(" · %d–%d", start+1, min(start+rows, n))
 	}
-	lines := []string{accentBold(title)}
-	for i := start; i < min(start+rows, n); i++ {
-		line := m.queueCommandLabel(i, max(1, w-2))
+	var lines []string
+	for i := 0; i < n; i++ {
+		line := m.queueCommandLabel(i, max(1, w-3))
 		if i == m.runQueueCursor && m.runQueueFocused {
-			line = m.selectedSyntaxRow("▶ "+line, w)
+			line = m.selectedSyntaxRow("▶ "+line, w-1)
 		} else {
 			line = "  " + line
 		}
@@ -46,7 +46,7 @@ func (m Model) shortRunQueue(w int) string {
 	if n == 0 {
 		lines = append(lines, gray("Tab: add commands in execution order"))
 	}
-	return strings.Join(lines, "\n")
+	return accentBold(title) + "\n" + scrollRows(lines, start, rows, w)
 }
 
 func (m Model) shortWorkflowSteps(w int, hitRow ...func(int, int)) string {

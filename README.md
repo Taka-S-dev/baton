@@ -21,8 +21,8 @@ Linux and macOS behave the same.
 ```
 [1 Workflows] [2 Commands] · api
 Select commands · 2 selected                       │ Run queue · 2 selected
-/ Search…                    4/4 · Name ↑ · s Sort │   1. $ go build ./...
-  [1] build                                        │   2. $ go test ./...
+/ Search…                    4/4 · Name ↑ · s Sort │   1. build  $ go build ./...
+  [1] build                                        │   2. test  $ go test ./...
   [ ] deploy                                       │
   [ ] logs                                         │
 ▶ [2] test                                         │
@@ -144,3 +144,4 @@ Named after the relay baton: each step hands off to the next.
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
+

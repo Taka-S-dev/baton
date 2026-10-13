@@ -56,7 +56,8 @@ func (m Model) helpLines(w int) []string {
 			return "Type to filter · ↑↓ Move · Tab Select / deselect"
 		}(),
 			"F2 Switch between candidates and execution queue · s Sort candidates",
-			"Queue: J/K or Shift+↓/↑ Reorder · Del/x Remove from queue",
+			"↔ Divider: drag to resize · Right-click divider: reset width",
+			"Queue: J/K or Shift+↓/↑ Reorder · Del/x Remove from queue · d Details popup (click the selected queue row also opens it) · PgUp/PgDn Scroll details · Esc / click outside Close",
 			"Enter Continue · Esc Back (keeps selection in the confirmation)",
 			"Removing a queue entry does not delete its command.",
 		)
@@ -111,6 +112,7 @@ func (m Model) helpLines(w int) []string {
 			}
 		} else {
 			lines = append(lines, strings.Split(m.exploreKeys(), "  ")...)
+			lines = append(lines, "↔ Divider: drag to resize · Right-click divider: reset width")
 		}
 		if m.contextInputActive() {
 			lines = append(lines, "Ctrl+V Paste · Right-click: Paste / Copy value")

@@ -9,6 +9,24 @@ import (
 )
 
 func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+
+	if !m.msEscArmed && msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && m.runProjectEditHit(msg.X, msg.Y) {
+		return m.editFromRunHome()
+	}
+	if !m.msEscArmed && m.handleRunScrollMouse(msg) {
+		return m, nil
+	}
+	if !m.msEscArmed && (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) && msg.X >= 0 && msg.X < m.viewWidth() && msg.Y >= 0 && msg.Y < m.termHeight() {
+		if !splitPanels(m.viewWidth()) || msg.X < m.runLeftWidth(m.viewWidth()) {
+			delta := 3
+			if msg.Button == tea.MouseButtonWheelUp {
+				delta = -3
+			}
+			m.msCursor = min(max(0, len(m.msFiltered())-1), max(0, m.msCursor+delta))
+			m.runQueueFocused = false
+		}
+		return m, nil
+	}
 	if m.msEscArmed || msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return m, nil
 	}
@@ -19,7 +37,7 @@ func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	split := splitPanels(w)
 	leftW := w
 	if split {
-		leftW = w / 2
+		leftW = m.runLeftWidth(w)
 	}
 	if (split && msg.X > leftW) || (!split && m.runQueueFocused) {
 		queueH := max(5, m.termHeight()/2)
@@ -37,8 +55,13 @@ func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		row := msg.Y - 1
 		index := start + row
 		if row < rows && index < len(m.msSelected) {
+			open := m.runQueueFocused && m.runQueueCursor == index
 			m.runQueueFocused = true
 			m.runQueueCursor = index
+			if open {
+				m.runDetailOpen = true
+				m.scrollRunDetail(0)
+			}
 		}
 		return m, nil
 	}

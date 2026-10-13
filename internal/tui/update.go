@@ -99,6 +99,21 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+
+	if mouse, ok := msg.(tea.MouseMsg); ok && (m.screen == ScreenExplore || m.exploreValueFlow() || m.exploreTemplateFlow()) && !m.exploreMenu && m.leaveAsk == leaveNone && !m.pasteMenu && mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
+		l := m.exploreLayout(m.viewWidth())
+		if mouse.Y == l.tabY {
+			for tab, span := range l.tabX {
+				if mouse.X >= span[0] && mouse.X < span[1] {
+					return m, m.clickExploreTab(tab)
+				}
+			}
+		}
+	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenExplore && !m.exploreMenu && m.leaveAsk == leaveNone && !m.pasteMenu && mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && m.exploreBackHit(mouse.X, mouse.Y) {
+		return m.updateScreen(tea.KeyMsg{Type: tea.KeyEsc})
+	}
+
 	if key, ok := msg.(tea.KeyMsg); ok && m.screen != ScreenRunning {
 		question := key.String() == "?" && m.screen == ScreenExplore && m.exploreListFocused() && !m.exploreSearching
 		if key.String() == "f1" || question {
@@ -209,8 +224,19 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, startSearchInput(&m.projectSearchTI, m.projectFilter)
 		}
 		names := m.visibleProjects()
+		if mouse.X < 0 || mouse.X >= m.viewWidth() || mouse.Y < 0 || mouse.Y >= m.termHeight() {
+			return m, nil
+		}
+		switch mouse.Button {
+		case tea.MouseButtonWheelUp:
+			m.listCursor = max(0, m.listCursor-1)
+			return m, nil
+		case tea.MouseButtonWheelDown:
+			m.listCursor = min(max(0, len(names)-1), m.listCursor+1)
+			return m, nil
+		}
 		y, rows := m.projectRows(m.viewWidth())
-		if mouse.Action == tea.MouseActionPress {
+		if mouse.Action == tea.MouseActionPress && (mouse.Button == tea.MouseButtonLeft || mouse.Button == tea.MouseButtonRight) {
 			if mouse.Y == m.projectAddY(m.viewWidth()) && mouse.Button == tea.MouseButtonLeft {
 				return m.updateProjects(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 			}
@@ -248,6 +274,9 @@ func (m Model) updateScreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if mouse, ok := msg.(tea.MouseMsg); ok && (m.screen == ScreenRunCommands || m.screen == ScreenCreateWorkflow || m.screen == ScreenEditWorkflowCommands) {
 		return m.updateRunSelectMouse(mouse)
+	}
+	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenRunWorkflow {
+		return m.updateWorkflowHomeMouse(mouse)
 	}
 	if mouse, ok := msg.(tea.MouseMsg); ok && m.screen == ScreenRunWorkflowSteps {
 		return m.updateWorkflowStepsMouse(mouse)

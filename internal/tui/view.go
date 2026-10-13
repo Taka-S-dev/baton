@@ -276,91 +276,6 @@ func (m Model) workflowLabel(idx int, hovered bool) string {
 	return strings.Join(styled, highlight("+")) + gray(tail)
 }
 
-func (m Model) viewRunWorkflowList(w int, searchRow ...func(int)) string {
-	var b strings.Builder
-	m.writeHeading(&b, "Run workflow", w)
-
-	if len(m.workflows) == 0 {
-		b.WriteString("  " + gray("(no workflows saved)") + "\n")
-		if m.termHeight() >= 18 {
-			b.WriteString("\n" + hline(w) + "\n")
-			b.WriteString("  " + gray("Esc Back · F1 Help") + "\n")
-		}
-		return b.String()
-	}
-
-	filtered := m.wfFiltered()
-	n := len(filtered)
-	// Spacing gives way to list rows on a short terminal.
-	gap, below := "\n", 5
-	if m.compact() {
-		gap, below = "", 4
-	}
-	for _, hit := range searchRow {
-		hit(strings.Count(b.String(), "\n"))
-	}
-	b.WriteString("  " + m.runSearchView(m.wfSearchTI) + "  " + dim(fmt.Sprintf("%d/%d", n, len(m.workflows))) + "\n" + gap)
-	cur := m.listCursor
-	if cur >= n {
-		cur = max(0, n-1)
-	}
-
-	// The steps viewport below has a fixed height, so budget against it
-	// instead of the hovered workflow's step count — a per-item budget
-	// makes the list grow and shrink as the cursor moves.
-	stepsH := m.previewBudget(&b, m.stepsVP.Height, below, 3)
-	if stepsH == 0 {
-		// below counts the blank line and the "steps" rule the preview
-		// opens with; without the preview the list gets both rows.
-		below -= 2
-	}
-	if m.termHeight() < 18 {
-		stepsH, below = 0, 0
-	}
-	viewH := m.listBudget(&b, stepsH+below)
-	writeWindowedList(&b, viewH, n, cur, "No results.", func(i int) string {
-		wf := m.workflows[filtered[i]]
-		suffix := ""
-		if wf.Name == m.lastWorkflow {
-			suffix = "  " + gray("(last)")
-		}
-		if i == cur {
-			return "  " + accentBold("▶") + " " + searchHighlight(m.workflowLabel(filtered[i], true)+suffix, strings.Fields(m.wfSearchTI.Value()), false, true)
-		}
-		return "    " + searchHighlight(m.workflowLabel(filtered[i], false)+suffix, strings.Fields(m.wfSearchTI.Value()), false, true)
-	})
-
-	// Step preview for hovered workflow (scrollable viewport), left out
-	// when the terminal cannot hold it and the list at once.
-	if stepsH > 0 {
-		if m.stepsFocused {
-			b.WriteString("\n" + hlineLabel(w, "steps ↑↓") + "\n")
-		} else {
-			b.WriteString("\n" + hlineLabel(w, "steps") + "\n")
-		}
-		b.WriteString(m.stepsVP.View() + "\n")
-	}
-
-	if m.termHeight() >= 18 {
-		b.WriteString(gap + hline(w) + "\n")
-		keys := "↑↓ Move  Enter Continue  Tab/→ Steps  F2 Details  Esc Back  F1 Help"
-		if m.runHomeVisible() {
-			keys = m.runHomeKeys()
-		}
-		b.WriteString("  " + gray(keys) + "\n")
-	}
-	if m.termHeight() < 18 {
-		lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
-		for len(lines) < m.termHeight() {
-			lines = append(lines, " ")
-		}
-		return strings.Join(lines, "\n")
-	}
-	return b.String()
-}
-
-// ── Multi-select ─────────────────────────────────────────────────────────────
-
 func (m Model) viewMultiSelectList(w int) string {
 	return m.viewMultiSelectCandidates(w, true)
 }
@@ -378,7 +293,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 
 	terms := strings.Fields(m.msSearchTI.Value())
 	orderW := max(3, len(fmt.Sprint(len(m.msSelected)))+2)
-	columnW, matchW := max(1, w-3-orderW), 0
+	columnW, matchW := max(1, w-4-orderW), 0
 	if len(terms) > 0 && columnW >= 48 {
 		matchW = min(32, columnW/3)
 		columnW -= matchW + 2
@@ -407,7 +322,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 	}
 
 	var b strings.Builder
-	m.writeHeading(&b, title, w)
+	m.writeCandidateHeading(&b, title, w)
 
 	// On a short terminal the blank lines around the list become list
 	// rows: spacing is the cheapest thing in the frame to give up.
@@ -436,7 +351,7 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 		below--
 	}
 	viewH := m.listBudget(&b, previewH+below)
-	writeWindowedList(&b, viewH, n, cursor, "No results.", func(i int) string {
+	m.writeCandidateWindow(&b, viewH+1, n, w, func(i int) string {
 		if len(hitRow) > 0 {
 			hitRow[0](i, strings.Count(b.String(), "\n"))
 		}

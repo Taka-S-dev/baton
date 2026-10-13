@@ -8,51 +8,34 @@ import (
 )
 
 func (m Model) viewRunWorkflow(w int, searchRow ...func(int)) string {
-	if splitPanels(w) && m.shortPanels() {
-		return m.viewShortWorkflowSplit(w, searchRow...)
-	}
-	if !splitPanels(w) {
-		return m.viewRunWorkflowList(w, searchRow...)
-	}
-	leftW := w / 3
-	var b strings.Builder
+	m.width = w
+	areas := m.workflowScrollAreas()
+	a := areas[0]
 	for _, hit := range searchRow {
 		hit(1)
 	}
-	b.WriteString(m.runSearchView(m.wfSearchTI) + "\n")
-	filtered := m.wfFiltered()
-	writeWindowedList(&b, max(1, m.termHeight()-5), len(filtered), m.listCursor, "No workflows.", func(i int) string {
-		wf := m.workflows[filtered[i]]
-		label := fmt.Sprintf("%s · %d steps", wf.Name, len(wf.Commands))
-		label = searchHighlight(truncate(label, leftW-4), strings.Fields(m.wfSearchTI.Value()), false, true)
+	f := m.wfFiltered()
+	var list []string
+	for i, idx := range f {
+		wf := m.workflows[idx]
+		label := fmt.Sprintf("  %s · %d steps", wf.Name, len(wf.Commands))
 		if i == m.listCursor {
-			row := m.selectedSyntaxRow("▶ "+label, leftW-2)
-			return searchHighlight(row, strings.Fields(m.wfSearchTI.Value()), true, true)
+			label = m.selectedSyntaxRow("▶ "+strings.TrimPrefix(label, "  "), a.width-1)
 		}
-		return "  " + label
-	})
-	left := box("Run workflow", b.String(), leftW, m.termHeight()-1, true)
-	rightW := w - leftW - 1
-	title := "Execution steps"
-	var detail strings.Builder
-	detail.WriteString("Saved order · all steps run by default\n\n")
-	if m.listCursor < len(filtered) {
-		wf := m.workflows[filtered[m.listCursor]]
-		title += " · " + wf.Name
-		writeWindowedList(&detail, max(1, m.termHeight()-9), len(wf.Commands), m.stepsVP.YOffset, "No steps.", func(i int) string {
-			name := wf.Commands[i]
-			if c, ok := m.workflowStepCommand(name); ok {
-				return m.syntaxText(truncate(fmt.Sprintf("%d  %s  $ %s", i+1, name, c.Cmd), rightW-2))
-			}
-			return warn(truncate(fmt.Sprintf("%d  %s · not found", i+1, name), rightW-2))
-		})
+		list = append(list, label)
 	}
-	right := box(truncate(title, rightW-4), detail.String(), rightW, m.termHeight()-1, false)
-	footer := "↑↓ Move · Enter Continue · Tab/→ Steps · F2 Details · Esc Back · F1 Help"
-	if m.runHomeVisible() {
-		footer = m.runHomeKeys()
+	if len(list) == 0 {
+		list = []string{"No workflows."}
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right) + "\n" + gray(truncate(footer, w)) + "\n"
+	left := box("Run workflow", m.runSearchView(m.wfSearchTI)+"\n"+scrollRows(list, a.offset, a.rows, a.width), a.width+2, m.termHeight()-1, true)
+	body := left
+	if len(areas) > 1 {
+		d := areas[1]
+		lines, _ := m.workflowDetailLines(d.width - 1)
+		right := box("Execution steps", scrollRows(lines, d.offset, d.rows, d.width), d.width+2, m.termHeight()-1, false)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, left, m.runDivider(m.termHeight()-1), right)
+	}
+	return body + "\n" + gray(truncate(m.runHomeKeys(), w))
 }
 
 func (m Model) workflowDetailsInline() bool { return splitPanels(m.viewWidth()) }

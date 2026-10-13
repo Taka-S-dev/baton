@@ -22,7 +22,7 @@ func (m Model) viewExplore(w int) string {
 	l := m.exploreLayout(w)
 
 	var b strings.Builder
-	m.writeHeading(&b, m.exploreTitle(), w)
+	m.writeExploreHeading(&b, w)
 	b.WriteString(m.exploreTabLine() + "\n")
 	gap := "\n"
 	if m.compact() {
@@ -39,7 +39,7 @@ func (m Model) viewExplore(w int) string {
 		if l.prevH > 0 {
 			right = lipgloss.JoinVertical(lipgloss.Left, right, m.explorePreviewBox(l))
 		}
-		b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right))
+		b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, left, m.exploreDivider(l), right))
 	}
 	b.WriteString("\n")
 
@@ -128,12 +128,23 @@ func (m Model) exploreListPane(l exploreLayout) string {
 		inner = l.leftW - 2
 	}
 	var rows strings.Builder
-	writeWindowedList(&rows, l.listH, len(l.items), l.cursor, "(none)", func(i int) string {
-		if m.exploreTab == tabCommands {
-			return searchHighlight(commandTableRow(l.items[i], i == l.cursor, m.exploreListFocused(), inner), strings.Fields(m.exploreSearch), i == l.cursor, m.exploreListFocused())
+
+	for row := 0; row < l.listH; row++ {
+		i := l.start + row
+		line := ""
+		if i < len(l.items) {
+			if m.exploreTab == tabCommands {
+				line = commandTableRow(l.items[i], i == l.cursor, m.exploreListFocused(), inner-1)
+			} else {
+				line = exploreRow(l.items[i], i == l.cursor, m.exploreListFocused(), inner-1)
+			}
+			line = searchHighlight(line, strings.Fields(m.exploreSearch), i == l.cursor, m.exploreListFocused())
+		} else if row == 0 && len(l.items) == 0 {
+			line = gray("(none)")
 		}
-		return searchHighlight(exploreRow(l.items[i], i == l.cursor, m.exploreListFocused(), inner), strings.Fields(m.exploreSearch), i == l.cursor, m.exploreListFocused())
-	})
+		rows.WriteString(candidateRow(line, inner, len(l.items), l.listH, l.start, row) + "\n")
+	}
+
 	body := strings.TrimRight(rows.String(), "\n")
 	if l.plain {
 		return body
@@ -278,8 +289,7 @@ func (m Model) exploreEditorBox(l exploreLayout) string {
 	case !ok:
 		// A name is no help for a kind of thing you have not met, and a
 		// project with none of it is exactly when you need to know.
-		what, how := categoryHelp(m.exploreTab)
-		b.WriteString(" " + gray(what) + "\n\n " + dim("none yet · "+how) + "\n")
+		b.WriteString(categoryHelpContent(m.exploreTab, inner))
 	case it.kind == exCommand:
 		title = "Command · " + it.name
 		cmd, _ := m.config.FindCommand(it.name)

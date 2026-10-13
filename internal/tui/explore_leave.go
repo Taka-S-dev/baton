@@ -86,6 +86,22 @@ func (m *Model) updateLeave(msg tea.KeyMsg) tea.Cmd {
 		key = "k"
 	}
 	what := m.leaveAsk
+	defer func() {
+		if m.explorePendingTab == 0 {
+			return
+		}
+		if key == "k" {
+			m.explorePendingTab = 0
+			return
+		}
+		if (key == "s" || key == "d") && m.leaveAsk == leaveNone {
+			tab := m.explorePendingTab - 1
+			m.explorePendingTab = 0
+			if m.exploreListFocused() {
+				m.switchTab(tab)
+			}
+		}
+	}()
 	switch key {
 	case "s":
 		m.leaveAsk = leaveNone
