@@ -47,6 +47,7 @@ func TestDetailsPreserveFullTextAndScroll(t *testing.T) {
 		t.Fatal("closing details changed selection")
 	}
 }
+
 func TestScrollbarOnlyForOverflow(t *testing.T) {
 	if strings.Contains(stripStyle(scrollRows([]string{"abc"}, 0, 3, 12)), "┃") {
 		t.Fatal("unnecessary bar")

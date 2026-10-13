@@ -24,6 +24,7 @@ func (m Model) runDetailCommand() *mdl.Command {
 	}
 	return m.msItems[index].cmd
 }
+
 func (m Model) runDetailLines(w int) ([]string, string) {
 	c := m.runDetailCommand()
 	if c == nil {
@@ -40,6 +41,7 @@ func (m Model) runDetailLines(w int) ([]string, string) {
 	// Hard wrapping preserves shell whitespace and long unbroken paths.
 	return strings.Split(ansi.Hardwrap(text, max(1, w), true), "\n"), c.Name + "\x00" + text
 }
+
 func (m Model) detailSize() (int, int) {
 	w, h := m.viewWidth(), m.termHeight()
 	if m.runDetailOpen {
@@ -51,6 +53,7 @@ func (m Model) detailSize() (int, int) {
 	}
 	return w, max(3, h-max(5, h/2)-2)
 }
+
 func (m *Model) scrollRunDetail(delta int) {
 	w, h := m.detailSize()
 	lines, key := m.runDetailLines(w - 3)
@@ -83,6 +86,7 @@ func scrollRows(lines []string, start, rows, width int) string {
 	}
 	return strings.Join(out, "\n")
 }
+
 func (m Model) runDetailBox(w, h int) string {
 	lines, key := m.runDetailLines(w - 3)
 	offset := m.runDetailOffset

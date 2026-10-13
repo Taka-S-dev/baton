@@ -12,6 +12,7 @@ func (m Model) runPaneIndex() int {
 	}
 	return 0
 }
+
 func (m Model) runLeftWidth(w int) int {
 	want := m.runPaneWidths[m.runPaneIndex()]
 	if want == 0 {
@@ -22,6 +23,7 @@ func (m Model) runLeftWidth(w int) int {
 	}
 	return min(max(want, 28), w-29)
 }
+
 func (m Model) runDivider(rows int) string {
 	lines := make([]string, max(1, rows))
 	for i := range lines {
@@ -36,6 +38,7 @@ func (m Model) runDivider(rows int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
 func (m *Model) handleRunDivider(msg tea.MouseMsg) bool {
 	if m.runPaneDragging {
 		if msg.Action == tea.MouseActionMotion && msg.Button == tea.MouseButtonLeft {

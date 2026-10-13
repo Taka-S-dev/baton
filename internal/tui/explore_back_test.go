@@ -20,6 +20,7 @@ func clickExploreBack(t *testing.T, m Model) Model {
 	t.Fatal("back button missing")
 	return m
 }
+
 func TestExploreBackReturnsToRun(t *testing.T) {
 	for _, height := range []int{10, 36} {
 		m := homeTab(homeTestModel(t), '2')
@@ -34,6 +35,7 @@ func TestExploreBackReturnsToRun(t *testing.T) {
 		}
 	}
 }
+
 func TestExploreBackConfirmsUnsavedForm(t *testing.T) {
 	m := exploreProject()
 	m.width = 120

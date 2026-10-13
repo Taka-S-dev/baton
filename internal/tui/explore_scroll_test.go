@@ -44,6 +44,7 @@ func TestEditorScrollAllTabs(t *testing.T) {
 		}
 	}
 }
+
 func TestEditorScrollKeepsUnsavedForm(t *testing.T) {
 	m := exploreProject()
 	for i := 0; i < 70; i++ {

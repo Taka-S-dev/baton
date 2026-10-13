@@ -9,6 +9,7 @@ func scrollbarThumb(total, rows, offset int) (int, int) {
 	size := min(rows, max(1, rows*rows/max(1, total)))
 	return min(max(0, offset), max(0, total-rows)) * (rows - size) / max(1, total-rows), size
 }
+
 func (m Model) runScrollAreas() []runScrollArea {
 	if m.screen == ScreenExplore {
 		l := m.exploreLayout(m.viewWidth())
@@ -60,6 +61,7 @@ func (m Model) runScrollAreas() []runScrollArea {
 	a = append(a, m.candidateScrollArea())
 	return a
 }
+
 func (m *Model) setRunScroll(a runScrollArea, offset int) {
 	offset = min(max(0, offset), max(0, a.total-a.rows))
 	if a.target == 6 {
@@ -89,6 +91,7 @@ func (m *Model) setRunScroll(a runScrollArea, offset int) {
 		m.scrollRunDetail(offset - a.offset)
 	}
 }
+
 func (m *Model) handleRunScrollMouse(msg tea.MouseMsg) bool {
 	if msg.Action == tea.MouseActionRelease {
 		was := m.runScrollDrag != 0

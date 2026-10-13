@@ -27,6 +27,7 @@ func (m Model) workflowDetailLines(w int) ([]string, string) {
 	}
 	return strings.Split(ansi.Hardwrap(strings.TrimSuffix(text, "\n"), max(1, w), true), "\n"), text
 }
+
 func (m Model) workflowScrollAreas() []runScrollArea {
 	w, h := m.viewWidth(), m.termHeight()
 	lw := w
@@ -52,6 +53,7 @@ func (m Model) workflowScrollAreas() []runScrollArea {
 	}
 	return areas
 }
+
 func (m Model) updateWorkflowHomeMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.handleRunScrollMouse(msg) {
 		return m, nil

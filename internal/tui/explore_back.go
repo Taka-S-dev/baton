@@ -14,6 +14,7 @@ func (m Model) exploreBackRow() int {
 	}
 	return 1
 }
+
 func (m Model) writeExploreHeading(b *strings.Builder, w int) {
 	var original strings.Builder
 	m.writeHeading(&original, m.exploreTitle(), w)
@@ -22,6 +23,7 @@ func (m Model) writeExploreHeading(b *strings.Builder, w int) {
 	lines[row] = ansi.Truncate("  "+gray(exploreBackLabel)+"  "+accentBold(m.exploreTitle()), w, "…")
 	b.WriteString(strings.Join(lines, "\n"))
 }
+
 func (m Model) exploreBackHit(x, y int) bool {
 	return m.viewWidth() >= 10 && y == m.exploreBackRow() && x >= 2 && x < 2+ansi.StringWidth(exploreBackLabel)
 }

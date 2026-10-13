@@ -12,6 +12,7 @@ func (m Model) candidateStart(rows, n int) int {
 	}
 	return windowStart(rows, n, m.msCursor)
 }
+
 func candidateRow(line string, w, n, rows, start, row int) string {
 	tail := "…"
 	if ansi.StringWidth(strings.TrimRight(ansi.Strip(line), " ")) <= max(0, w-1) {
@@ -29,6 +30,7 @@ func candidateRow(line string, w, n, rows, start, row int) string {
 	}
 	return line + bar
 }
+
 func (m Model) writeCandidateWindow(b *strings.Builder, rows, n, w int, render func(int) string) {
 	start := m.candidateStart(rows, n)
 	for row := 0; row < rows; row++ {
@@ -41,6 +43,7 @@ func (m Model) writeCandidateWindow(b *strings.Builder, rows, n, w int, render f
 		b.WriteString(candidateRow(line, w, n, rows, start, row) + "\n")
 	}
 }
+
 func (m Model) candidateScrollArea() runScrollArea {
 	w := m.viewWidth()
 	split := splitPanels(w)

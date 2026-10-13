@@ -64,6 +64,7 @@ func (m Model) runDetailPopup() actionPopupLayout {
 	}
 	return p
 }
+
 func (m Model) viewRunDetailPopup(w int) string {
 	bg := m
 	bg.runDetailOpen = false

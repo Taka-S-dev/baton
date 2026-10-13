@@ -19,6 +19,7 @@ func (m Model) candidateHeading(title string, w int) (string, int) {
 	}
 	return white(prefix) + "  " + gray(runProjectEditLabel), start
 }
+
 func (m Model) writeCandidateHeading(b *strings.Builder, title string, w int) {
 	var original strings.Builder
 	m.writeHeading(&original, title, w)
@@ -30,6 +31,7 @@ func (m Model) writeCandidateHeading(b *strings.Builder, title string, w int) {
 	lines[row], _ = m.candidateHeading(title, w)
 	b.WriteString(strings.Join(lines, "\n"))
 }
+
 func (m Model) runProjectEditHit(x, y int) bool {
 	if m.runDetailOpen {
 		return false
