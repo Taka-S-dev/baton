@@ -739,3 +739,30 @@ func TestScrollCountsKeepTheirColumns(t *testing.T) {
 		t.Fatalf("the down count moved: %q vs %q", top, mid)
 	}
 }
+
+// TestSelectedLineNamesTheQueueOrSaysHowManyAreHidden: on its own the
+// Selected line lists the queue in full while it fits; when it does not,
+// it shows the first names and how many more there are, never a bare
+// ellipsis. Beside the queue box it is the count alone.
+func TestSelectedLineNamesTheQueueOrSaysHowManyAreHidden(t *testing.T) {
+	if got := queueNamesLine([]string{"build", "recent", "vet"}, 40); got != "build, recent, vet" {
+		t.Fatalf("names that fit must be shown in full: %q", got)
+	}
+	if got := queueNamesLine([]string{"build", "recent", "vet", "version"}, 20); got != "build, recent +2 more" && got != "build +3 more" {
+		t.Fatalf("names that do not fit must say how many are hidden: %q", got)
+	}
+	cmds := []mdl.Command{{Name: "build", Cmd: "go build"}, {Name: "recent", Cmd: "git log"}, {Name: "vet", Cmd: "go vet"}}
+	m := Model{width: 120, height: 30}
+	for i := range cmds {
+		m.msItems = append(m.msItems, msItem{cmd: &cmds[i]})
+	}
+	m.msSelected = []int{0, 1, 2}
+	alone := stripStyle(m.viewMultiSelectCandidates(80, true))
+	if !strings.Contains(alone, "Selected(3)") || !strings.Contains(alone, "build, recent, vet") || strings.Contains(alone, "...") {
+		t.Fatalf("alone, the line should name the whole queue:\n%s", alone)
+	}
+	beside := stripStyle(m.viewMultiSelectCandidates(60, false))
+	if !strings.Contains(beside, "Selected(3)") || strings.Contains(beside, "Run queue →") {
+		t.Fatalf("beside the queue box the line should be the count alone:\n%s", beside)
+	}
+}

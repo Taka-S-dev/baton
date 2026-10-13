@@ -491,18 +491,21 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 		writePadded(&b, pv.String(), previewH)
 	}
 
-	var selNames []string
-	for _, idx := range m.msSelected {
-		selNames = append(selNames, m.msItems[idx].name())
+	// Beside the queue box the names are already listed there in order,
+	// so the line is the count alone. On its own the line names the
+	// queue in full while it fits, and otherwise as many names as fit
+	// followed by how many are not shown — never a bare ellipsis — kept
+	// to one row because a wrapped line would push the frame past the
+	// terminal height.
+	selected := "  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected)))
+	if showPreview && len(m.msSelected) > 0 {
+		var names []string
+		for _, idx := range m.msSelected {
+			names = append(names, m.msItems[idx].name())
+		}
+		selected += "  " + dim("Run queue →") + ": " + queueNamesLine(names, max(10, w-ansi.StringWidth(ansi.Strip(selected))-16))
 	}
-	orderHint := ""
-	if len(m.msSelected) > 0 {
-		orderHint = "  " + dim("Run queue →")
-	}
-	// Keep the Selected line to one row: a wrapped line would grow the
-	// frame past the terminal height and bring the jitter back.
-	joined := truncate(strings.Join(selNames, ", "), max(10, w-40))
-	b.WriteString(gap + "  " + success(fmt.Sprintf("Selected(%d)", len(m.msSelected))) + orderHint + ": " + joined + "\n")
+	b.WriteString(gap + selected + "\n")
 	b.WriteString(hline(w) + "\n")
 	keys := "Tab Select  Enter Review  F2 Queue  s Sort  / Search  Esc Back"
 	if m.runHomeVisible() {
@@ -512,9 +515,29 @@ func (m Model) viewMultiSelectCandidates(w int, showPreview bool, hitRow ...func
 
 	// Discard guard: opens as a centered floating window over the list.
 	if m.msEscArmed && len(m.msSelected) > 0 {
-		return m.viewDiscardWindow(w, selNames)
+		var names []string
+		for _, idx := range m.msSelected {
+			names = append(names, m.msItems[idx].name())
+		}
+		return m.viewDiscardWindow(w, names)
 	}
 	return b.String()
+}
+
+// queueNamesLine lists names in order within width: all of them when
+// they fit, otherwise the first ones and a count of the rest.
+func queueNamesLine(names []string, width int) string {
+	line := strings.Join(names, ", ")
+	if ansi.StringWidth(line) <= width {
+		return line
+	}
+	for n := len(names) - 1; n >= 1; n-- {
+		short := strings.Join(names[:n], ", ") + fmt.Sprintf(" +%d more", len(names)-n)
+		if ansi.StringWidth(short) <= width {
+			return short
+		}
+	}
+	return fmt.Sprintf("%d commands", len(names))
 }
 
 // viewDiscardWindow renders the discard confirmation as a centered floating
