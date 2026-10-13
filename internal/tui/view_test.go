@@ -717,3 +717,25 @@ func TestConfirmRunFitsTheTerminal(t *testing.T) {
 		}
 	}
 }
+
+// TestScrollCountsKeepTheirColumns: "↓ N more" stays in the same column
+// whether or not "↑ N more" is shown beside it, so the hint does not
+// jump sideways as the list scrolls past its first page.
+func TestScrollCountsKeepTheirColumns(t *testing.T) {
+	hint := func(cursor int) string {
+		var b strings.Builder
+		writeWindowedList(&b, 5, 30, cursor, "", func(i int) string { return fmt.Sprintf("row %d", i) })
+		lines := strings.Split(strings.TrimRight(stripStyle(b.String()), "\n"), "\n")
+		return lines[len(lines)-1]
+	}
+	top, mid := hint(0), hint(15)
+	if !strings.Contains(top, "↓") || strings.Contains(top, "↑") {
+		t.Fatalf("at the top only the down count should show: %q", top)
+	}
+	if !strings.Contains(mid, "↑") || !strings.Contains(mid, "↓") {
+		t.Fatalf("mid-list both counts should show: %q", mid)
+	}
+	if len([]rune(top[:strings.Index(top, "↓")])) != len([]rune(mid[:strings.Index(mid, "↓")])) {
+		t.Fatalf("the down count moved: %q vs %q", top, mid)
+	}
+}

@@ -880,18 +880,21 @@ func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string
 	for ; rows < viewH; rows++ {
 		b.WriteString("\n")
 	}
-	var marks []string
+	// The two counts keep their columns: the "↑" slot is padded even
+	// when empty, so "↓ N more" does not jump sideways as the list
+	// scrolls past its first page.
+	up, down := "", ""
 	if viewStart > 0 {
-		marks = append(marks, fmt.Sprintf("↑ %d more", viewStart))
+		up = fmt.Sprintf("↑ %d more", viewStart)
 	}
 	if viewEnd < n {
-		marks = append(marks, fmt.Sprintf("↓ %d more", n-viewEnd))
+		down = fmt.Sprintf("↓ %d more", n-viewEnd)
 	}
-	if len(marks) > 0 {
-		b.WriteString("  " + dim(strings.Join(marks, "   ")) + "\n")
-	} else {
+	if up == "" && down == "" {
 		b.WriteString("\n")
+		return
 	}
+	b.WriteString("  " + dim(strings.TrimRight(fmt.Sprintf("%-13s%s", up, down), " ")) + "\n")
 }
 
 // windowStart is the index of the first row a cursor-following window
