@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -27,7 +28,10 @@ func TestConfirmBackPreservesSelectedFile(t *testing.T) {
 }
 
 func TestConfirmButtonsStayAtSameRow(t *testing.T) {
-	m := Model{width: 100, height: 36, launchDir: t.TempDir()}
+	// A short launch directory: the review cuts a line to the width,
+	// and a temporary directory is long enough to be cut on some
+	// machines, which is not what this test is about.
+	m := Model{width: 100, height: 36, launchDir: filepath.Join("srv", "api")}
 	cmd := mdl.Command{Name: "test", Cmd: "echo test"}
 	m.confirmRunItems = []mdl.RunItem{{Name: "test", Cmd: &cmd}}
 	line := func(view string) int {
