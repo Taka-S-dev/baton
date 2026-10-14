@@ -11,6 +11,7 @@ func revealRow(start, rows, total, cursor int) int {
 	}
 	return min(max(0, start), max(0, total-rows))
 }
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	before := m
 	if m.screen == ScreenRunCommands {

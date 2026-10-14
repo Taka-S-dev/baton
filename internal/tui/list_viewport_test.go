@@ -30,6 +30,7 @@ func TestEditorClickKeepsViewport(t *testing.T) {
 		t.Fatal("edge did not scroll by one")
 	}
 }
+
 func TestRevealRow(t *testing.T) {
 	for _, v := range [][2]int{{10, 10}, {14, 10}, {15, 11}, {9, 9}} {
 		if got := revealRow(10, 5, 50, v[0]); got != v[1] {
