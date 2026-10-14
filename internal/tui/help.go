@@ -31,7 +31,8 @@ func (m Model) helpLines(w int) []string {
 	}
 	if m.screen == ScreenRecent {
 		lines = append(lines,
-			"/ Start search · ↑↓ Move · Enter Select",
+			"/ Start search · ↑↓ Move · Tab Add/remove from queue · Enter Review",
+			"Queue runs in selection order, across projects. With nothing queued, Enter reviews one command.",
 			"Search: ↓ Results · Enter Select · Esc Clear text, then exit search",
 			"p Projects · q Quit · Esc Clear filter / Quit · Ctrl+R Refresh",
 			"Delete Remove from this directory’s history",

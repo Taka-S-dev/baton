@@ -72,6 +72,8 @@ type ListEntry struct {
 
 // RunItem is a resolved command ready for execution.
 type RunItem struct {
-	Name string
-	Cmd  *Command
+	Project string
+	Vars    map[string]string
+	Name    string
+	Cmd     *Command
 }

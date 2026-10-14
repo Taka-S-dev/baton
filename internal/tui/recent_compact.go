@@ -14,7 +14,7 @@ func (m Model) viewRecentCompact(w int) string {
 	filtered := m.recentFiltered()
 	h := m.termHeight()
 	search := m.recentSearchLine()
-	title := fmt.Sprintf("Recent · %d/%d", len(filtered), len(m.recentRows))
+	title := fmt.Sprintf("Recent · %d selected · %d/%d", len(m.recentQueue), len(filtered), len(m.recentRows))
 	if len(filtered) > p.rows {
 		title += fmt.Sprintf(" · %d–%d", p.start+1, min(p.start+p.rows, len(filtered)))
 	}
@@ -30,18 +30,15 @@ func (m Model) viewRecentCompact(w int) string {
 			continue
 		}
 		entry := m.recentRows[filtered[i]]
-		label := entry.ref.Command
-		if entry.problem != "" {
-			label += " [unavailable]"
-		}
 		selected := i == m.recentCursor
+		label := m.recentColumns(entry, p.width-3, selected)
 		label = recentHighlight(label, m.recentSearch, selected)
 		if selected {
 			label = sRowActive.Width(p.width).Render(ansi.Truncate("▶ "+label, p.width, "…"))
 		} else {
 			label = "  " + label
 		}
-		lines = append(lines, label)
+		lines = append(lines, candidateRow(label, p.width, len(filtered), p.rows, p.start, row))
 	}
 	lines = append(lines, recentBrowseRow(p.width, m.recentCursor == len(filtered)))
 	if m.recentNotice != "" {

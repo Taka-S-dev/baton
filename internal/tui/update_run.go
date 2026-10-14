@@ -9,7 +9,6 @@ import (
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/runner"
-	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/Taka-S-dev/baton/internal/store"
 )
 
@@ -93,7 +92,7 @@ func (m Model) runNext() tea.Cmd {
 	}
 	item := r.items[r.current]
 	r.stepStart = time.Now()
-	cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
+	cmd := m.runItemCommand(item)
 	header := stepHeader(r.current+1, len(r.items), item.Name, cmd)
 	prefix := ""
 	if r.current == r.startIdx && ((r.label != "" && r.label != "manual") || r.retryCount > 0) {
@@ -112,7 +111,7 @@ func (m Model) runNext() tea.Cmd {
 		prefix = "\n" + sep + "\n"
 	}
 	if !m.dryRun && m.launchDir != "" && m.projectsDir != "" {
-		if err := store.RecordRecent(m.projectsDir, m.launchDir, m.projectDir, item.Cmd.Name, time.Now()); err != nil {
+		if err := store.RecordRecent(m.projectsDir, m.launchDir, m.runItemProject(item), item.Cmd.Name, time.Now()); err != nil {
 			prefix += "Warning: could not save recent command: " + err.Error() + "\n"
 		}
 	}

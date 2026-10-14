@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -14,7 +13,7 @@ func (m Model) confirmCommonDirectory() (string, bool) {
 		if item.Cmd == nil {
 			return "", false
 		}
-		cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
+		cmd := m.runItemCommand(item)
 		current := m.confirmWorkdir(cmd.Dir)
 		if i == 0 {
 			dir = current
@@ -50,7 +49,7 @@ func (m Model) viewCompactConfirm(w int) string {
 		name += strings.Repeat(" ", max(0, nameWidth-ansi.StringWidth(name)))
 		line := gray(fmt.Sprintf("%*d. %s │ ", numberWidth, i+1, name))
 		if item.Cmd != nil {
-			cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
+			cmd := m.runItemCommand(item)
 			line += white("$ " + strings.ReplaceAll(strings.ReplaceAll(cmd.Cmd, "\r", ""), "\n", " ↵ "))
 			lines = append(lines, line)
 			if !same {

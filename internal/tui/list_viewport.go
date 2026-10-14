@@ -25,6 +25,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch m.screen {
+	case ScreenRecent:
+		p := m.recentGeometry(m.viewWidth())
+		m.recentOffset = p.start
+		m.recentManual = true
 	case ScreenExplore:
 		l := m.exploreLayout(m.viewWidth())
 		m.exploreScroll[m.exploreTab] = l.start
@@ -53,6 +57,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, keyboard := msg.(tea.KeyMsg)
 	if result.screen == before.screen && keyboard {
 		switch result.screen {
+		case ScreenRecent:
+			p := result.recentGeometry(result.viewWidth())
+			result.recentOffset = revealRow(p.start, p.rows, len(result.recentFiltered()), min(result.recentCursor, max(0, len(result.recentFiltered())-1)))
+			result.recentManual = true
 		case ScreenEditList:
 			if result.le != nil && !result.le.adding && !result.le.editing && result.exploreValueFlow() {
 				a := result.listValueScrollArea()

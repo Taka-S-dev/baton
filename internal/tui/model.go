@@ -82,7 +82,9 @@ const (
 
 // msItem is a command shown in the multi-select screen.
 type msItem struct {
-	cmd *mdl.Command
+	cmd        *mdl.Command
+	project    *config.Project
+	projectDir string
 }
 
 func (i msItem) name() string { return i.cmd.Name }
@@ -417,6 +419,9 @@ type Model struct {
 	recentActive     bool
 	exitAfterRun     bool
 	recentRows       []recentRow
+	recentOffset     int
+	recentManual     bool
+	recentQueue      []store.RecentEntry
 	recentSearch     string
 	recentSearching  bool
 	recentCursor     int

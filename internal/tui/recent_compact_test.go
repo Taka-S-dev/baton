@@ -23,13 +23,13 @@ func TestRecentCompactFitsAndKeepsFocusedRowVisible(t *testing.T) {
 				if len(lines) > height {
 					t.Fatalf("%dx%d: got %d lines", width, height, len(lines))
 				}
-				if strings.Contains(view, "Enter Select") || (!splitPanels(width) && strings.Contains(view, "│")) {
+				if strings.Contains(view, "Enter Select") {
 					t.Fatal(view)
 				}
 				if !strings.Contains(lines[p.browseY], "Browse") {
 					t.Fatal(view)
 				}
-				if cursor < 20 && !strings.Contains(view, fmt.Sprintf("▶ command-%02d", cursor)) {
+				if cursor < 20 && !strings.Contains(view, fmt.Sprintf("▶ [ ] command-%02d", cursor)) {
 					t.Fatal(view)
 				}
 				if cursor == 20 && !strings.Contains(lines[p.browseY], "▶") {

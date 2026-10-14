@@ -64,6 +64,8 @@ func (m *Model) gotoRecent() {
 // focusRecentCommand puts the cursor on the newest available reference,
 // or on Browse projects when there is none.
 func (m *Model) focusRecentCommand() {
+	m.recentOffset = 0
+	m.recentManual = false
 	filtered := m.recentFiltered()
 	m.recentCursor = len(filtered)
 	for cursor, index := range filtered {
@@ -99,6 +101,11 @@ func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.recentSearching = true
 		cmd := startSearchInput(&m.recentSearchTI, m.recentSearch)
 		return m, cmd
+	case "tab":
+		if m.recentCursor < len(filtered) {
+			m.toggleRecent(m.recentRows[filtered[m.recentCursor]])
+		}
+		return m, nil
 	case "p":
 		m.browseRecentProjects()
 		return m, nil
@@ -126,18 +133,7 @@ func (m Model) updateRecent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.browseRecentProjects()
 			return m, nil
 		}
-		row := m.recentRows[filtered[m.recentCursor]]
-		if err := m.loadProject(row.ref.Project); err != nil {
-			m.errMsg = err.Error()
-			return m, nil
-		}
-		cmd, ok := m.config.FindCommand(row.ref.Command)
-		if !ok {
-			m.errMsg = "Command removed or renamed; choose another command or browse projects"
-			return m, nil
-		}
-		m.recentActive = true
-		return m.startResolveFlow([]msItem{{cmd: &cmd}})
+		return m.resolveRecentQueue(m.recentRows[filtered[m.recentCursor]].ref)
 
 	}
 	return m, nil
@@ -157,10 +153,10 @@ func (m Model) recentGeometry(w int) recentLayout {
 	n := len(m.recentFiltered())
 	if m.shortPanels() {
 		rows := min(max(1, n), max(1, m.termHeight()-3))
-		return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: windowStart(rows, n, min(m.recentCursor, max(0, n-1))), listY: 2, browseY: 2 + rows}
+		return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: m.recentStart(rows, n), listY: 2, browseY: 2 + rows}
 	}
 	rows := min(max(1, n), min(8, max(1, m.termHeight()-14)))
-	return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: windowStart(rows, n, min(m.recentCursor, max(0, n-1))), listY: 5, browseY: 10 + rows}
+	return recentLayout{x: x, width: max(1, min(96, w-2*x)), rows: rows, start: m.recentStart(rows, n), listY: 5, browseY: 10 + rows}
 }
 
 func (m Model) viewRecent(w int) string {
@@ -174,7 +170,7 @@ func (m Model) viewRecent(w int) string {
 	filtered := m.recentFiltered()
 	rule := gray(strings.Repeat("─", p.width))
 	search := m.recentSearchLine()
-	lines := []string{accentBold("[ Recent commands ]"), gray("In: " + m.launchDir), gray(fmt.Sprintf("%d matches / %d recent", len(filtered), len(m.recentRows))), search, rule}
+	lines := []string{accentBold("[ Recent commands ]"), gray("In: " + m.launchDir), gray(fmt.Sprintf("%d selected · %d matches / %d recent", len(m.recentQueue), len(filtered), len(m.recentRows))), search, rule}
 	rowLine := func(label string, selected bool) string {
 		if selected {
 			return sRowActive.Width(p.width).Render(ansi.Truncate("▶ "+label, p.width, "…"))
@@ -192,22 +188,17 @@ func (m Model) viewRecent(w int) string {
 			continue
 		}
 		entry := m.recentRows[filtered[i]]
-		nameWidth := 0
-		for _, index := range filtered {
-			nameWidth = max(nameWidth, ansi.StringWidth(m.recentRows[index].ref.Command))
-		}
-		nameWidth = min(nameWidth, max(8, p.width/2))
-		name := ansi.Truncate(entry.ref.Command, nameWidth, "…")
-		label := name + strings.Repeat(" ", max(0, nameWidth-ansi.StringWidth(name))) + "  · " + filepath.Base(entry.ref.Project)
-		if entry.problem != "" {
-			label += "  [unavailable]"
-		}
 		age := recentAge(entry.ref.UsedAt, time.Now())
-		if p.width >= 48 && age != "" {
-			label = ansi.Truncate(label, p.width-ansi.StringWidth(age)-4, "…")
-			label += strings.Repeat(" ", max(2, p.width-2-ansi.StringWidth(label)-ansi.StringWidth(age))) + age
+		contentWidth := p.width - 3
+		showAge := p.width >= 48 && age != ""
+		if showAge {
+			contentWidth -= ansi.StringWidth(age) + 2
 		}
-		lines = append(lines, rowLine(recentHighlight(label, m.recentSearch, i == m.recentCursor), i == m.recentCursor))
+		label := m.recentColumns(entry, contentWidth, i == m.recentCursor)
+		if showAge {
+			label += strings.Repeat(" ", max(2, p.width-3-ansi.StringWidth(label)-ansi.StringWidth(age))) + age
+		}
+		lines = append(lines, candidateRow(rowLine(recentHighlight(label, m.recentSearch, i == m.recentCursor), i == m.recentCursor), p.width, len(filtered), p.rows, p.start, row))
 	}
 	preview := "Selected command"
 	if m.recentCursor >= len(filtered) {
@@ -255,11 +246,14 @@ func (m Model) viewRecent(w int) string {
 }
 
 func (m Model) updateRecentMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.handleRunScrollMouse(msg) {
+		return m, nil
+	}
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
-		return m.updateRecent(tea.KeyMsg{Type: tea.KeyUp})
+		return m, nil
 	case tea.MouseButtonWheelDown:
-		return m.updateRecent(tea.KeyMsg{Type: tea.KeyDown})
+		return m, nil
 	case tea.MouseButtonLeft:
 		if msg.Action != tea.MouseActionPress {
 			return m, nil
@@ -287,7 +281,12 @@ func (m Model) updateRecentMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if row >= 0 && row < p.rows && p.start+row < n {
 			m.recentCursor = p.start + row
 			m.recentSearching = false
-			return m.updateRecent(tea.KeyMsg{Type: tea.KeyEnter})
+			entry := m.recentRows[m.recentFiltered()[m.recentCursor]]
+			markerWidth := ansi.StringWidth(strings.TrimSpace(m.recentMarker(entry.ref)))
+			if msg.X >= p.x+2 && msg.X < p.x+2+markerWidth {
+				return m.updateRecent(tea.KeyMsg{Type: tea.KeyTab})
+			}
+			return m, nil
 		}
 	}
 	return m, nil
@@ -313,7 +312,7 @@ func (m Model) recentKeys() string {
 		}
 		return "↓ Results  Enter Open  Esc Clear  F1 Help"
 	}
-	return "↑↓ Move  Enter Select  / Search  p Projects  q Quit  F1 Help"
+	return "↑↓ Move  Tab Queue  Enter Review  / Search  p Projects  q Quit  F1 Help"
 }
 
 func (m Model) updateRecentSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

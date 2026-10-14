@@ -11,6 +11,10 @@ func scrollbarThumb(total, rows, offset int) (int, int) {
 }
 
 func (m Model) runScrollAreas() []runScrollArea {
+	if m.screen == ScreenRecent {
+		p := m.recentGeometry(m.viewWidth())
+		return []runScrollArea{{8, p.x, p.listY, p.width, p.rows, len(m.recentFiltered()), p.start}}
+	}
 	if m.screen == ScreenEditList && m.le != nil && !m.le.adding && !m.le.editing && m.exploreValueFlow() {
 		return []runScrollArea{m.listValueScrollArea()}
 	}
@@ -67,6 +71,11 @@ func (m Model) runScrollAreas() []runScrollArea {
 
 func (m *Model) setRunScroll(a runScrollArea, offset int) {
 	offset = min(max(0, offset), max(0, a.total-a.rows))
+	if a.target == 8 {
+		m.recentManual = true
+		m.recentOffset = offset
+		return
+	}
 	if a.target == 7 {
 		m.le.scrollOffset = offset
 		return
@@ -128,7 +137,14 @@ func (m *Model) handleRunScrollMouse(msg tea.MouseMsg) bool {
 			delta = 3
 		}
 		if delta != 0 {
-			if a.target == 3 || a.target == 4 || a.target == 5 || a.target == 6 || a.target == 7 {
+			if a.target == 8 {
+				if delta > 0 {
+					delta = min(3, a.rows)
+				} else {
+					delta = -min(3, a.rows)
+				}
+			}
+			if a.target == 3 || a.target == 4 || a.target == 5 || a.target == 6 || a.target == 7 || a.target == 8 {
 				m.setRunScroll(a, a.offset+delta)
 			} else if a.target == 1 {
 				m.runQueueFocused = true

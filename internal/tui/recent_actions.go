@@ -89,6 +89,12 @@ func (m Model) removeRecentSelection() (tea.Model, tea.Cmd) {
 		m.recentNotice = "Could not remove history: " + err.Error()
 		return m, nil
 	}
+	for i, ref := range m.recentQueue {
+		if sameRecent(ref, row.ref) {
+			m.recentQueue = append(m.recentQueue[:i:i], m.recentQueue[i+1:]...)
+			break
+		}
+	}
 	m.recentUndo = &row
 	m.recentRows = append(m.recentRows[:index:index], m.recentRows[index+1:]...)
 	m.recentCursor = min(m.recentCursor, len(m.recentFiltered()))

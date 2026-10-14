@@ -1019,7 +1019,7 @@ func (m Model) viewConfirmRun(w int) string {
 			// Resolve {$vars} here as every other preview does, and as
 			// the runner will: this screen answers "what is about to
 			// run", so it must not show something else.
-			cmd := slot.ApplyVarsToCommand(*item.Cmd, m.vars)
+			cmd := m.runItemCommand(item)
 			b.WriteString("       " + white("$ "+cmd.Cmd) + "\n")
 			workdir := m.confirmWorkdir(cmd.Dir)
 			b.WriteString("         " + dim("workdir: "+workdir) + "\n")

@@ -40,8 +40,9 @@ or write the TSV by hand; both work.
 - **No background or remote execution.** Commands run in the
   foreground of the terminal baton was started in, with their output
   live. The only part meant for scripts and CI is `baton check`.
-- **No cross-project runs.** A workflow belongs to one project; a
-  project is one folder.
+- **No cross-project workflows.** A workflow belongs to one project; a
+  project is one folder. (`baton r` can queue recent commands from
+  several projects for one run, each with its own variables.)
 - **No shell history.** The recent-command launcher stores which
   saved command ran in which directory, never the resolved command
   line or the values typed into it.

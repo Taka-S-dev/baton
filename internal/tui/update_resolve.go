@@ -281,6 +281,12 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 	r := m.resolve
 	for r.currentIdx < len(r.rawItems) {
 		item := r.rawItems[r.currentIdx]
+		if item.project != nil {
+			m.projectDir = item.projectDir
+			m.vars = item.project.Vars
+			m.lists = item.project.Lists
+			m.config = item.project.Config
+		}
 
 		// Command (template-derived ones are baked at load time).
 		// Remaining {slots} — including ones skipped at creation — are
@@ -295,7 +301,7 @@ func (m Model) advanceResolve() (tea.Model, tea.Cmd) {
 			if r.itemNotes[r.currentIdx] == "" {
 				r.itemNotes[r.currentIdx] = m.cmdNote(resolved)
 			}
-			r.resolved = append(r.resolved, mdl.RunItem{Name: item.cmd.Name, Cmd: &resolved})
+			r.resolved = append(r.resolved, m.resolvedRunItem(item, resolved))
 			r.currentIdx++
 			r.currentValues = nil
 			r.currentSlots = nil
@@ -362,7 +368,7 @@ func (m Model) openSlotPick(s slot.Def, cmd *mdl.Command) (tea.Model, tea.Cmd) {
 	// answer so repeating it costs one Enter, and never apply it on the
 	// user's behalf: steps that need different values still just pick
 	// them, the way the same command twice in a workflow expects.
-	if prev, ok := r.answered[slotAnswerKey(s)]; ok {
+	if prev, ok := r.answered[m.projectDir+"\x00"+slotAnswerKey(s)]; ok {
 		sp.reuseFrom, sp.reuseValue = prev.by, prev.value
 		if s.Variadic {
 			sp.picked = strings.Fields(prev.value)
@@ -525,11 +531,17 @@ func (m Model) acceptSlotValue(value string) (tea.Model, tea.Cmd) {
 	if r.answered == nil {
 		r.answered = make(map[string]answeredSlot)
 	}
-	r.answered[slotAnswerKey(def)] = answeredSlot{value: value, by: r.itemNames[r.currentIdx]}
+	r.answered[m.projectDir+"\x00"+slotAnswerKey(def)] = answeredSlot{value: value, by: r.itemNames[r.currentIdx]}
 	r.currentSlotIdx++
 
 	if r.currentIdx < len(r.rawItems) {
 		item := r.rawItems[r.currentIdx]
+		if item.project != nil {
+			m.projectDir = item.projectDir
+			m.vars = item.project.Vars
+			m.lists = item.project.Lists
+			m.config = item.project.Config
+		}
 		if note := m.partialNote(item, r.currentValues); note != "" {
 			r.itemNotes[r.currentIdx] = note
 		}

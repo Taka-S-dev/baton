@@ -489,7 +489,11 @@ baton recent --dry-run
 ```
 
 Open the current launch directory's recent commands directly, newest first.
-Enter reloads the current definition,
+`Tab` adds the highlighted command to a queue (or removes it); the rows show the
+queue position, and `Enter` reviews the queue in that order. The queue may mix
+projects: each command runs with its own project's variables, lists and working
+directory. With nothing queued, `Enter` reviews the highlighted command alone:
+it reloads the current definition,
 prompts for interactive inputs (including file completion), then shows execution
 review. On success, recent mode returns directly to the shell after one
 completion summary; failures retain the retry choices. Explicit workdir settings still apply; an empty workdir uses the launch
