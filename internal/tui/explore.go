@@ -250,20 +250,6 @@ func (m Model) commandRefLocations(name string) []string {
 	return out
 }
 
-// listRefLocations lists the commands whose placeholders draw on the
-// named list, which is what deleting or renaming it would break.
-func (m Model) listRefLocations(name string) []string {
-	var out []string
-	for _, c := range m.config.AllCommands() {
-		for _, d := range slot.GetSlots(c) {
-			if d.ListName == name {
-				out = append(out, fmt.Sprintf("command %q, %s", c.Name, d.Placeholder()))
-			}
-		}
-	}
-	return out
-}
-
 // countLabel renders "1 step" / "3 steps" without the caller spelling
 // out the plural each time.
 func countLabel(n int, unit string) string {

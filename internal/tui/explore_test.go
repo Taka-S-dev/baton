@@ -409,7 +409,7 @@ func TestExplorePreviewSaysWhatPointsAtIt(t *testing.T) {
 		}
 	}
 	m.exploreTab = tabLists
-	if view := stripStyle(m.View()); !strings.Contains(view, `command "deploy", {env}`) {
+	if view := stripStyle(m.View()); !strings.Contains(view, "Command  Slot") || !strings.Contains(view, "deploy   {env}") {
 		t.Errorf("the preview for a list does not name the command drawing on it\n%s", view)
 	}
 	m.exploreTab = tabVars

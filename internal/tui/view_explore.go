@@ -197,7 +197,11 @@ func exploreRow(it wsItem, selected, focused bool, w int) string {
 	avail := max(4, w-len(marker))
 	text := truncate(it.label, avail)
 	note := ""
-	if it.note != "" {
+	if it.kind == exList && it.note != "" && avail >= lipgloss.Width(it.note)+6 {
+		nameW := avail - lipgloss.Width(it.note) - 2
+		text = truncate(it.label, nameW)
+		note = strings.Repeat(" ", max(2, avail-lipgloss.Width(text)-lipgloss.Width(it.note))) + it.note
+	} else if it.note != "" {
 		if spare := avail - lipgloss.Width(text) - 2; spare >= 8 {
 			note = "  " + truncate(it.note, spare)
 		}
@@ -301,13 +305,11 @@ func (m Model) exploreEditorBox(l exploreLayout) string {
 		m.writeWorkflowSteps(&b, it.name, false, inner)
 	case it.kind == exList:
 		title = "List · " + it.name
+		var pairs [][2]string
 		for _, e := range m.lists[it.name] {
-			line := " " + e.Value
-			if e.Label != "" {
-				line += "  " + dim("· "+e.Label)
-			}
-			b.WriteString(line + "\n")
+			pairs = append(pairs, [2]string{e.Value, e.Label})
 		}
+		writeExploreColumns(&b, "Value", "Label", pairs, inner)
 	case it.kind == exVar:
 		title = "Global variable · " + it.name
 		if _, _, scoped := scopedKey(it.name); scoped {
@@ -364,7 +366,15 @@ func (m Model) explorePreviewBox(l exploreLayout) string {
 	case it.kind == exWorkflow:
 		m.writeWorkflowSteps(&b, it.name, true, inner)
 	case it.kind == exList:
-		m.writeRefList(&b, "Commands using list: "+it.name, m.listRefLocations(it.name), inner)
+		var pairs [][2]string
+		for _, c := range m.config.AllCommands() {
+			for _, d := range slot.GetSlots(c) {
+				if d.ListName == it.name {
+					pairs = append(pairs, [2]string{c.Name, d.Placeholder()})
+				}
+			}
+		}
+		writeExploreColumns(&b, "Command", "Slot", pairs, inner)
 		return box("List usage", b.String(), l.rightW, l.prevH, false)
 	case it.kind == exVar:
 		if cmdName, _, scoped := scopedKey(it.name); scoped {
@@ -647,6 +657,7 @@ func (m Model) writePickCandidates(b *strings.Builder, cf *commandFormState, w, 
 		line := searchHighlight(marker+text+"  "+dim(truncate(c.what, max(8, w-len(c.text)-5))), []string{cf.pickTyped(m.nameInput)}, i == cursor, true)
 		b.WriteString(candidateRow(line, w, len(cands), show, start, i-start) + "\n")
 	}
+
 }
 
 // writeWorkflowEditor draws the steps being edited, the one under the
@@ -657,7 +668,6 @@ func (m Model) writeWorkflowEditor(b *strings.Builder, w, rows int) {
 	if e.adding {
 		search := " " + accent("/") + " " + white(e.addSearch) + dim("_")
 		b.WriteString(search + "\n")
-
 		cands := m.addCandidates()
 		var list strings.Builder
 		writeWindowedList(&list, max(1, rows-1-1), len(cands), e.addCursor, w, "(no command matches)", func(i int) string {
