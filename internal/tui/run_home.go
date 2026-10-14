@@ -234,7 +234,7 @@ func (m Model) runHomeHeader(w int) string {
 }
 
 // Update owns the run-home frame; screen handlers keep their local coordinates.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateFrame(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.runHomeVisible() && !m.helpOpen && !m.msEscArmed && !m.pasteMenu && m.leaveAsk == leaveNone {
 		if mouse, ok := msg.(tea.MouseMsg); ok {
 			mouse.Y--
@@ -250,13 +250,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if _, ok := msg.(tea.KeyMsg); ok && m.exploreListFocused() {
-			m.exploreScrollManual[m.exploreTab] = false
+			// The outer update preserves the viewport.
 		}
 	}
 	switch msg.(type) {
 	case tea.WindowSizeMsg, tea.KeyMsg:
-		m.msScrollManual = false
-		m.wfScrollManual = false
+
 		m.runScrollDrag = 0
 	}
 	if m.runDetailOpen && !m.helpOpen {

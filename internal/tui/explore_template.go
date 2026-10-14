@@ -46,7 +46,7 @@ func (m Model) exploreTemplateBox(l exploreLayout) string {
 	}
 	rows := max(1, l.editH-5)
 	draw := func(items []string, cursor int) {
-		writeWindowedList(&b, rows, len(items), cursor, "(none)", func(i int) string {
+		writeWindowedList(&b, rows, len(items), cursor, l.rightW-2, "(none)", func(i int) string {
 			mark := "   "
 			if i == cursor {
 				mark = " ▶ "

@@ -644,10 +644,8 @@ func (m Model) writePickCandidates(b *strings.Builder, cf *commandFormState, w, 
 		if i == cursor {
 			marker, text = " ▶ ", highlight(c.text)
 		}
-		b.WriteString(searchHighlight(marker+text+"  "+dim(truncate(c.what, max(8, w-len(c.text)-5))), []string{cf.pickTyped(m.nameInput)}, i == cursor, true) + "\n")
-	}
-	if rest := len(cands) - start - show; rest > 0 {
-		b.WriteString("   " + dim(fmt.Sprintf("↓ %d more", rest)) + "\n")
+		line := searchHighlight(marker+text+"  "+dim(truncate(c.what, max(8, w-len(c.text)-5))), []string{cf.pickTyped(m.nameInput)}, i == cursor, true)
+		b.WriteString(candidateRow(line, w, len(cands), show, start, i-start) + "\n")
 	}
 }
 
@@ -659,9 +657,10 @@ func (m Model) writeWorkflowEditor(b *strings.Builder, w, rows int) {
 	if e.adding {
 		search := " " + accent("/") + " " + white(e.addSearch) + dim("_")
 		b.WriteString(search + "\n")
+
 		cands := m.addCandidates()
 		var list strings.Builder
-		writeWindowedList(&list, max(1, rows-1-1), len(cands), e.addCursor, "(no command matches)", func(i int) string {
+		writeWindowedList(&list, max(1, rows-1-1), len(cands), e.addCursor, w, "(no command matches)", func(i int) string {
 			cmd, _ := m.config.FindCommand(cands[i])
 			marker, name := "   ", cands[i]
 			if i == e.addCursor {
@@ -677,7 +676,7 @@ func (m Model) writeWorkflowEditor(b *strings.Builder, w, rows int) {
 		b.WriteString(" " + dim("no steps · a adds one") + "\n")
 		return
 	}
-	writeWindowedList(b, max(1, rows-1), len(e.steps), e.cursor, "", func(i int) string {
+	writeWindowedList(b, max(1, rows-1), len(e.steps), e.cursor, w, "", func(i int) string {
 		step := e.steps[i]
 		cmd, ok := m.workflowStepCommand(step)
 		what := warn("(not found)")

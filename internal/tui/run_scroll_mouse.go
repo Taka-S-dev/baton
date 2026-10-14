@@ -11,6 +11,9 @@ func scrollbarThumb(total, rows, offset int) (int, int) {
 }
 
 func (m Model) runScrollAreas() []runScrollArea {
+	if m.screen == ScreenEditList && m.le != nil && !m.le.adding && !m.le.editing && m.exploreValueFlow() {
+		return []runScrollArea{m.listValueScrollArea()}
+	}
 	if m.screen == ScreenExplore {
 		l := m.exploreLayout(m.viewWidth())
 		x, w := 1, l.leftW-2
@@ -49,7 +52,7 @@ func (m Model) runScrollAreas() []runScrollArea {
 			qw = m.viewWidth() - qx
 		}
 	}
-	a := []runScrollArea{{1, qx, qy, qw, rows, len(m.msSelected), windowStart(rows, len(m.msSelected), m.runQueueCursor)}}
+	a := []runScrollArea{{1, qx, qy, qw, rows, len(m.msSelected), m.queueStart(rows)}}
 	if !m.shortPanels() {
 		lines, key := m.runDetailLines(w - 3)
 		offset := m.runDetailOffset
@@ -64,6 +67,10 @@ func (m Model) runScrollAreas() []runScrollArea {
 
 func (m *Model) setRunScroll(a runScrollArea, offset int) {
 	offset = min(max(0, offset), max(0, a.total-a.rows))
+	if a.target == 7 {
+		m.le.scrollOffset = offset
+		return
+	}
 	if a.target == 6 {
 		m.exploreScrollManual[m.exploreTab] = true
 		m.exploreScroll[m.exploreTab] = offset
@@ -85,6 +92,8 @@ func (m *Model) setRunScroll(a runScrollArea, offset int) {
 		return
 	}
 	if a.target == 1 {
+		m.runQueueOffset = offset
+		m.runQueueManual = true
 		m.runQueueFocused = true
 		m.runQueueCursor = min(max(0, a.total-1), offset+a.rows/2)
 	} else {
@@ -119,11 +128,13 @@ func (m *Model) handleRunScrollMouse(msg tea.MouseMsg) bool {
 			delta = 3
 		}
 		if delta != 0 {
-			if a.target == 3 || a.target == 4 || a.target == 5 || a.target == 6 {
+			if a.target == 3 || a.target == 4 || a.target == 5 || a.target == 6 || a.target == 7 {
 				m.setRunScroll(a, a.offset+delta)
 			} else if a.target == 1 {
 				m.runQueueFocused = true
 				m.runQueueCursor = min(max(0, a.total-1), max(0, m.runQueueCursor+delta))
+				m.runQueueManual = true
+				m.runQueueOffset = revealRow(a.offset, a.rows, a.total, m.runQueueCursor)
 			} else {
 				m.scrollRunDetail(delta)
 			}

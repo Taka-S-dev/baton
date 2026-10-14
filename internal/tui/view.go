@@ -201,7 +201,7 @@ func (m Model) viewSingleSelect(title string, w int) string {
 	if n := len(m.listItems); n <= shortMenu && n > viewH {
 		viewH = n
 	}
-	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "(empty)", func(i int) string {
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, w, "(empty)", func(i int) string {
 		if i == m.listCursor {
 			return "  " + accentBold("▶") + " " + m.listItems[i]
 		}
@@ -803,36 +803,19 @@ func (m Model) compact() bool { return m.termHeight() < 20 }
 // two rows whatever is in them, and on a ten-line terminal that was two
 // of the four the list had to itself. The line is always written, empty
 // or not, so the frame keeps one height as the window scrolls.
-func writeWindowedList(b *strings.Builder, viewH, n, cursor int, emptyMsg string, render func(i int) string) {
-	viewStart := windowStart(viewH, n, cursor)
-	viewEnd := min(viewStart+viewH, n)
-	rows := 0
-	if n == 0 && emptyMsg != "" {
-		b.WriteString("  " + gray(emptyMsg) + "\n")
-		rows++
+func writeWindowedList(b *strings.Builder, viewH, n, cursor, w int, emptyMsg string, render func(int) string) {
+	start := windowStart(viewH, n, cursor)
+	for row := 0; row < viewH; row++ {
+		line := ""
+		if start+row < n {
+			line = render(start + row)
+		} else if row == 0 && n == 0 {
+			line = "  " + gray(emptyMsg)
+		}
+		b.WriteString(candidateRow(line, w, n, viewH, start, row) + "\n")
 	}
-	for i := viewStart; i < viewEnd; i++ {
-		b.WriteString(render(i) + "\n")
-		rows++
-	}
-	for ; rows < viewH; rows++ {
-		b.WriteString("\n")
-	}
-	// The two counts keep their columns: the "↑" slot is padded even
-	// when empty, so "↓ N more" does not jump sideways as the list
-	// scrolls past its first page.
-	up, down := "", ""
-	if viewStart > 0 {
-		up = fmt.Sprintf("↑ %d more", viewStart)
-	}
-	if viewEnd < n {
-		down = fmt.Sprintf("↓ %d more", n-viewEnd)
-	}
-	if up == "" && down == "" {
-		b.WriteString("\n")
-		return
-	}
-	b.WriteString("  " + dim(strings.TrimRight(fmt.Sprintf("%-13s%s", up, down), " ")) + "\n")
+	// Keep the reserved spacer so existing pointer coordinates stay stable.
+	b.WriteString("\n")
 }
 
 // windowStart is the index of the first row a cursor-following window
@@ -949,7 +932,7 @@ func (m Model) viewEditCommandPick(w int) string {
 		below = 3
 	}
 	viewH := m.listBudget(&b, previewH+below)
-	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "", func(i int) string {
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, w, "", func(i int) string {
 		label := m.commandPickLabel(m.editRefCommand(m.editRefs[m.pickOrig(i)]))
 		if i == m.listCursor {
 			return "  " + accentBold("▶") + " " + label
@@ -1027,11 +1010,8 @@ func (m Model) viewConfirmRun(w int) string {
 	scroll := min(max(0, m.confirmRunScroll), max(0, n-perPage))
 	end := min(scroll+perPage, n)
 
-	if scroll > 0 {
-		b.WriteString("  " + dim(fmt.Sprintf("↑ %d more", scroll)) + "\n")
-	} else {
-		b.WriteString("\n")
-	}
+	b.WriteString("\n")
+	contentStart := strings.Count(b.String(), "\n")
 	for i := scroll; i < end; i++ {
 		item := m.confirmRunItems[i]
 		b.WriteString(fmt.Sprintf("  %s%2d.%s  %s\n", gray(""), i+1, gray(""), item.Name))
@@ -1050,11 +1030,13 @@ func (m Model) viewConfirmRun(w int) string {
 	for pad := end - scroll; pad < perPage; pad++ {
 		b.WriteString("\n\n\n")
 	}
-	if end < n {
-		b.WriteString("  " + dim(fmt.Sprintf("↓ %d more", n-end)) + "\n")
-	} else {
-		b.WriteString("\n")
+	lines := strings.Split(b.String(), "\n")
+	for row := 0; row < perPage*3; row++ {
+		lines[contentStart+row] = candidateRow(lines[contentStart+row], w, n*3, perPage*3, scroll*3, row)
 	}
+	b.Reset()
+	b.WriteString(strings.Join(lines, "\n"))
+	b.WriteString("\n")
 
 	b.WriteString(confirmGap(m) + hline(w) + "\n" + confirmGap(m))
 	b.WriteString(renderBtns(m.confirmRunBtn, "  Run  ", "  "+m.confirmBackLabel()+"  ") + "\n")
@@ -1165,7 +1147,7 @@ func (m Model) viewEditList(w int) string {
 	}
 	// The "+ Add value" row scrolls with the entries as the last row.
 	viewH := m.listBudget(&b, 3)
-	writeWindowedList(&b, viewH, len(le.entries)+1, le.cursor, "", func(i int) string {
+	writeWindowedList(&b, viewH, len(le.entries)+1, le.cursor, w, "", func(i int) string {
 		// The add row is an action and is drawn like every other Add
 		// row: in the accent, with its key beside it.
 		if i == len(le.entries) {
@@ -1225,7 +1207,7 @@ func (m Model) viewEditListPick(w int) string {
 	})
 	previewH = m.previewBudget(&b, previewH, 3, 3)
 	viewH := m.listBudget(&b, previewH+3)
-	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, "(no lists)", func(i int) string {
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, w, "(no lists)", func(i int) string {
 		if i == m.listCursor {
 			return "  " + accentBold("▶") + " " + m.listItems[i]
 		}
@@ -1290,7 +1272,7 @@ func (m Model) viewEditVarPick(w int) string {
 	// All of the preview or none of it, as on every other pick screen.
 	previewH = m.previewBudget(&b, previewH, 3, 3)
 	viewH := m.listBudget(&b, previewH+3)
-	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor,
+	writeWindowedList(&b, viewH, len(m.listItems), m.listCursor, w,
 		"(vars.tsv is empty — create a global, or save a command with fixed values)", func(i int) string {
 			if i == m.listCursor {
 				return "  " + accentBold("▶") + " " + m.listItems[i]
@@ -1390,7 +1372,7 @@ func (m Model) viewVarRebase(w int) string {
 		reserved = 7
 	}
 	viewH := m.listBudget(&b, reserved)
-	writeWindowedList(&b, viewH, len(vr.items), vr.cursor, "", func(i int) string {
+	writeWindowedList(&b, viewH, len(vr.items), vr.cursor, w, "", func(i int) string {
 		it := vr.items[i]
 		check := dim("[ ]")
 		if it.on {
@@ -1463,7 +1445,7 @@ func (m Model) viewDeleteList(title string, items []string, w int) string {
 		selectedSet[s] = true
 	}
 	viewH := m.listBudget(&b, previewH+footer)
-	writeWindowedList(&b, viewH, len(items), m.listCursor, "(empty)", func(i int) string {
+	writeWindowedList(&b, viewH, len(items), m.listCursor, w, "(empty)", func(i int) string {
 		item := items[i]
 		check := gray("[ ]")
 		if selectedSet[m.pickOrig(i)] {
@@ -1545,7 +1527,7 @@ func (m Model) viewRunWorkflowStepsList(w int, hitRow ...func(int, int)) string 
 	}
 	b.WriteString("  " + gray(truncate(heading, max(1, w-2))) + "\n")
 	viewH := m.listBudget(&b, 4)
-	writeWindowedList(&b, viewH, n, p.cursor, "(no steps)", func(i int) string {
+	writeWindowedList(&b, viewH, n, p.cursor, w, "(no steps)", func(i int) string {
 		for _, hit := range hitRow {
 			hit(i, strings.Count(b.String(), "\n"))
 		}

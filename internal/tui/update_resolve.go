@@ -62,7 +62,7 @@ func (m *Model) msFiltered() []int {
 }
 
 func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	m.msScrollManual = false
+
 	filtered := m.msFiltered()
 	n := len(filtered)
 

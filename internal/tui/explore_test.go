@@ -623,8 +623,8 @@ func TestFormPopupStaysInsideTheTerminal(t *testing.T) {
 			}
 			// Where there is room for the window, the count of what is
 			// off it is drawn; where there is not, nothing is lost silently.
-			if h >= 24 && !strings.Contains(stripStyle(m.View()), "more") {
-				t.Errorf("%dx%d: more candidates than fit, but no count of what is off the window\n%s", w, h, m.View())
+			if h >= 24 && !strings.Contains(stripStyle(m.View()), "┃") {
+				t.Errorf("%dx%d: overflowing candidates have no scrollbar\n%s", w, h, m.View())
 			}
 		}
 	}

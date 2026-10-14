@@ -327,18 +327,19 @@ type runningState struct {
 
 // listEditState holds state for list editing.
 type listEditState struct {
-	name      string
-	entries   []mdl.ListEntry
-	fromPick  bool // entered via Edit list (Esc returns to the pick screen)
-	cursor    int
-	adding    bool
-	addVal    string
-	addLbl    string
-	addFld    int // 0=value, 1=label
-	editing   bool
-	editFld   int // 0=value, 1=label
-	editValTI textinput.Model
-	editLblTI textinput.Model
+	scrollOffset int
+	name         string
+	entries      []mdl.ListEntry
+	fromPick     bool // entered via Edit list (Esc returns to the pick screen)
+	cursor       int
+	adding       bool
+	addVal       string
+	addLbl       string
+	addFld       int // 0=value, 1=label
+	editing      bool
+	editFld      int // 0=value, 1=label
+	editValTI    textinput.Model
+	editLblTI    textinput.Model
 }
 
 // commandEditState holds state for creating/editing a template-derived command.
@@ -467,6 +468,8 @@ type Model struct {
 	msSelected      []int
 	msSearchTI      textinput.Model
 	runQueueFocused bool
+	runQueueOffset  int
+	runQueueManual  bool
 	runQueueCursor  int
 	msScrollOffset  int
 	msScrollManual  bool

@@ -43,8 +43,9 @@ func TestCandidateScrollPreservesSelection(t *testing.T) {
 			t.Fatal("clicked wrong scrolled row")
 		}
 		m = homeKey(m, tea.KeyMsg{Type: tea.KeyUp})
-		if m.msScrollManual {
-			t.Fatal("keyboard did not restore following")
+		a = m.candidateScrollArea()
+		if m.msCursor < a.offset || m.msCursor >= a.offset+a.rows {
+			t.Fatal("keyboard cursor outside viewport")
 		}
 	}
 }

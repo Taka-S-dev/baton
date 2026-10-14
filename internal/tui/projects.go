@@ -289,7 +289,7 @@ func (m Model) viewProjects(w int) string {
 		nameW = max(nameW, lipgloss.Width(name))
 	}
 	nameW = min(nameW, max(1, w-18))
-	writeWindowedList(&b, rows, len(names), m.listCursor, empty, func(i int) string {
+	writeWindowedList(&b, rows, len(names), m.listCursor, w, empty, func(i int) string {
 		prefix := "   "
 		if i == m.listCursor {
 			prefix = " ▶ "

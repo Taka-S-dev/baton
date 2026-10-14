@@ -62,7 +62,7 @@ func (m Model) viewRunQueue(w int) string {
 	queueH := max(5, h/2)
 	cursor := min(m.runQueueCursor, max(0, len(m.msSelected)-1))
 	rows := max(1, queueH-3)
-	start := windowStart(rows, len(m.msSelected), cursor)
+	start := m.queueStart(rows)
 	var queue []string
 	for i := range m.msSelected {
 		label := " " + m.queueCommandLabel(i, max(1, w-4))

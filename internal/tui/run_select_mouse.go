@@ -51,7 +51,7 @@ func (m Model) updateRunSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if m.shortPanels() {
 			rows = max(1, m.termHeight()-1)
 		}
-		start := windowStart(rows, len(m.msSelected), min(m.runQueueCursor, max(0, len(m.msSelected)-1)))
+		start := m.queueStart(rows)
 		row := msg.Y - 1
 		index := start + row
 		if row < rows && index < len(m.msSelected) {

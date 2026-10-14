@@ -28,7 +28,7 @@ func joinPanels(left, right string, w, leftW, h int) string {
 func (m Model) shortRunQueue(w int) string {
 	n := len(m.msSelected)
 	rows := max(1, m.termHeight()-1)
-	start := windowStart(rows, n, m.runQueueCursor)
+	start := m.queueStart(rows)
 	title := fmt.Sprintf("Run queue · %d selected", n)
 	if n > rows {
 		title += fmt.Sprintf(" · %d–%d", start+1, min(start+rows, n))

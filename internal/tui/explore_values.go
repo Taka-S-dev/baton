@@ -82,7 +82,7 @@ func (m Model) exploreValueBox(l exploreLayout) string {
 			}
 			b.WriteString("\n\n " + dim("Label is optional. Enter confirms each field."))
 		default:
-			writeWindowedList(&b, max(1, l.editH-4), len(le.entries)+1, le.cursor, "", func(i int) string {
+			m.writeListValueRows(&b, func(i int) string {
 				// The add row is an action, not an entry: it takes the
 				// same accent and key hint as the Add row of the list pane.
 				if i == len(le.entries) {
@@ -108,6 +108,9 @@ func (m Model) exploreValueBox(l exploreLayout) string {
 
 func (m Model) updateExploreValueMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	l := m.exploreLayout(m.viewWidth())
+	if m.screen == ScreenEditList && m.le != nil && !m.le.adding && !m.le.editing && !l.single && m.handleRunScrollMouse(msg) {
+		return m, nil
+	}
 	if !l.single && msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress {
 		onList := msg.X >= 0 && msg.X < l.leftW && msg.Y >= l.bodyY && msg.Y < l.bodyY+l.bodyH
 		onBack := msg.Y == l.editY && msg.X >= l.rightX+3 && msg.X < l.rightX+9
@@ -133,7 +136,8 @@ func (m Model) updateExploreValueMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.screen == ScreenEditList && !m.le.adding && !m.le.editing {
-		rows := max(1, l.editH-4)
+		a := m.listValueScrollArea()
+		rows := a.rows
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
 			m.le.cursor = max(0, m.le.cursor-1)
@@ -141,7 +145,7 @@ func (m Model) updateExploreValueMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.le.cursor = min(len(m.le.entries), m.le.cursor+1)
 		case tea.MouseButtonLeft:
 			if msg.Action == tea.MouseActionPress {
-				i := windowStart(rows, len(m.le.entries)+1, m.le.cursor) + msg.Y - l.fieldY
+				i := a.offset + msg.Y - l.fieldY
 				if i >= 0 && i <= len(m.le.entries) && msg.Y-l.fieldY < rows {
 					if i == m.le.cursor {
 						return m.updateEditList(tea.KeyMsg{Type: tea.KeyEnter})
