@@ -84,10 +84,15 @@ columns are tab-separated.
 baton                    open the project picker, or the only project
 baton r                  recent commands for the current directory
 baton check [project]    validate every project file; exit 1 on problems
+baton api schema        discover the JSON interface for agents and scripts
 baton --dry-run          show what would run without running it
 ```
 
 ## Adding a command
+
+Agents can use [the JSON API](docs/agent-api.md) to inspect projects, preview and
+commit validated edits, manage saved inputs/workflows, and plan/run commands.
+Use this interface for app-owned files instead of editing them directly.
 
 `e` opens the project editor; `a` starts a command. Typing `{` in the
 command lists the placeholders the project already knows, the name is

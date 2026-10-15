@@ -9,6 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/Taka-S-dev/baton/internal/config"
+	"github.com/Taka-S-dev/baton/internal/projectfs"
 	"github.com/Taka-S-dev/baton/internal/tui"
 )
 
@@ -34,8 +36,11 @@ Usage:
   baton recent [--dry-run]
   baton r [--dry-run]
   baton check [project|path]
+  baton api [schema | --file request.json]
 
 Commands:
+  api          JSON interface for agents: inspect, edit, validate, plan and run.
+               Reads one request from stdin unless --file is provided.
   recent, r    Choose a recent command for the current directory, then
                fill its inputs and review before running.
   check        Validate projects without starting the TUI and print any
@@ -55,6 +60,9 @@ Environment variables:
 `
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "api" {
+		os.Exit(runAPI(os.Args[2:], os.Stdin, os.Stdout))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "check" {
 		os.Exit(runCheck(os.Args[2:]))
 	}
@@ -72,6 +80,25 @@ func main() {
 		fmt.Println("baton " + versionString())
 		return
 	}
+	os.Exit(runTUI(opts))
+}
+
+func runTUI(opts launchOptions) int {
+	projectsDir, err := config.FindProjectsDir()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err = os.MkdirAll(projectsDir, 0755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	release, err := projectfs.Lock(projectsDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer release()
 	var m tui.Model
 	if opts.recent {
 		m, err = tui.NewRecent(opts.dryRun)
@@ -81,7 +108,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// The overview is pointable: a tree is the one shape where reaching
@@ -90,6 +117,7 @@ func main() {
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

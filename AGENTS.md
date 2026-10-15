@@ -7,6 +7,17 @@ them. Everything needed to produce a valid project is on this page, and
 
 ## Ownership — which files you may write
 
+For agent-driven operations, prefer `baton api` over direct file changes.
+Run `baton api schema` for discovery. Start with
+[docs/agent-quickstart.md](docs/agent-quickstart.md); the full reference is
+[docs/agent-api.md](docs/agent-api.md). Use `project.get` to obtain a revision, preview `apply` with
+`dry_run: true`, then commit with the original revision. The API may update
+app-owned files through baton; agents must still never write those files directly.
+Command renames update references; referenced deletions and invalid batches are
+rejected. TUI sessions must be closed before API writes or execution.
+`.baton-lock` and `.baton-transaction.json` are also app-owned. Never edit the
+transaction journal; use `project.recover` after an interrupted transaction.
+
 | File | Edit / generate? |
 |------|-----------|
 | `commands.tsv` | yes — command definitions (the baton TUI also appends, edits, or deletes individual rows on user request; untargeted lines are never touched) |

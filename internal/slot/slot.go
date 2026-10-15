@@ -287,7 +287,7 @@ func LoadLists(listsDir string) map[string][]model.ListEntry {
 		if err != nil {
 			continue
 		}
-		var list []model.ListEntry
+		list := make([]model.ListEntry, 0)
 		for _, line := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
@@ -303,9 +303,7 @@ func LoadLists(listsDir string) map[string][]model.ListEntry {
 				list = append(list, model.ListEntry{Value: value, Label: label})
 			}
 		}
-		if len(list) > 0 {
-			result[name] = list
-		}
+		result[name] = list
 	}
 	return result
 }

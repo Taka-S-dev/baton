@@ -66,8 +66,8 @@ type Workflow struct {
 
 // ListEntry is a single entry in a selection list.
 type ListEntry struct {
-	Value string
-	Label string
+	Value string `json:"value"`
+	Label string `json:"label,omitempty"`
 }
 
 // RunItem is a resolved command ready for execution.

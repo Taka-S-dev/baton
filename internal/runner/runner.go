@@ -1,9 +1,12 @@
 package runner
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/Taka-S-dev/baton/internal/model"
 	tea "github.com/charmbracelet/bubbletea"
@@ -50,4 +53,25 @@ func buildExec(cmd model.Command) *exec.Cmd {
 		c.Dir = cmd.Dir
 	}
 	return c
+}
+
+// RunCaptured uses the same shell selection as the TUI, without an interactive stdin.
+func RunCaptured(cmd model.Command, timeout time.Duration, stdout, stderr io.Writer) (int, error) {
+	base := buildExec(cmd)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	c := exec.CommandContext(ctx, base.Path, base.Args[1:]...)
+	c.Dir, c.Stdout, c.Stderr = base.Dir, stdout, stderr
+	c.WaitDelay = time.Second
+	err := c.Run()
+	if err == nil {
+		return 0, nil
+	}
+	if ctx.Err() != nil {
+		return -1, ctx.Err()
+	}
+	if c.ProcessState != nil {
+		return c.ProcessState.ExitCode(), err
+	}
+	return -1, err
 }

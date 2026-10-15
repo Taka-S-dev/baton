@@ -165,10 +165,10 @@ func TestSaveList_EmptyEntries(t *testing.T) {
 	if err := slot.SaveList(dir, "empty", nil); err != nil {
 		t.Fatalf("SaveList: %v", err)
 	}
-	// empty list should not appear in LoadLists (no entries)
+	// An empty list remains addressable after reloading.
 	lists := slot.LoadLists(dir)
-	if _, ok := lists["empty"]; ok {
-		t.Error("empty list should not be returned by LoadLists")
+	if entries, ok := lists["empty"]; !ok || entries == nil || len(entries) != 0 {
+		t.Error("empty list must survive reloading as an empty array")
 	}
 }
 
