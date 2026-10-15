@@ -1,12 +1,14 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/projectfs"
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/Taka-S-dev/baton/internal/store"
 )
@@ -27,6 +29,9 @@ type Project struct {
 // startup warning and `baton check` both come from here.
 func LoadProject(projectDir string) (Project, error) {
 	var p Project
+	if projectfs.Pending(projectDir) {
+		return p, fmt.Errorf("pending transaction in %s: use baton api with action project.recover before opening it", projectDir)
+	}
 
 	cfg, err := LoadConfig(projectDir)
 	if err != nil {

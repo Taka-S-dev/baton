@@ -33,6 +33,8 @@ projects.example/**/workflows.json
 projects.example/**/commands.local.json
 projects.example/.baton-recent/
 projects.example/.baton-trash/
+**/.baton-lock
+**/.baton-transaction.json
 
 # Exclude binaries
 *.exe
