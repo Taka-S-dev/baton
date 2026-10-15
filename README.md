@@ -37,17 +37,19 @@ or write the TSV by hand; both work.
 - **No build graph.** No dependencies, conditions or loops between
   steps. A workflow is a list of commands run in order; use `just`,
   `make` or `task` for anything that needs a graph.
-- **No background or remote execution.** Commands run in the
-  foreground of the terminal baton was started in, with their output
-  live. The only part meant for scripts and CI is `baton check`.
+- **No daemon or remote execution.** Commands run in the foreground
+  of the terminal baton was started in, with their output live. Scripts
+  and agents have two entry points, `baton check` and the local
+  [JSON API](docs/agent-api.md); each is one process that exits.
 - **No cross-project workflows.** A workflow belongs to one project; a
   project is one folder. (`baton r` can queue recent commands from
   several projects for one run, each with its own variables.)
 - **No shell history.** The recent-command launcher stores which
   saved command ran in which directory, never the resolved command
   line or the values typed into it.
-- **No plugins or scripting.** Behaviour is fixed; extension is by
-  editing the project files.
+- **No plugins.** Behaviour is fixed; extension is by editing the
+  project files, by hand or through the JSON API, which writes the
+  same files.
 
 ## Install
 
