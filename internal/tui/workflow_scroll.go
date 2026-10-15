@@ -18,12 +18,21 @@ func (m Model) workflowDetailLines(w int) ([]string, string) {
 	if m.rows()-m.bannerRows >= 20 {
 		text = "Saved order · all steps run by default\n\n"
 	}
+	orderW := len(fmt.Sprint(len(wf.Commands)))
+	nameW := 0
+	for _, name := range wf.Commands {
+		nameW = max(nameW, ansi.StringWidth(name))
+	}
+	// Measure all steps so scrolling keeps the command column stationary.
+	nameW = min(nameW, max(1, (w-orderW-5)/3))
 	for i, name := range wf.Commands {
 		body := "not found"
 		if c, ok := m.workflowStepCommand(name); ok {
 			body = "$ " + c.Cmd
 		}
-		text += fmt.Sprintf("%d. %s  %s\n", i+1, name, body)
+		label := ansi.Truncate(name, nameW, "…")
+		label += strings.Repeat(" ", max(0, nameW-ansi.StringWidth(label)))
+		text += fmt.Sprintf("%*d. %s  %s\n", orderW, i+1, label, body)
 	}
 	if len(wf.Commands) == 0 {
 		text += "No steps."
