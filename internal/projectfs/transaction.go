@@ -80,6 +80,7 @@ func Read(dir string) (Files, error) {
 	}
 	return out, nil
 }
+
 func Revision(files Files) string {
 	keys := make([]string, 0, len(files))
 	for k := range files {
@@ -126,15 +127,47 @@ func atomic(path string, data []byte) error {
 	}
 	return os.Rename(tmp, path)
 }
+
+// Lock takes the exclusive lock of dir for one write. The lock is a file
+// holding the owner's pid; a lock whose owner no longer runs is replaced,
+// so a crash never needs a cleanup by hand.
 func Lock(dir string) (func(), error) {
 	path := filepath.Join(dir, ".baton-lock")
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("project busy or lock unavailable (%s): %w; do not remove a lock while its process is running", path, err)
+	for attempt := 0; ; attempt++ {
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err == nil {
+			fmt.Fprintf(f, "pid=%d\n", os.Getpid())
+			f.Close()
+			return func() { _ = os.Remove(path) }, nil
+		}
+		if !os.IsExist(err) {
+			return nil, fmt.Errorf("lock unavailable (%s): %w", path, err)
+		}
+		pid, ok := lockOwner(path)
+		if !ok {
+			return nil, fmt.Errorf("project busy: %s exists; remove it only if no baton is running", path)
+		}
+		// Renaming first makes sure only one of several waiters removes
+		// the stale file; the others find it gone and retry.
+		if attempt == 0 && !alive(pid) && os.Rename(path, path+".stale") == nil {
+			_ = os.Remove(path + ".stale")
+			continue
+		}
+		return nil, fmt.Errorf("project busy: baton process %d holds %s", pid, path)
 	}
-	fmt.Fprintf(f, "pid=%d\n", os.Getpid())
-	f.Close()
-	return func() { _ = os.Remove(path) }, nil
+}
+
+// lockOwner reads the pid recorded in a lock file.
+func lockOwner(path string) (int, bool) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return 0, false
+	}
+	var pid int
+	if _, err := fmt.Sscanf(string(b), "pid=%d", &pid); err != nil || pid <= 0 {
+		return 0, false
+	}
+	return pid, true
 }
 
 const Journal = ".baton-transaction.json"

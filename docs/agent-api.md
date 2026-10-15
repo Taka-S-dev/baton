@@ -136,9 +136,10 @@ overwriting and retain the journal for inspection. This is recoverable
 multi-file persistence, not instantaneous multi-file visibility or guaranteed
 power-loss atomicity.
 
-A crash may leave `.baton-lock`, which contains the owner's PID. Verify that
-process has exited before removing the stale lock and retrying. Never remove a
-live process's lock. Journals may contain sensitive project data.
+`.baton-lock` holds the owner's PID. A lock left behind by a crash is replaced
+by the next baton once that process has exited, so it never needs removing by
+hand; never remove a live process's lock. Journals may contain sensitive
+project data.
 
 ## Plan and execute
 
