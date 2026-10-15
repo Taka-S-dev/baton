@@ -39,7 +39,7 @@ func demoProject(t *testing.T) Model {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	m := Model{width: 100, height: 20, projectDir: dir, projectsDir: filepath.Dir(dir), configFile: "commands.tsv", launchDir: dir}
+	m := Model{width: 100, height: 20, projectDir: dir, projectsDir: filepath.Dir(dir), configFile: "commands.tsv", launchDir: `C:\work\api`}
 	m.config = mdl.Config{Base: []mdl.Command{
 		{Name: "build", Group: "make", Cmd: "go build ./...", Source: "tsv"},
 		{Name: "test", Group: "make", Cmd: "go test ./...", Source: "tsv"},
