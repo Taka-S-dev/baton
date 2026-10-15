@@ -9,11 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/Taka-S-dev/baton/internal/config"
 	mdl "github.com/Taka-S-dev/baton/internal/model"
 	"github.com/Taka-S-dev/baton/internal/projectops"
 	"github.com/Taka-S-dev/baton/internal/slot"
-	"github.com/Taka-S-dev/baton/internal/store"
 )
 
 // ── Manage menu (Create / Edit / Delete) ──────────────────────────────────────
@@ -180,7 +178,7 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 	if cf.tsvEdit {
 		newCmd := m.config.Base[cf.editIdx] // keeps Slots and Source
 		newCmd.Name, newCmd.Cmd, newCmd.Dir, newCmd.Group, newCmd.Shell = name, cmdStr, cf.fields[2], cf.fields[3], shell
-		if file, err := config.UpdateCommandTSV(m.projectDir, cf.origName, newCmd); err != nil {
+		if file, err := m.updateCommandTSV(cf.origName, newCmd); err != nil {
 			m.errMsg = "failed to save: " + err.Error()
 			return m, nil
 		} else {
@@ -208,7 +206,7 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		}
 		err := m.saveConfig()
 		if err == nil && wfSteps > 0 {
-			err = store.SaveWorkflows(m.projectDir, m.workflows)
+			err = m.saveWorkflows()
 		}
 		if err != nil {
 			m.errMsg = "failed to save: " + err.Error()
@@ -235,7 +233,7 @@ func (m *Model) saveCommandForm() (tea.Model, tea.Cmd) {
 		// the next load set it.
 		Source: "tsv",
 	}
-	if file, err := config.AppendCommandTSV(m.projectDir, newCmd); err != nil {
+	if file, err := m.appendCommandTSV(newCmd); err != nil {
 		m.errMsg = "failed to save: " + err.Error()
 		return m, nil
 	} else {
@@ -601,7 +599,7 @@ func (m *Model) retargetCommandRefs(oldName, newName string) (wfSteps, tplRefs, 
 func (m *Model) persistRetargetedRefs(oldName, newName string) error {
 	wfSteps, tplRefs, varKeys := m.retargetCommandRefs(oldName, newName)
 	if wfSteps > 0 {
-		if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
+		if err := m.saveWorkflows(); err != nil {
 			return err
 		}
 	}
@@ -612,7 +610,7 @@ func (m *Model) persistRetargetedRefs(oldName, newName string) error {
 			return err
 		}
 	} else if varKeys > 0 {
-		if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+		if err := m.saveVars(); err != nil {
 			return err
 		}
 	}
@@ -655,7 +653,7 @@ func (m Model) renameCommand(name string) (tea.Model, tea.Cmd) {
 	wfSteps, tplRefs, _ := m.retargetCommandRefs(oldName, name)
 	err := m.saveConfig()
 	if err == nil && wfSteps > 0 {
-		err = store.SaveWorkflows(m.projectDir, m.workflows)
+		err = m.saveWorkflows()
 	}
 	if err != nil {
 		m.errMsg = "failed to save: " + err.Error()
@@ -812,7 +810,7 @@ func (m *Model) updateEditCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		err := m.saveConfig()
 		if err == nil && wfSteps > 0 {
-			err = store.SaveWorkflows(m.projectDir, m.workflows)
+			err = m.saveWorkflows()
 		}
 		if err != nil {
 			m.errMsg = "failed to save: " + err.Error()
@@ -855,7 +853,7 @@ func (m *Model) updateDeleteCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			err := m.saveConfig()
 			if err == nil && len(tsvNames) > 0 {
-				_, err = config.DeleteCommandsTSV(m.projectDir, tsvNames)
+				err = m.deleteCommandsTSV(tsvNames)
 			}
 			if err != nil {
 				m.errMsg = "failed to save: " + err.Error()

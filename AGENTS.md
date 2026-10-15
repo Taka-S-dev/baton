@@ -14,7 +14,8 @@ Run `baton api schema` for discovery. Start with
 `dry_run: true`, then commit with the original revision. The API may update
 app-owned files through baton; agents must still never write those files directly.
 Command renames update references; referenced deletions and invalid batches are
-rejected. TUI sessions must be closed before API writes or execution.
+rejected. A TUI may stay open: its saves and API writes take turns on the
+project lock, and a TUI save refuses when the files changed underneath it.
 `.baton-lock` and `.baton-transaction.json` are also app-owned. Never edit the
 transaction journal; use `project.recover` after an interrupted transaction.
 

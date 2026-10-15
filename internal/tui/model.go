@@ -437,6 +437,7 @@ type Model struct {
 	projectCmdCounts map[string]int
 
 	projectDir string
+	revision   string // definition files as opened; see commit
 	configFile string
 	config     mdl.Config
 	workflows  []mdl.Workflow
@@ -685,6 +686,7 @@ func (m *Model) loadProject(projectDir string) error {
 	m.workflows = p.Workflows
 	m.lists = p.Lists
 	m.vars = p.Vars
+	m.revision = revisionOf(projectDir)
 	m.lastWorkflow = store.LoadLastWorkflow(projectDir)
 	m.loadWarnings = p.Warnings
 	m.snapOld = config.LoadSnapshot(projectDir)
@@ -741,11 +743,13 @@ func (m *Model) writeSnapshot() {
 
 // saveConfig persists user commands to commands.local.json.
 func (m *Model) saveConfig() error {
-	vars, err := projectops.SaveConfig(m.projectDir, m.config, m.vars)
-	if err == nil {
-		m.vars = vars
-	}
-	return err
+	return m.commit(func() error {
+		vars, err := projectops.SaveConfig(m.projectDir, m.config, m.vars)
+		if err == nil {
+			m.vars = vars
+		}
+		return err
+	})
 }
 
 // gotoManageLists opens the Manage lists submenu.

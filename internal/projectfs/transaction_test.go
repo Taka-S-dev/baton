@@ -62,3 +62,15 @@ func TestCommitConflictAndRecoveryConflict(t *testing.T) {
 		t.Fatal("lost external edit")
 	}
 }
+
+func TestRevisionIgnoresBookkeepingFiles(t *testing.T) {
+	a := Files{"commands.tsv": []byte("x"), ".last_workflow": []byte("ship"), ".command_names": []byte("a")}
+	b := Files{"commands.tsv": []byte("x"), ".last_workflow": []byte("build"), ".command_names": []byte("b")}
+	c := Files{"commands.tsv": []byte("y"), ".last_workflow": []byte("ship")}
+	if Revision(a) != Revision(b) {
+		t.Fatal("bookkeeping files changed the revision")
+	}
+	if Revision(a) == Revision(c) {
+		t.Fatal("a definition change kept the revision")
+	}
+}

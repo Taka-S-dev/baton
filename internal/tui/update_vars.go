@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -250,7 +249,7 @@ func (m Model) saveVar(value string) (tea.Model, tea.Cmd) {
 	}
 	oldValue, existed := m.vars[ve.name]
 	m.vars[ve.name] = value
-	if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+	if err := m.saveVars(); err != nil {
 		if existed {
 			m.vars[ve.name] = oldValue
 		} else {
@@ -322,7 +321,7 @@ func (m Model) updateDeleteVars(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// run time again.
 				m.syncScopedVar(names[i], "", true)
 			}
-			if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+			if err := m.saveVars(); err != nil {
 				m.errMsg = "failed to save vars.tsv: " + err.Error()
 				return
 			}
@@ -520,13 +519,12 @@ func (m Model) applyVarRebase() (tea.Model, tea.Cmd) {
 		applied++
 	}
 	if varsChanged {
-		if err := slot.SaveVars(m.projectDir, m.vars); err != nil {
+		if err := m.saveVars(); err != nil {
 			m.errMsg = "failed to save vars.tsv: " + err.Error()
 		}
 	}
-	listsDir := filepath.Join(m.projectDir, "lists")
 	for ln := range changedLists {
-		if err := slot.SaveList(listsDir, ln, m.lists[ln]); err != nil {
+		if err := m.saveList(ln, m.lists[ln]); err != nil {
 			m.errMsg = "failed to save list \"" + ln + "\": " + err.Error()
 		}
 	}

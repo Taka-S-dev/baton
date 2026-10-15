@@ -81,9 +81,16 @@ func Read(dir string) (Files, error) {
 	return out, nil
 }
 
+// Revision hashes the definition files. .last_workflow and .command_names
+// are bookkeeping the TUI rewrites on its own, so they are left out: a
+// running TUI must not make an agent's edit conflict, or the other way
+// round.
 func Revision(files Files) string {
 	keys := make([]string, 0, len(files))
 	for k := range files {
+		if k == ".last_workflow" || k == ".command_names" {
+			continue
+		}
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

@@ -273,8 +273,9 @@ func (s Service) handle(r Request) (any, error) {
 		}
 		return plan, nil
 	}
-	// TUI holds the same root lock for its lifetime, so background agent writes
-	// cannot be overwritten by a stale form in a running TUI.
+	// The root lock serializes project creation and deletion with every
+	// write; the project lock serializes the writers of one project, the
+	// TUI's saves included.
 	releaseRoot, err := projectfs.Lock(s.ProjectsDir)
 	if err != nil {
 		return nil, err
@@ -317,7 +318,7 @@ func (s Service) handle(r Request) (any, error) {
 		if err = os.MkdirAll(filepath.Dir(trash), 0700); err != nil {
 			return nil, err
 		}
-		release() // the root lock still excludes TUI and agent operations
+		release() // the root lock still excludes the other writers
 		if err = os.Rename(dir, trash); err != nil {
 			return nil, err
 		}

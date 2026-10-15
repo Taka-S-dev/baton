@@ -35,7 +35,7 @@ func errorRecovery() map[string]string {
 		"conflict":          "Read project.get again and reconsider the diff. For execution, repeat run.plan with identical inputs and use its new token. Do not blindly resubmit writes.",
 		"referenced":        "Inspect data.references from project.get. Update/delete the listed dependents first in the same apply batch.",
 		"validation_failed": "Inspect the error and project.check diagnostics; correct definitions before retrying.",
-		"busy":              "A TUI/API writer is active. Wait or close TUI before retrying; never remove a live process lock.",
+		"busy":              "Another baton is writing to or running this project. Wait and retry; never remove a live process lock.",
 		"invalid_request":   "Check schema examples and required_operation_fields. Updates replace definitions; use explicit {} or [] when clearing.",
 		"not_found":         "Read project.list/project.get and use an existing name.",
 		"execution_failed":  "Inspect data.results; execution stops at the first failure. Do not automatically repeat already-completed commands.",

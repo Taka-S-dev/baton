@@ -2,8 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -11,7 +9,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	mdl "github.com/Taka-S-dev/baton/internal/model"
-	"github.com/Taka-S-dev/baton/internal/slot"
 )
 
 // ── Name input ────────────────────────────────────────────────────────────────
@@ -174,11 +171,10 @@ func (m Model) updateDeleteLists(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.updateDeleteList(msg, len(m.listItems), nil,
 		m.gotoManageLists,
 		func(indices []int) {
-			listsDir := filepath.Join(m.projectDir, "lists")
 			failed := false
 			for _, i := range indices {
 				name := names[i]
-				if err := os.Remove(filepath.Join(listsDir, name+".tsv")); err != nil {
+				if err := m.removeList(name); err != nil {
 					m.errMsg = "failed to delete list: " + err.Error()
 					failed = true
 				}
@@ -203,8 +199,7 @@ func (m Model) saveNewList(name string) (tea.Model, tea.Cmd) {
 		m.nameInputErr = "name already in use: " + name
 		return m, nil
 	}
-	listsDir := filepath.Join(m.projectDir, "lists")
-	if err := slot.SaveList(listsDir, name, nil); err != nil {
+	if err := m.saveList(name, nil); err != nil {
 		m.errMsg = "failed to create list: " + err.Error()
 		return m, nil
 	} else {
@@ -245,8 +240,7 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Value: le.editValTI.Value(),
 				Label: le.editLblTI.Value(),
 			}
-			listsDir := filepath.Join(m.projectDir, "lists")
-			if err := slot.SaveList(listsDir, le.name, le.entries); err != nil {
+			if err := m.saveList(le.name, le.entries); err != nil {
 				m.errMsg = "failed to save list: " + err.Error()
 				le.entries[le.cursor] = oldEntry
 				return m, nil
@@ -287,8 +281,7 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				le.entries = append(le.entries, mdl.ListEntry{Value: le.addVal, Label: le.addLbl})
-				listsDir := filepath.Join(m.projectDir, "lists")
-				if err := slot.SaveList(listsDir, le.name, le.entries); err != nil {
+				if err := m.saveList(le.name, le.entries); err != nil {
 					le.entries = le.entries[:len(le.entries)-1]
 					m.errMsg = "failed to save list: " + err.Error()
 					return m, nil
@@ -350,8 +343,7 @@ func (m Model) updateEditList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if le.cursor >= len(le.entries) && le.cursor > 0 {
 				le.cursor--
 			}
-			listsDir := filepath.Join(m.projectDir, "lists")
-			if err := slot.SaveList(listsDir, le.name, le.entries); err != nil {
+			if err := m.saveList(le.name, le.entries); err != nil {
 				m.errMsg = "failed to save list: " + err.Error()
 			}
 			m.lists[le.name] = append([]mdl.ListEntry{}, le.entries...)

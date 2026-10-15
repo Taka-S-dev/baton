@@ -4,9 +4,6 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/Taka-S-dev/baton/internal/slot"
-	"github.com/Taka-S-dev/baton/internal/store"
 )
 
 // ── Rename repair ─────────────────────────────────────────────────────────────
@@ -50,14 +47,14 @@ func (m *Model) applyRenames() {
 	}
 	var err error
 	if wfSteps > 0 {
-		err = store.SaveWorkflows(m.projectDir, m.workflows)
+		err = m.saveWorkflows()
 	}
 	if err == nil && tplRefs > 0 {
 		// saveConfig persists the moved template references and, via its
 		// vars mirror, the re-keyed scoped values in one pass.
 		err = m.saveConfig()
 	} else if err == nil && varKeys > 0 {
-		err = slot.SaveVars(m.projectDir, m.vars)
+		err = m.saveVars()
 	}
 	count := len(m.renames)
 	m.renames = nil

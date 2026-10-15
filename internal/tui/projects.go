@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Taka-S-dev/baton/internal/config"
+	"github.com/Taka-S-dev/baton/internal/projectfs"
 	"github.com/Taka-S-dev/baton/internal/store"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
@@ -84,11 +85,18 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if key == "enter" {
 			path, err := projectPath(m.projectsDir, m.projectInput)
+			var release func()
+			if err == nil {
+				release, err = projectfs.Lock(m.projectsDir)
+			}
 			if err == nil {
 				err = os.Mkdir(path, 0755)
 			}
 			if err == nil {
 				err = os.WriteFile(filepath.Join(path, "commands.tsv"), []byte("name\tgroup\tworkdir\tcmd\tshell\tslots\n"), 0644)
+			}
+			if release != nil {
+				release()
 			}
 			if err != nil {
 				m.errMsg = err.Error()
@@ -125,6 +133,10 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if key == "y" {
 			path, err := projectPath(m.projectsDir, m.projectInput)
+			var release func()
+			if err == nil {
+				release, err = projectfs.Lock(m.projectsDir)
+			}
 			if err == nil {
 				var info os.FileInfo
 				info, err = os.Lstat(path)
@@ -145,6 +157,9 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			if err == nil {
 				err = os.Rename(path, filepath.Join(trash, m.projectInput+"-"+time.Now().Format("20060102-150405.000000000")))
+			}
+			if release != nil {
+				release()
 			}
 			if err != nil {
 				m.errMsg = err.Error()

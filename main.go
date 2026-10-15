@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Taka-S-dev/baton/internal/config"
-	"github.com/Taka-S-dev/baton/internal/projectfs"
 	"github.com/Taka-S-dev/baton/internal/tui"
 )
 
@@ -93,12 +92,6 @@ func runTUI(opts launchOptions) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	release, err := projectfs.Lock(projectsDir)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	defer release()
 	var m tui.Model
 	if opts.recent {
 		m, err = tui.NewRecent(opts.dryRun)

@@ -39,11 +39,12 @@ remaining input definitions, diagnostics and a `revision` hash.
 Derived commands include their saved inputs in `values`.
 `project.check` returns the same state and diagnostics without writing.
 
-Inspection and run planning are available while the TUI is open.
-Close TUI sessions before API edits/execution: TUI and API writers share an
-exclusive projects-directory lock, preventing an open stale form from
-overwriting agent changes. Raw editors do not honor this lock; do not edit
-project files concurrently. The API also rechecks the revision before commit.
+Inspection and run planning never wait. Edits and execution hold the
+project's lock while they run, and so does every TUI save, so writers take
+turns and the TUI may stay open. The API rechecks the revision before commit,
+and a TUI save refuses when the files changed since the project was opened,
+so neither side overwrites the other's edits. Raw editors honor none of
+this; do not edit project files concurrently.
 
 ## Apply
 

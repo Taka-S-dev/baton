@@ -4,8 +4,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/Taka-S-dev/baton/internal/store"
 )
 
 // A workflow is edited in the box beside the list as the ordered steps
@@ -149,7 +147,7 @@ func (m *Model) saveWorkflowSteps() tea.Cmd {
 	}
 	original := m.workflows[e.idx].Commands
 	m.workflows[e.idx].Commands = append([]string{}, e.steps...)
-	if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
+	if err := m.saveWorkflows(); err != nil {
 		m.workflows[e.idx].Commands = original
 		m.errMsg = "failed to save: " + err.Error()
 		return nil

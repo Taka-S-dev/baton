@@ -99,11 +99,12 @@ A failed step stops the sequence. Do not blindly repeat completed commands.
 | `referenced` | Inspect references, then explicitly update dependents. |
 | `invalid_request` | Check examples and required fields from schema. |
 | `validation_failed` | Fix reported definitions; use project.check. |
-| `busy` | Close the TUI or wait for another API writer. Do not force-unlock. |
+| `busy` | Another baton is writing to or running the project. Wait and retry; do not force-unlock. |
 | `execution_failed` | Inspect per-step results; decide what to retry. |
 | `recovery_required` | Use project.recover; retain external-conflict journals. |
 
-TUI-open read/plan calls work; writes/execution require TUI to be closed.
+The TUI may stay open: its saves and API writes take turns on the project
+lock, and a TUI save refuses when the files changed underneath it.
 Interactive commands need the TUI: the API closes stdin.
 See [the full API reference](agent-api.md) for project deletion, timeouts,
 output limits, recovery, and storage ownership.

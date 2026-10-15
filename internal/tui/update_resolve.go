@@ -223,7 +223,7 @@ func (m Model) updateMultiSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.openNameInput(nameInputWorkflow)
 		case ScreenEditWorkflowCommands:
 			m.workflows[m.editTargetIdx].Commands = names
-			if err := store.SaveWorkflows(m.projectDir, m.workflows); err != nil {
+			if err := m.saveWorkflows(); err != nil {
 				m.errMsg = "failed to save workflows: " + err.Error()
 			} else {
 				m.successMsg = "updated workflow \"" + m.workflows[m.editTargetIdx].Name + "\""
