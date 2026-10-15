@@ -16,6 +16,7 @@ import (
 
 	"github.com/Taka-S-dev/baton/internal/config"
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/projectops"
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/Taka-S-dev/baton/internal/store"
 )
@@ -740,42 +741,11 @@ func (m *Model) writeSnapshot() {
 
 // saveConfig persists user commands to commands.local.json.
 func (m *Model) saveConfig() error {
-	vars := make(map[string]string, len(m.vars))
-	for k, v := range m.vars {
-		vars[k] = v
+	vars, err := projectops.SaveConfig(m.projectDir, m.config, m.vars)
+	if err == nil {
+		m.vars = vars
 	}
-	// Mirror every template-derived command's fixed values into vars.tsv
-	// ("command.slot" names), drop entries for commands that no longer
-	// exist, and persist the local layer without the values — vars.tsv is
-	// their single editable home.
-	for _, c := range m.config.Commands {
-		if c.Template != "" {
-			slot.SetCommandValues(vars, c.Name, c.Values)
-		}
-	}
-	slot.PruneCommandValues(vars, func(name string) bool {
-		_, ok := m.config.FindCommand(name)
-		return ok
-	})
-	// Template-derived entries persist only their identity: cmd/workdir/
-	// slots/values are all recomputed from template + vars.tsv on load,
-	// and a baked copy in the file just looks editable without being so.
-	stripped := m.config
-	stripped.Commands = make([]mdl.Command, len(m.config.Commands))
-	copy(stripped.Commands, m.config.Commands)
-	for i := range stripped.Commands {
-		if stripped.Commands[i].Template != "" {
-			stripped.Commands[i].Values = nil
-			stripped.Commands[i].Cmd = ""
-			stripped.Commands[i].Dir = ""
-			stripped.Commands[i].Slots = nil
-		}
-	}
-	if err := store.SaveConfigWithVars(m.projectDir, stripped, vars); err != nil {
-		return err
-	}
-	m.vars = vars
-	return nil
+	return err
 }
 
 // gotoManageLists opens the Manage lists submenu.

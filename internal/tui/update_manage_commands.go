@@ -11,6 +11,7 @@ import (
 
 	"github.com/Taka-S-dev/baton/internal/config"
 	mdl "github.com/Taka-S-dev/baton/internal/model"
+	"github.com/Taka-S-dev/baton/internal/projectops"
 	"github.com/Taka-S-dev/baton/internal/slot"
 	"github.com/Taka-S-dev/baton/internal/store"
 )
@@ -590,35 +591,7 @@ func (m *Model) updateEditCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // commands, and scoped vars.tsv keys. It only mutates memory — callers
 // persist the files whose returned count is non-zero.
 func (m *Model) retargetCommandRefs(oldName, newName string) (wfSteps, tplRefs, varKeys int) {
-	for wi := range m.workflows {
-		for si, step := range m.workflows[wi].Commands {
-			if step == oldName {
-				m.workflows[wi].Commands[si] = newName
-				wfSteps++
-			}
-		}
-	}
-	for i := range m.config.Commands {
-		if m.config.Commands[i].Template == oldName {
-			m.config.Commands[i].Template = newName
-			tplRefs++
-		}
-	}
-	// Scoped keys are "command.slot" with the separator on the last dot;
-	// a key re-keys only when the suffix after oldName is a single segment.
-	prefix := oldName + "."
-	var moved []string
-	for k := range m.vars {
-		if strings.HasPrefix(k, prefix) && !strings.Contains(k[len(prefix):], ".") {
-			moved = append(moved, k)
-		}
-	}
-	for _, k := range moved {
-		m.vars[newName+"."+k[len(prefix):]] = m.vars[k]
-		delete(m.vars, k)
-		varKeys++
-	}
-	return wfSteps, tplRefs, varKeys
+	return projectops.RetargetCommandRefs(&m.config, m.workflows, m.vars, oldName, newName)
 }
 
 // persistRetargetedRefs retargets references after a rename outside the
