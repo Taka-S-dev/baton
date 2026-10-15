@@ -20,7 +20,7 @@ func TestRunDetailPopupClickAndDismiss(t *testing.T) {
 		m.runQueueFocused = false
 		a := m.runScrollAreas()[0]
 		click := func(x, y int) {
-			m = exploreModel(exploreFirst(m.Update(tea.MouseMsg{X: x, Y: y + 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})))
+			m = exploreModel(exploreFirst(m.Update(tea.MouseMsg{X: x, Y: y + m.runHeaderRows(), Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})))
 		}
 		click(a.x+3, a.y)
 		if !m.runQueueFocused || m.runDetailOpen {

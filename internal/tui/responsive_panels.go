@@ -44,9 +44,13 @@ func (m Model) shortRunQueue(w int) string {
 		lines = append(lines, line)
 	}
 	if n == 0 {
-		lines = append(lines, gray("Tab: add commands in execution order"))
+		lines = append(lines, gray("Tab: add commands"))
 	}
-	return accentBold(title) + "\n" + scrollRows(lines, start, rows, w)
+	heading := white(title)
+	if m.runQueueFocused {
+		heading = accentBold(title)
+	}
+	return heading + "\n" + scrollRows(lines, start, rows, w)
 }
 
 func (m Model) shortWorkflowSteps(w int, hitRow ...func(int, int)) string {

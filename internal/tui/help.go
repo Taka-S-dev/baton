@@ -136,7 +136,7 @@ func (m Model) helpLines(w int) []string {
 		"Variable: shared constant substituted as {$name} in commands and list values.",
 		"Fixed values: saved slot answers owned by a command. A fixed answer skips the run-time prompt; edit via Change values.",
 		"", "Navigation",
-		"1 Workflows · 2 Commands · 3 Lists · 4 Variables (Project editor)",
+		"1 Workflows · 2 Commands · 3 Lists · 4 Variables (Edit project)",
 		"Space / right-click: actions for the selected item.",
 		"Command actions include links to referenced lists and variables.",
 		"Esc returns from a related item, preserving your previous selection.",

@@ -27,13 +27,20 @@ func (m Model) viewRunWorkflow(w int, searchRow ...func(int)) string {
 	if len(list) == 0 {
 		list = []string{"No workflows."}
 	}
-	left := box("Run workflow", m.runSearchView(m.wfSearchTI)+"\n"+scrollRows(list, a.offset, a.rows, a.width), a.width+2, m.termHeight()-1, true)
+	left := box("Run workflow", m.runSearchView(m.wfSearchTI)+"\n"+scrollRows(list, a.offset, a.rows, a.width), a.width+2, m.workflowBodyHeight(), true)
 	body := left
 	if len(areas) > 1 {
 		d := areas[1]
 		lines, _ := m.workflowDetailLines(d.width - 1)
-		right := box("Execution steps", scrollRows(lines, d.offset, d.rows, d.width), d.width+2, m.termHeight()-1, false)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, left, m.runDivider(m.termHeight()-1), right)
+		title := "Execution steps"
+		if m.listCursor >= 0 && m.listCursor < len(f) {
+			title += " · " + m.workflows[f[m.listCursor]].Name
+		}
+		right := box(title, scrollRows(lines, d.offset, d.rows, d.width), d.width+2, m.workflowBodyHeight(), false)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, left, m.runDivider(m.workflowBodyHeight()), right)
+	}
+	if m.hideWorkspaceHints() {
+		return body
 	}
 	return body + "\n" + gray(truncate(m.runHomeKeys(), w))
 }

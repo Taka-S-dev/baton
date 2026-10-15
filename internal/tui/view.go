@@ -701,7 +701,7 @@ func (m Model) rows() int {
 func (m Model) termHeight() int {
 	reserved := 0
 	if m.runHomeVisible() {
-		reserved = 1
+		reserved = m.runHeaderRows()
 	}
 	return max(1, m.rows()-m.bannerRows-reserved)
 }

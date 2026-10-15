@@ -1,29 +1,23 @@
 package tui
 
-import (
-	"strings"
-
-	"github.com/charmbracelet/x/ansi"
-)
+import "strings"
 
 const exploreBackLabel = "[← Back]"
 
-func (m Model) exploreBackRow() int {
-	if m.termHeight() < 12 {
-		return 0
+func (m Model) exploreBackText() string {
+	if m.runHome.ready && m.exploreListFocused() && !m.exploreSearching && m.exploreSearch == "" && len(m.exploreHistory) == 0 {
+		return "[← Back to Run]"
 	}
-	return 1
+	return exploreBackLabel
 }
-
 func (m Model) writeExploreHeading(b *strings.Builder, w int) {
-	var original strings.Builder
-	m.writeHeading(&original, m.exploreTitle(), w)
-	lines := strings.Split(original.String(), "\n")
-	row := m.exploreBackRow()
-	lines[row] = ansi.Truncate("  "+gray(exploreBackLabel)+"  "+accentBold(m.exploreTitle()), w, "…")
-	b.WriteString(strings.Join(lines, "\n"))
+	line, _ := workspaceHeading(m.exploreTitle(), m.exploreBackText(), w)
+	b.WriteString(line + "\n")
+	if m.workspaceTabRow() == 2 {
+		b.WriteString(hline(w) + "\n")
+	}
 }
-
 func (m Model) exploreBackHit(x, y int) bool {
-	return m.viewWidth() >= 10 && y == m.exploreBackRow() && x >= 2 && x < 2+ansi.StringWidth(exploreBackLabel)
+	_, start := workspaceHeading(m.exploreTitle(), m.exploreBackText(), m.viewWidth())
+	return start >= 0 && y == 0 && x >= start && x < m.viewWidth()-2
 }

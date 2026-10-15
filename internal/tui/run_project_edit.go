@@ -21,6 +21,9 @@ func (m Model) candidateHeading(title string, w int) (string, int) {
 }
 
 func (m Model) writeCandidateHeading(b *strings.Builder, title string, w int) {
+	if m.runHomeVisible() {
+		return
+	}
 	var original strings.Builder
 	m.writeHeading(&original, title, w)
 	lines := strings.Split(original.String(), "\n")
@@ -33,7 +36,7 @@ func (m Model) writeCandidateHeading(b *strings.Builder, title string, w int) {
 }
 
 func (m Model) runProjectEditHit(x, y int) bool {
-	if m.runDetailOpen {
+	if m.runHomeVisible() || m.runDetailOpen {
 		return false
 	}
 	w := m.viewWidth()

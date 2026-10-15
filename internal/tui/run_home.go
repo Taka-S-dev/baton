@@ -179,13 +179,13 @@ type runHomeAction struct {
 
 func (m Model) runHomeLayout(w int) (string, []runHomeAction) {
 	labels := []string{"[1 Workflows]", "[2 Commands]"}
-	text := ""
-	col := 0
+	text := "  "
+	col := 2
 	var actions []runHomeAction
 	for i, label := range labels {
 		if i > 0 {
-			text += " "
-			col++
+			text += "  "
+			col += 2
 		}
 		end := col + lipgloss.Width(label)
 		if end > w {
@@ -198,9 +198,6 @@ func (m Model) runHomeLayout(w int) (string, []runHomeAction) {
 		}
 		actions = append(actions, runHomeAction{i, col, end})
 		col = end
-	}
-	if name := filepath.Base(m.projectDir); m.projectDir != "" && w-col > 5 {
-		text += gray(" · " + ansi.Truncate(name, w-col-3, "…"))
 	}
 	return text, actions
 }
@@ -229,7 +226,20 @@ func (m Model) runHomeKeys() string {
 }
 
 func (m Model) runHomeHeader(w int) string {
-	text, _ := m.runHomeLayout(w)
+	tabs, _ := m.runHomeLayout(w)
+	title := "Run"
+	if m.projectDir != "" {
+		title += " · " + filepath.Base(m.projectDir)
+	}
+	heading, _ := workspaceHeading(title, runProjectEditLabel, w)
+	text := heading + "\n"
+	if m.workspaceTabRow() == 2 {
+		text += hline(w) + "\n"
+	}
+	text += tabs
+	if m.runHeaderRows() == 4 {
+		text += "\n"
+	}
 	return text
 }
 
@@ -237,7 +247,7 @@ func (m Model) runHomeHeader(w int) string {
 func (m Model) updateFrame(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.runHomeVisible() && !m.helpOpen && !m.msEscArmed && !m.pasteMenu && m.leaveAsk == leaveNone {
 		if mouse, ok := msg.(tea.MouseMsg); ok {
-			mouse.Y--
+			mouse.Y -= m.runHeaderRows()
 			if m.handleRunDivider(mouse) {
 				return m, nil
 			}
@@ -285,7 +295,7 @@ func (m Model) updateFrame(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if mouse, ok := msg.(tea.MouseMsg); ok {
 			if m.runHomeVisible() {
-				mouse.Y--
+				mouse.Y -= m.runHeaderRows()
 			}
 			p := m.runDetailPopup()
 			if m.runScrollDrag == 0 && mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft && (mouse.X < p.x || mouse.X >= p.x+p.w || mouse.Y < p.y || mouse.Y >= p.y+p.h) {
@@ -348,12 +358,18 @@ func (m Model) updateFrame(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if mouse, ok := msg.(tea.MouseMsg); ok {
 			if m.runScrollDrag != 0 {
-				mouse.Y--
+				mouse.Y -= m.runHeaderRows()
 				m.handleRunScrollMouse(mouse)
 				return m, nil
 			}
-			if mouse.Y == 0 {
-				if mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
+			if mouse.Y < m.runHeaderRows() {
+				if mouse.Y == 0 && mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
+					_, start := workspaceHeading("Run", runProjectEditLabel, m.viewWidth())
+					if start >= 0 && mouse.X >= start && mouse.X < start+len(runProjectEditLabel) {
+						return m.editFromRunHome()
+					}
+				}
+				if mouse.Y == m.workspaceTabRow() && mouse.Action == tea.MouseActionPress && mouse.Button == tea.MouseButtonLeft {
 					_, actions := m.runHomeLayout(m.viewWidth())
 					for _, action := range actions {
 						if mouse.X < action.start || mouse.X >= action.end {
@@ -369,7 +385,7 @@ func (m Model) updateFrame(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			mouse.Y--
+			mouse.Y -= m.runHeaderRows()
 			if mouse.Button == tea.MouseButtonLeft && mouse.Action == tea.MouseActionPress && m.runSearchHit(mouse.X, mouse.Y) {
 				m.runQueueFocused = false
 				m.stepsFocused = false

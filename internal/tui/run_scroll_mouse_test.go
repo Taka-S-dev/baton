@@ -19,7 +19,7 @@ func TestRunMouseScrolling(t *testing.T) {
 		}
 		send := func(x, y int, b tea.MouseButton, a tea.MouseAction) {
 			t.Helper()
-			next, _ := m.Update(tea.MouseMsg{X: x, Y: y + 1, Button: b, Action: a})
+			next, _ := m.Update(tea.MouseMsg{X: x, Y: y + m.runHeaderRows(), Button: b, Action: a})
 			m = next.(Model)
 		}
 		area := m.runScrollAreas()[0]

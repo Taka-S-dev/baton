@@ -17,7 +17,7 @@ func TestRunDividerBothTabs(t *testing.T) {
 			m.msSelected = []int{2, 0}
 			initial := m.runLeftWidth(140)
 			send := func(x, y int, b tea.MouseButton, a tea.MouseAction) {
-				m = exploreModel(exploreFirst(m.Update(tea.MouseMsg{X: x, Y: y + 1, Button: b, Action: a})))
+				m = exploreModel(exploreFirst(m.Update(tea.MouseMsg{X: x, Y: y + m.runHeaderRows(), Button: b, Action: a})))
 			}
 			send(initial, 3, tea.MouseButtonLeft, tea.MouseActionPress)
 			send(80, 3, tea.MouseButtonLeft, tea.MouseActionMotion)

@@ -14,10 +14,14 @@ func (m Model) viewCompactCandidates(w int, hitRow ...func(int, int)) string {
 		title = "Edit commands"
 	}
 
-	rows := max(1, m.termHeight()-2)
+	headingRows := 2
+	if m.runHomeVisible() {
+		headingRows = 1
+	}
+	rows := max(1, m.termHeight()-headingRows)
 	start := m.candidateStart(rows, len(filtered))
 	for _, hit := range hitRow {
-		hit(-2, 1)
+		hit(-2, headingRows-1)
 	}
 	search := m.commandSearchLine(w, len(filtered))
 	heading, buttonStart := m.candidateHeading(title, w)
@@ -25,6 +29,9 @@ func (m Model) viewCompactCandidates(w int, hitRow ...func(int, int)) string {
 		heading = white(ansi.Truncate(title+fmt.Sprintf(" · %d selected", len(m.msSelected)), w, "…"))
 	}
 	lines := []string{heading, ansi.Truncate(search, w, "…")}
+	if m.runHomeVisible() {
+		lines = lines[1:]
+	}
 	terms := strings.Fields(m.msSearchTI.Value())
 	for row := 0; row < rows; row++ {
 		i := start + row

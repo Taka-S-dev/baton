@@ -266,7 +266,7 @@ func countLabel(n int, unit string) string {
 // with the form open on the right, the list still fills the left, and
 // nothing else would say a command is half-written.
 func (m Model) exploreTitle() string {
-	title := "Project editor"
+	title := "Edit project"
 	if m.projectDir != "" {
 		title += " · " + filepath.Base(filepath.Clean(m.projectDir))
 	}
@@ -322,7 +322,7 @@ func (m Model) exploreLayout(w int) exploreLayout {
 	m.bannerRows = len(m.bannerLines())
 
 	var b strings.Builder
-	m.writeHeading(&b, m.exploreTitle(), w)
+	m.writeExploreHeading(&b, w)
 	l := exploreLayout{addY: -1, tabY: strings.Count(b.String(), "\n")}
 
 	gap := 1
@@ -331,6 +331,9 @@ func (m Model) exploreLayout(w int) exploreLayout {
 	}
 	l.bodyY = l.tabY + 1 + gap
 	l.bodyH = m.termHeight() - l.bodyY - 2 - gap
+	if m.hideWorkspaceHints() {
+		l.bodyH += 2 + gap
+	}
 	l.plain = l.bodyH < 5
 	l.single = w < exploreMinList+exploreMinRight+1 || l.bodyH < 9
 

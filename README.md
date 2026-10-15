@@ -19,7 +19,10 @@ Linux and macOS behave the same.
 ![Pick two commands, answer a placeholder, review the run](docs/demo.gif)
 
 ```
-[1 Workflows] [2 Commands] · api
+  Run · api                                                 [e Edit]
+  ──────────────────────────────────────────────────────────────────
+  [1 Workflows]  [2 Commands]
+
 Select commands · 2 selected                       │ Run queue · 2 selected
 / Search…                    4/4 · Name ↑ · s Sort │   1. build  $ go build ./...
   [1] build                                        │   2. test  $ go test ./...

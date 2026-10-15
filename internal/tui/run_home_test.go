@@ -108,7 +108,7 @@ func TestRunHomeHeaderMouseAndSize(t *testing.T) {
 			}
 			m = homeKey(m, tea.KeyMsg{Type: tea.KeyEsc})
 			_, actions := m.runHomeLayout(width)
-			next, _ := m.Update(tea.MouseMsg{X: actions[0].start, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+			next, _ := m.Update(tea.MouseMsg{X: actions[0].start, Y: m.workspaceTabRow(), Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
 			if next.(Model).screen != ScreenRunWorkflow {
 				t.Fatal("tab click")
 			}
@@ -128,7 +128,7 @@ func TestRunHomeCandidateMouseOffset(t *testing.T) {
 	if y < 0 {
 		t.Fatal("missing candidate")
 	}
-	next, _ := m.Update(tea.MouseMsg{X: 5, Y: y + 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	next, _ := m.Update(tea.MouseMsg{X: 5, Y: y + m.runHeaderRows(), Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
 	if next.(Model).msCursor != 1 {
 		t.Fatal("header offset selected the wrong row")
 	}
@@ -173,7 +173,7 @@ func TestRunHomeHeaderMatchesEditorVocabulary(t *testing.T) {
 		if strings.Contains(plain, "\n") || ansi.StringWidth(header) > width {
 			t.Fatalf("invalid header: %q", plain)
 		}
-		if len(actions) != 2 || !strings.HasPrefix(plain, "[1 Workflows] [2 Commands]") {
+		if len(actions) != 2 || !strings.HasPrefix(plain, "  [1 Workflows]  [2 Commands]") {
 			t.Fatalf("inconsistent tabs: %q", plain)
 		}
 		if strings.Contains(plain, "Edit") || strings.Contains(plain, "Projects") {

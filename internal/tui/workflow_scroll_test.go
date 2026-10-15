@@ -17,7 +17,7 @@ func TestWorkflowPaneScrolling(t *testing.T) {
 			m.workflows = append(m.workflows, mdl.Workflow{Name: fmt.Sprintf("workflow-%d", i), Commands: strings.Fields(strings.Repeat("build ", 70))})
 		}
 		send := func(x, y int, b tea.MouseButton, a tea.MouseAction) {
-			next, _ := m.Update(tea.MouseMsg{X: x, Y: y + 1, Button: b, Action: a})
+			next, _ := m.Update(tea.MouseMsg{X: x, Y: y + m.runHeaderRows(), Button: b, Action: a})
 			m = next.(Model)
 		}
 		for _, area := range m.workflowScrollAreas() {

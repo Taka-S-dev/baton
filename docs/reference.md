@@ -397,12 +397,16 @@ The Run workspace has **Workflows** (`1`) and **Commands** (`2`) tabs. `e` opens
 
 `Del` / `x` asks to delete a project. This moves its baton settings into `.baton-trash` under the projects directory; command working directories are untouched. Restore an archived project by moving its folder back into the projects directory.
 
-### Project editor
+### Edit project
 
-Open **Edit project** for the shared workspace:
+`e` opens **Edit project** under the same header as Run: the title row
+names the workspace and the project, and its right end holds the way
+back; the tab row continues with the editor's own tabs.
 
 ```text
-[1 Workflows] [2 Commands] | [3 Lists] [4 Variables]
+  Edit project · api                                   [← Back to Run]
+  ────────────────────────────────────────────────────────────────────
+  [1 Workflows]  [2 Commands]  │  [3 Lists]  [4 Variables]
 
 Left: items and search       Right: selected item / editor
                             Below: preview and references

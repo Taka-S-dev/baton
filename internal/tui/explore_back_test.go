@@ -12,7 +12,7 @@ func clickExploreBack(t *testing.T, m Model) Model {
 	t.Helper()
 	lines := strings.Split(ansi.Strip(m.View()), "\n")
 	for y, line := range lines {
-		if x := strings.Index(line, exploreBackLabel); x >= 0 {
+		if x := strings.Index(line, m.exploreBackText()); x >= 0 {
 			next, _ := m.Update(tea.MouseMsg{X: ansi.StringWidth(line[:x]) + 2, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
 			return exploreModel(next)
 		}

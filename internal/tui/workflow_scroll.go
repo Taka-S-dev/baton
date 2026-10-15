@@ -14,7 +14,10 @@ func (m Model) workflowDetailLines(w int) ([]string, string) {
 		return []string{"Choose a workflow."}, ""
 	}
 	wf := m.workflows[f[m.listCursor]]
-	text := wf.Name + "\nSaved order · all steps run by default\n\n"
+	text := ""
+	if m.rows()-m.bannerRows >= 20 {
+		text = "Saved order · all steps run by default\n\n"
+	}
 	for i, name := range wf.Commands {
 		body := "not found"
 		if c, ok := m.workflowStepCommand(name); ok {
@@ -25,16 +28,16 @@ func (m Model) workflowDetailLines(w int) ([]string, string) {
 	if len(wf.Commands) == 0 {
 		text += "No steps."
 	}
-	return strings.Split(ansi.Hardwrap(strings.TrimSuffix(text, "\n"), max(1, w), true), "\n"), text
+	return strings.Split(ansi.Hardwrap(strings.TrimSuffix(text, "\n"), max(1, w), true), "\n"), wf.Name + "\n" + text
 }
 
 func (m Model) workflowScrollAreas() []runScrollArea {
-	w, h := m.viewWidth(), m.termHeight()
+	w, h := m.viewWidth(), m.workflowBodyHeight()
 	lw := w
 	if splitPanels(w) {
 		lw = m.runLeftWidth(w)
 	}
-	rows := max(1, h-4)
+	rows := max(1, h-3)
 	n := len(m.wfFiltered())
 	offset := windowStart(rows, n, m.listCursor)
 	if m.wfScrollManual {
@@ -48,7 +51,7 @@ func (m Model) workflowScrollAreas() []runScrollArea {
 		if key == m.wfDetailKey {
 			off = m.wfDetailOffset
 		}
-		rows = max(1, h-3)
+		rows = max(1, h-2)
 		areas = append(areas, runScrollArea{5, lw + 2, 1, rw - 2, rows, len(lines), min(off, max(0, len(lines)-rows))})
 	}
 	return areas

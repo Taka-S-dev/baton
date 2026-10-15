@@ -21,7 +21,7 @@ func TestCandidateScrollPreservesSelection(t *testing.T) {
 		}
 		m.msSelected = []int{4, 2}
 		send := func(x, y int, b tea.MouseButton, a tea.MouseAction) {
-			next, _ := m.Update(tea.MouseMsg{X: x, Y: y + 1, Button: b, Action: a})
+			next, _ := m.Update(tea.MouseMsg{X: x, Y: y + m.runHeaderRows(), Button: b, Action: a})
 			m = next.(Model)
 		}
 		a := m.candidateScrollArea()

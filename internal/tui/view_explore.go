@@ -43,8 +43,10 @@ func (m Model) viewExplore(w int) string {
 	}
 	b.WriteString("\n")
 
-	b.WriteString(gap + hline(w) + "\n")
-	b.WriteString(gray(m.compactFooter(w)) + "\n")
+	if !m.hideWorkspaceHints() {
+		b.WriteString(gap + hline(w) + "\n")
+		b.WriteString(gray(m.compactFooter(w)) + "\n")
+	}
 	view := b.String()
 	if m.exploreMenu {
 		view = m.overlayExploreActions(view, w)
